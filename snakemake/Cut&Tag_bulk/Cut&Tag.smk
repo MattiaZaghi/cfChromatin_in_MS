@@ -1,46 +1,38 @@
 #config
-configfile: "Cut&Tag_bulk/config.yaml"
+configfile: "cfChromatin_in_MS/snakemake/Cut&Tag_bulk/config.yaml"
 
-# ------ sample handling ----------
-# samplesheet file path from config
-#SAMPLESHEET=config["SAMPLESHEET"]
-#PROJECT=config["Project"]
-# read samplesheet skipping header
-#rH = config["skipH"]
-#s=pd.read_csv(SAMPLESHEET, skiprows=rH)
-# sample list
-#SAMPLES_ATAC = s.loc[s['Sample_Project'] == PROJECT].Sample_ID.tolist()
-SAMPLES = "P29054".split()
-MATURE= "P29054".split()
-#PUPS = "P4-K27ac-1 P4-K27ac-2 P4-K27ac-3".split()
-#SAMPLES_BROAD = "IP-meDIP-P4-1 IP-meDIP-P4-2".split()
-#SAMPLES_NARROW = "2m-V5-1 2m-V5-3".split()
-#IGP4="P4-igG".split()
-#IG2M="2M-igG".split()
-#INPUT="Input-meDIP-4P"
-#SAMPLES_ATAC= "".split()
+
+ALL_FILTER_BAM = expand("dedup/{mysample}.bam", sample = ALL_SAMPLES)
+ALL_FLAGSTAT = expand("samtools/dedup/filter/{mysample}.bam.flagstat", sample = ALL_SAMPLES)
+ALL_DOWNSAMPLE_INDEX = expand("04aln_downsample/{sample}-downsample.sorted.bam.bai", sample = ALL_SAMPLES)
+
+ALL_PHATOM = expand("05phantompeakqual/{sample}_phantom.txt", sample = ALL_SAMPLES)
+ALL_BIGWIG = expand("07bigwig/{sample}.bw", sample = ALL_SAMPLES)
+ALL_QC = ["10multiQC/multiQC_log.html"]
+
+TARGETS = []
+TARGETS.extend(ALL_FASTQC)
+TARGETS.extend(ALL_BAM)
+TARGETS.extend(ALL_DOWNSAMPLE_BAM)
+TARGETS.extend(ALL_INDEX)
+TARGETS.extend(ALL_PHATOM)
+TARGETS.extend(ALL_PEAKS)
+TARGETS.extend(ALL_BIGWIG)
+TARGETS.extend(ALL_inputSubtract_BIGWIG)
+TARGETS.extend(ALL_FASTQ)
+TARGETS.extend(ALL_FLAGSTAT)
+TARGETS.extend(ALL_QC)
+TARGETS.extend(ALL_SUPER)
+
+
 
 RUNID = config["RUN_ID"]
 
 ruleorder: fastq_trimming__ > bam__bowtie2 > bam__sorted > bam__markdup > bam__dedup > bam__filter > stat > bam__bigWig > peak_calling_ATAC > Gopeaks_mature > Gopeaks_P4 #> down_sample > downsample_stat > bam__bigWig_downsample > peak_calling_ATAC_downsample > Gopeaks_P4_downsample > Gopeaks_mature_downsample
 
-rule all_done:
-    input:
-        filter = expand("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/{mysample}.bam",mysample=SAMPLES, myrun=RUNID),
-        bw = expand("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/{mysample}_RPKM.bw", mysample=SAMPLES, myrun=RUNID),
-        flagstat = expand("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/{mysample}.bam.flagstat", mysample=SAMPLES, myrun=RUNID),
-        #ratio=expand("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/{mysample}_ratio_RPKM.bw", mysample=SAMPLES, myrun=RUNID),
-        #peak_narrow = expand("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/peaks/{mysample_narrow}_peaks.narrowPeak", mysample_narrow=SAMPLES_NARROW, myrun=RUNID),
-        #downsample_bam= expand("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{mysample}.bam",mysample=SAMPLES, myrun=RUNID),
-        #downsample_flagstat = expand("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{mysample}.bam.flagstat",mysample=SAMPLES, myrun=RUNID),
-        #downsample_bw = expand("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{mysample}_RPKM.bw", mysample=SAMPLES, myrun=RUNID),
-        #downsample_peaks_atac =  expand("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/peaks/SE/{mysample_atac}_peaks.narrowPeak", mysample_atac=SAMPLES_ATAC, myrun=RUNID),
-        #downsample_peaks_pups =  expand("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/peaks/Gopeaks/{pups}_peaks.bed",pups=PUPS, myrun=RUNID),
-        #downsample_peaks_mature =  expand("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/peaks/Gopeaks/{mature}_peaks.bed",mature=MATURE, myrun=RUNID),
-        #peak_broad = expand("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/peaks/{mysample_broad}_peaks.broadPeak", mysample_broad=SAMPLES_BROAD, myrun=RUNID),
-        #peaks_pups = expand("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/peaks/Gopeaks/{pups}_peaks.bed",pups=PUPS, myrun=RUNID),
-        peaks_mature = expand("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/peaks/Gopeaks/{mature}_peaks.bed",mature=MATURE, myrun=RUNID),
-        #peak_atac = expand("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/peaks/SE/{mysample_atac}_peaks.narrowPeak", mysample_atac=SAMPLES_ATAC, myrun=RUNID)
+
+rule all:
+    input: TARGETS
 
 
 rule fastq_trimming__:  
@@ -120,32 +112,6 @@ rule bam__sorted:
         /home/mattia/miniconda3/envs/samtools/bin/samtools index {output.bam} -@ {threads}
         """
 
-rule bam__markdup:
-    input:
-        sorted = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/{mysample}.bam"
-    output:
-        markdup = temp("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/markdup/{mysample}.bam"),
-        bai   = temp("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/markdup/{mysample}.bam.bai"),
-        metrics = temp("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/markdup/{mysample}_markdup_metrics.txt")
-    params:
-        dir = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/markdup",
-        tmp = "/proj/tmp/tmp_MZ/tmp"
-    resources:
-        mem_mb=140000
-    threads: 20
-    conda:
-        "picard"
-    shell:
-        """
-         {params.dir}
-        # mark duplicate
-        /home/mattia/miniconda3/envs/picard/bin/picard MarkDuplicates  I={input.sorted} O={output.markdup} M={output.metrics}    ASSUME_SORTED=coordinate REMOVE_DUPLICATES=false TMP_DIR={params.tmp}
-
-        /home/mattia/miniconda3/envs/samtools/bin/samtools index {output.markdup} -@ {threads}
-        
-        """
-
-
 
 rule bam__dedup:
     input:
@@ -166,7 +132,7 @@ rule bam__dedup:
         """
         mkdir -p {params.dir}
         
-        /home/mattia/miniconda3/envs/picard/bin/picard MarkDuplicates I={input.markdup} O={output.dedup} M={output.metrics} VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=coordinate REMOVE_DUPLICATES=true TMP_DIR={params.tmp}
+        java -Xmx120g -jar /home/mattia/picard.jar MarkDuplicates I={input.markdup} O={output.dedup} M={output.metrics} VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=coordinate REMOVE_DUPLICATES=true TMP_DIR={params.tmp}
         
         /home/mattia/miniconda3/envs/samtools/bin/samtools index {output.dedup} -@ {threads}
         

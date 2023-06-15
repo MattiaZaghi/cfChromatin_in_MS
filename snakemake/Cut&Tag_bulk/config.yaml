@@ -1,0 +1,28 @@
+# proj parameters
+RAWDATA: "/beegfs/scratch/ric.broccoli/ric.broccoli/Cut_Tag_Astro"
+RUN_ID: "SCIFI_H3K27me3" # "RUN_id"
+# genome
+genome: "mm10"
+ref_genome_fa: "/beegfs/scratch/ric.broccoli/ric.broccoli/Genomes/mm10/fa/mm10.fa" 
+chrom_sizes: "/beegfs/scratch/ric.broccoli/ric.broccoli/Genomes/mm10/mm10.chrom.sizes"
+# trimming
+adapters: "/home/mattia/Trimmomatic/adapters/NexteraPE-PE.fa"
+# blacklist
+blacklist: "/beegfs/scratch/ric.broccoli/ric.broccoli/Cut_Tag_Astro/ABC/mm10.blacklist.bed"
+# peaks
+genome_size_bp: 2730871774
+peaks_qvalue: 0.01
+#Cut&Tag or ChIP
+c&t: 'Cut&Tag'
+chip: 'ChIP'
+# genes
+BEDgened: "genomes/hg38/genes.bed"
+#downsample target
+target_reads: "10000000"
+#gene
+gene: "/beegfs/scratch/ric.broccoli/ric.broccoli/Cut_Tag_Astro/mm10_refseq_collapsed_curated.bed"
+# Path to a JSON file with samples and their corresponding FASTQ files.
+SAMPLES: './SRR.txt'
+SAMPLES_JSON: './samples.json'
+
+CLUSTER_JSON: './cluster.json'
