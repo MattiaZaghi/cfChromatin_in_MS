@@ -51,8 +51,8 @@ sample_num = len(FILES.keys())
 print ("total {} unique samples will be processed".format(sample_num))
 print ("------------------------------------------")
 for sample_name in sorted(FILES.keys()):
-	for sample_type in FILES[sample_name]:
-    for assay in FILES[sample_name]:
+	for sample_type in FILES[sample_name].keys():
+     for assay in FILES[sample_name][sample_type].keys():
 		    fastq_file = "".join(FILES[sample_name][sample_type][assay])
 print("sample {sample_name}'s {sample_type} fastq path is {fastq_file}".format(sample_name = sample_name, sample_type = sample_type, assay=assay, fastq_file = fastq_file))
 print ("------------------------------------------")
