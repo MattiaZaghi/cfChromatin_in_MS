@@ -1,6 +1,6 @@
 {
     "SciFi_H3K27me3": {
-        "H3K27me3": [
+        "Cut_Tag": [
             "/date/gcb/GCB_MK/P29054/P29054_1005/02-FASTQ/230510_A00187_0957_BH2CM3DRX3/zcat/P29054_R2_001.fastq.gz",
             "/date/gcb/GCB_MK/P29054/P29054_1005/02-FASTQ/230510_A00187_0957_BH2CM3DRX3/zcat/P29054_R1_001.fastq.gz"
         ]

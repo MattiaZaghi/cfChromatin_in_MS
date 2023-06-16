@@ -1,0 +1,2 @@
+sample_name fastq_name  factor  assay
+SciFi_H3K27me3 P29054  H3K27me3  Cut_Tag    

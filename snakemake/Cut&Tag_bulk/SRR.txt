@@ -1,2 +1,0 @@
-sample_name fastq_name  factor 
-SciFi_H3K27me3 P29054  H3K27me3    

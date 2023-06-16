@@ -13,7 +13,7 @@ blacklist: "/beegfs/scratch/ric.broccoli/ric.broccoli/Cut_Tag_Astro/ABC/mm10.bla
 genome_size_bp: 2730871774
 peaks_qvalue: 0.01
 #Cut&Tag or ChIP
-c&t: 'Cut&Tag'
+c_t: 'Cut_Tag'
 chip: 'ChIP'
 # genes
 BEDgened: "genomes/hg38/genes.bed"

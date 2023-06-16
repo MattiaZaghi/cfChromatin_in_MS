@@ -2,27 +2,45 @@
 configfile: "cfChromatin_in_MS/snakemake/Cut&Tag_bulk/config.yaml"
 
 
-ALL_FILTER_BAM = expand("dedup/{mysample}.bam", sample = ALL_SAMPLES)
-ALL_FLAGSTAT = expand("samtools/dedup/filter/{mysample}.bam.flagstat", sample = ALL_SAMPLES)
-ALL_DOWNSAMPLE_INDEX = expand("04aln_downsample/{sample}-downsample.sorted.bam.bai", sample = ALL_SAMPLES)
+FILES = json.load(open(config['SAMPLES_JSON']))
 
-ALL_PHATOM = expand("05phantompeakqual/{sample}_phantom.txt", sample = ALL_SAMPLES)
-ALL_BIGWIG = expand("07bigwig/{sample}.bw", sample = ALL_SAMPLES)
-ALL_QC = ["10multiQC/multiQC_log.html"]
+import csv
+import os
+
+SAMPLES = sorted(FILES.keys())
+
+## list all samples by sample_name and sample_type
+MARK_SAMPLES = []
+for sample in SAMPLES:
+    for sample_type in FILES[sample].keys():
+        MARK_SAMPLES.append(sample + "_" + assay)
+
+
+# which sample_type is used as control for calling peaks: e.g. Input, IgG...
+CUT_TAG = config["c_t"]
+CHIP = config["chip"]
+
+## list BAM files
+CUT_TAG = expand("filter/{sample}.bam", sample=CUT_TAG)
+CHIP = expand("filter/{sample}.bam", sample=CHIP)
+
+ALL_SAMPLES = CUT_TAG + CHIP
+ALL_BAM     = CONTROL_BAM + CASE_BAM
+ALL_DOWNSAMPLE_BAM = expand("downsample/{sample}-downsample.sorted.bam", sample = ALL_SAMPLES)
+ALL_FASTQC  = expand("02fqc/{sample}_fastqc.zip", sample = ALL_SAMPLES)
+ALL_FLAGSTAT = expand("flagstat/{sample}.sorted.bam.flagstat", sample = ALL_SAMPLES)
+ALL_BIGWIG = expand("Coverage/{sample}_RPKM.bw", sample = ALL_SAMPLES)
+GOPEAKS = expand("Coverage/{sample}_peaks.bed", sample = CUT_TAG)
+MACS2 = expand("Coverage/{sample}_peaks.narrowPeak", sample = CHIP)
 
 TARGETS = []
 TARGETS.extend(ALL_FASTQC)
 TARGETS.extend(ALL_BAM)
 TARGETS.extend(ALL_DOWNSAMPLE_BAM)
-TARGETS.extend(ALL_INDEX)
-TARGETS.extend(ALL_PHATOM)
-TARGETS.extend(ALL_PEAKS)
+TARGETS.extend(GOPEAKS)
 TARGETS.extend(ALL_BIGWIG)
-TARGETS.extend(ALL_inputSubtract_BIGWIG)
-TARGETS.extend(ALL_FASTQ)
+TARGETS.extend(MACS2)
 TARGETS.extend(ALL_FLAGSTAT)
-TARGETS.extend(ALL_QC)
-TARGETS.extend(ALL_SUPER)
 
 
 

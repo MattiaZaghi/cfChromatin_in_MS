@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+
 import json
 import os
 import csv
@@ -37,24 +38,22 @@ with open(args.meta, "r") as f:
     	sample_name = row[0].strip()
     	fastq_name = row[1].strip()
     	sample_type = row[2].strip()
-        assay= row[3].strip()
+    	assay = row[3].strip()
     	## now just assume the file name in the metafile contained in the fastq file path
     	fastq_full_path = [x for x in fastq_paths if fastq_name in x]
     	if fastq_full_path:
-    		FILES[sample_name][sample_type][assay].extend(fastq_full_path)
+    		FILES[sample_name][assay].extend(fastq_full_path)
     	else:
     		print("sample {sample_name} missing {sample_type} {fastq_name} fastq files".format(sample_name = sample_name, sample_type = sample_type, fastq_name = fastq_name))
-
 
 print()
 sample_num = len(FILES.keys())
 print ("total {} unique samples will be processed".format(sample_num))
 print ("------------------------------------------")
 for sample_name in sorted(FILES.keys()):
-	for sample_type in FILES[sample_name].keys():
-     for assay in FILES[sample_name][sample_type].keys():
-		    fastq_file = "".join(FILES[sample_name][sample_type][assay])
-print("sample {sample_name}'s {sample_type} fastq path is {fastq_file}".format(sample_name = sample_name, sample_type = sample_type, assay=assay, fastq_file = fastq_file))
+	for assay in FILES[sample_name]:
+		fastq_file = "".join(FILES[sample_name][assay])
+		print("sample {sample_name}'s {sample_type} {assay} fastq path is {fastq_file}".format(sample_name = sample_name, sample_type = sample_type, assay=assay, fastq_file = fastq_file))
 print ("------------------------------------------")
 for sample in FILES.keys():
 	print ("{sample} has {n} marks".format(sample = sample, n = len(FILES[sample])))
