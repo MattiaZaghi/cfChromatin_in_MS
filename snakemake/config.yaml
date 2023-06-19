@@ -17,6 +17,8 @@ c_t: 'Cut_Tag'
 chip: 'ChIP'
 # genes
 BEDgened: "genomes/hg38/genes.bed"
+#index Bowtie2
+index_bt2_hg: "/home/mattia/Genomes/hg38/fa/hg38"
 #downsample target
 target_reads: "10000000"
 #gene
