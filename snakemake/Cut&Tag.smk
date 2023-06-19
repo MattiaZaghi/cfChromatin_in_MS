@@ -59,25 +59,25 @@ rule fastq_trimming__:
         R2       = "/date/gcb/GCB_MK/P29054/P29054_1005/02-FASTQ/230510_A00187_0957_BH2CM3DRX3/zcat/{mysample}_R2_001.fastq.gz",
         adapters = config['adapters'] #"adapters/trimmomatic/adapters-pe.fa"
     output:
-        Paired1       = temp("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/{mysample}_R1_paired.fastq.gz"),
-        Paired2       = temp("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/{mysample}_R2_paired.fastq.gz"),
-        Unpaired1 = temp("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/{mysample}_R1_unpaired.fastq.gz"),
-        Unpaired2 = temp("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/{mysample}_R2_unpaired.fastq.gz")
+        Paired1       = temp("trimmed/trimmomatic/{mysample}_R1_paired.fastq.gz"),
+        Paired2       = temp("trimmed/trimmomatic/{mysample}_R2_paired.fastq.gz"),
+        Unpaired1 = temp("trimmed/trimmomatic/{mysample}_R1_unpaired.fastq.gz"),
+        Unpaired2 = temp("trimmed/trimmomatic/{mysample}_R2_unpaired.fastq.gz")
     log:
-        main     = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/{mysample}_trim.log",
-        out      = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/{mysample}_trimout.log"
+        main     = "trimmed/trimmomatic/{mysample}_trim.log",
+        out      = "trimmed/trimmomatic/{mysample}_trimout.log"
     params:
-        dir = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/"
+        dir = "trimmed/trimmomatic/"
     resources:
         mem_mb=64000
     threads: 20
-    #conda:
-        #"trimmomatic"
+    conda:
+        "/home/mattia/miniconda3/envs/trimmomatic.yml"
     shell:
         """
         mkdir -p {params.dir} 
         
-        /home/mattia/miniconda3/envs/trimmomatic/bin/trimmomatic PE -threads {threads} -phred33 {input.R1} {input.R2} {output.Paired1} {output.Unpaired1} {output.Paired2} {output.Unpaired2} ILLUMINACLIP:{input.adapters}:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 > "{log.out}"
+        trimmomatic PE -threads {threads} -phred33 {input.R1} {input.R2} {output.Paired1} {output.Unpaired1} {output.Paired2} {output.Unpaired2} ILLUMINACLIP:{input.adapters}:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 > "{log.out}"
         """    
 
 rule bam__bowtie2:
@@ -85,74 +85,74 @@ rule bam__bowtie2:
     Align reads with bowtie2
     """
     input:
-        R1       = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/{mysample}_R1_paired.fastq.gz",
-        R2       = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/{mysample}_R2_paired.fastq.gz",
+        R1       = "trimmed/trimmomatic/{mysample}_R1_paired.fastq.gz",
+        R2       = "trimmed/trimmomatic/{mysample}_R2_paired.fastq.gz",
     log:
-        error    = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/{mysample}.log"
+        error    = "mapped/bowtie2/{mysample}.log"
     output:
-        sam = temp("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/{mysample}.sam")
+        sam = temp("mapped/bowtie2/{mysample}.sam")
     params:
-        index    = "/home/mattia/Genomes/hg38/fa/hg38",
-        dir      = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2"
+        index    = config['index_bt2_hg'] ,
+        dir      = "mapped/bowtie2"
     resources:
         mem_mb=64000
     threads: 20
     resources:
         mem_mb=64000
-    #conda:
-        #"bowtie2"
+    conda:
+        "/home/mattia/miniconda3/envs/bowtie2.yml"
     shell:
         """
         mkdir -p {params.dir}
         
-        /home/mattia/miniconda3/envs/bowtie2/bin/bowtie2 --very-sensitive-local -x {params.index} -1 {input.R1} -2 {input.R2} -S {output.sam} -p {threads} > "{log.error}"
+        bowtie2 --very-sensitive-local -x {params.index} -1 {input.R1} -2 {input.R2} -S {output.sam} -p {threads} > "{log.error}"
         """
         
 
 rule bam__sorted:
     input:
-        sam = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/{mysample}.sam"
+        sam = "mapped/bowtie2/{mysample}.sam"
     output:
-        bam = temp("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/{mysample}.bam")
+        bam = temp("mapped/bowtie2/sorted/samtools/{mysample}.bam")
     params:
-        dir = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools"
+        dir = "mapped/bowtie2/sorted/samtools"
     threads: 20
     resources:
         mem_mb=64000
-    #conda:
-        #"samtools"
+    conda:
+        "/home/mattia/miniconda3/envs/samtools.yml"
     shell:
         """
         mkdir -p {params.dir}
         
-        /home/mattia/miniconda3/envs/samtools/bin/samtools sort -o {output.bam} -O bam {input.sam} -@ {threads}
+        samtools sort -o {output.bam} -O bam {input.sam} -@ {threads}
         
-        /home/mattia/miniconda3/envs/samtools/bin/samtools index {output.bam} -@ {threads}
+        samtools index {output.bam} -@ {threads}
         """
 
 
 rule bam__dedup:
     input:
-        markdup = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/{mysample}.bam"
+        markdup = "mapped/bowtie2/sorted/samtools/{mysample}.bam"
     output:
-        dedup = temp("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/{mysample}.bam"),
-        bai   = temp("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/{mysample}.bam.bai"),
-        metrics = temp("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/{mysample}.bam_metrics.txt")
+        dedup = temp("mapped/bowtie2/sorted/samtools/dedup/{mysample}.bam"),
+        bai   = temp("mapped/bowtie2/sorted/samtools/dedup/{mysample}.bam.bai"),
+        metrics = temp("mapped/bowtie2/sorted/samtools/dedup/{mysample}.bam_metrics.txt")
     params:
         dir="/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/",
         tmp = "/proj/tmp/tmp_MZ/tmp"
     resources:
         mem_mb=140000
     threads: 20
-    #conda:
-        #"picard"
+    conda:
+        "/home/mattia/miniconda3/envs/samtools.yml"
     shell:
         """
         mkdir -p {params.dir}
         
         java -Xmx120g -jar /home/mattia/picard.jar MarkDuplicates I={input.markdup} O={output.dedup} M={output.metrics} VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=coordinate REMOVE_DUPLICATES=true TMP_DIR={params.tmp}
         
-        /home/mattia/miniconda3/envs/samtools/bin/samtools index {output.dedup} -@ {threads}
+        samtools index {output.dedup} -@ {threads}
         
         """
 #  Non canonical chromosomes, Y and X unmapped and mitochondrial are removed
@@ -161,24 +161,24 @@ rule bam__filter:
     Filter out Non-canonical chromosomes, Y and X  and mitochondrial
     """
     input:
-        dedup  = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/{mysample}.bam"
+        dedup  = "mapped/bowtie2/sorted/samtools/dedup/{mysample}.bam"
     output:
-        filter = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/{mysample}.bam",
-        bai="/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/{mysample}.bam.bai"
+        filter = "mapped/bowtie2/sorted/samtools/dedup/filter/{mysample}.bam",
+        bai="mapped/bowtie2/sorted/samtools/dedup/filter/{mysample}.bam.bai"
     params:
-        dir    = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter"
+        dir    = "mapped/bowtie2/sorted/samtools/dedup/filter"
     resources:
         mem_mb=140000
     threads: 20
-    #conda:
-        #"samtools"
+    conda:
+        "/home/mattia/miniconda3/envs/samtools.yml"
     shell:
         """
         mkdir -p {params.dir}
 
-        /home/mattia/miniconda3/envs/samtools/bin/samtools view -b {input.dedup} chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX > {output.filter} -@ {threads}
+        samtools view -b {input.dedup} chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX > {output.filter} -@ {threads}
         
-        /home/mattia/miniconda3/envs/samtools/bin/samtools index {output.filter} -@ {threads}
+        samtools index {output.filter} -@ {threads}
         
         """
 rule stat:
@@ -186,98 +186,66 @@ rule stat:
     Filter out Non-canonical chromosomes, Y and X  and mitochondrial
     """
     input:
-        filter = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/{mysample}.bam"
+        filter = "mapped/bowtie2/sorted/samtools/dedup/filter/{mysample}.bam"
     output:
-        flagstat = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/{mysample}.bam.flagstat"
+        flagstat = "mapped/bowtie2/sorted/samtools/dedup/filter/{mysample}.bam.flagstat"
     resources:
         mem_mb=140000
     threads: 20
-    #conda:
-        #"samtools"
+    conda:
+        "/home/mattia/miniconda3/envs/samtools"
     shell:
         """        
-        /home/mattia/miniconda3/envs/samtools/bin/samtools flagstat -@ {threads} {input.filter} > {output.flagstat} 
+        samtools flagstat -@ {threads} {input.filter} > {output.flagstat} 
         
         """
-#rule down_sample:
-    #input:  
-        #filter ="/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/{mysample}.bam",
-        #stat ="/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/{mysample}.bam.flagstat"
-    #output: 
-        #downsample_bam="/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{mysample}.bam", 
-        #downsample_bai="/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{mysample}.bam.bai"
-    #resources: name = "downsample", time_min=50000, mem_mb=64000, cpus=20
-    #run:
-        #import re
-        #import subprocess
-        #with open (input[1], "r") as f:
+rule down_sample:
+    input:  
+        filter ="/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/{mysample}.bam",
+        stat ="/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/{mysample}.bam.flagstat"
+    output: 
+        downsample_bam="/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{mysample}.bam", 
+        downsample_bai="/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{mysample}.bam.bai"
+    resources:
+        mem_mb=64000, cpus=20
+    threads: 20
+    conda:
+        "/home/mattia/miniconda3/envs/sambamba.yml"
+    run:
+        import re
+        import subprocess
+        with open (input[1], "r") as f:
             #fifth line contains the number of mapped reads
-            #line = f.readlines()[4]
-            #match_number = re.match(r'(\d.+) \+.+', line)
-            #total_reads = int(match_number.group(1))
+            line = f.readlines()[4]
+            match_number = re.match(r'(\d.+) \+.+', line)
+            total_reads = int(match_number.group(1))
 
-        #target_reads = config["target_reads"] # 15million reads  by default, set up in the config.yaml file
-        #if total_reads > int(target_reads):
+        target_reads = config["target_reads"] # 15million reads  by default, set up in the config.yaml file
+        if total_reads > int(target_reads):
             #down_rate = int(target_reads)/total_reads
-        #else:
-            #down_rate = 1
+        else:
+            down_rate = 1
 
-        #shell("/proj/tmp/tmp_MZ/anaconda3/envs/sambamba/bin/sambamba view -f bam -t 36 --subsampling-seed=3 -s {rate} {inbam} |  /proj/tmp/tmp_MZ/anaconda3/envs/samtools/bin/samtools sort -m 2G -@ 5 -T {outbam}.tmp > {outbam} ".format(rate = down_rate, inbam = input[0], outbam = output[0]))
+        shell("sambamba view -f bam -t 36 --subsampling-seed=3 -s {rate} {inbam} |  /proj/tmp/tmp_MZ/anaconda3/envs/samtools/bin/samtools sort -m 2G -@ 5 -T {outbam}.tmp > {outbam} ".format(rate = down_rate, inbam = input[0], outbam = output[0]))
 
-        #shell("/proj/tmp/tmp_MZ/anaconda3/envs/samtools/bin/samtools index {outbam}".format(outbam = output[0]))
+        shell("/home/mattia/miniconda3/envs/samtools index {outbam}".format(outbam = output[0]))
 
-#rule downsample_stat:
-    #input:
-        #downsample_bam = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{mysample}.bam"
-    #output:
-        #downsample_flagstat = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{mysample}.bam.flagstat"
-    #resources: name = "downsample_stat", time_min=50000, mem_mb=64000, cpus=20
-    #shell:
-        #"""        
-        #/proj/tmp/tmp_MZ/anaconda3/envs/samtools/bin/samtools flagstat -@ 20 {input.downsample_bam} > {output.downsample_flagstat} 
+rule downsample_stat:
+    input:
+        downsample_bam = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{mysample}.bam"
+    output:
+        downsample_flagstat = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{mysample}.bam.flagstat"
+    resources: mem_mb=64000
+    threads: 20
+    conda:
+        "/home/mattia/miniconda3/envs/samtools"
+    shell:
+        """        
+        /proj/tmp/tmp_MZ/anaconda3/envs/samtools/bin/samtools flagstat -@ 20 {input.downsample_bam} > {output.downsample_flagstat} 
         
-        #"""
+        """
 
-#rule bam__bigWig_downsample:
-    #input: 
-        #downsample_bam="/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{mysample}.bam",
-        #downsample_bai="/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{mysample}.bam.bai"
-    #output:
-        #downsample_bw="/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{mysample}_RPKM.bw"
-    #params:
-        #ref_genome_fa   =  config['ref_genome_fa'],
-        # blacklist       =  config['blacklist'],
-        #genome_size_bp  = config['genome_size_bp'],
-        #mapping_qual_bw = 10
-    #resources: name = "bamcoverage_downsample", time_min=50000, mem_mb=64000, cpus=10
-    #shell:
-        #"""
-        #/proj/tmp/tmp_MZ/anaconda3/envs/deeptools/bin/bamCoverage -b {input.downsample_bam} --outFileName {output.downsample_bw} --normalizeUsing RPKM --binSize 10 --smoothLength 300 --numberOfProcessors 10 --effectiveGenomeSize {params.genome_size_bp}  --ignoreDuplicates  --skipNAs --exactScaling 
-          
-        #"""
-#rule peak_calling_ATAC_downsample:
-    #input:
-        #downsample_treatment = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{mysample_atac}.bam",
-    #output:
-        #downsample_peaks_atac =  "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/peaks/SE/{mysample_atac}_peaks.narrowPeak",
-        #downsample_bed   =  "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/peaks/SE/{mysample_atac}_summits.bed"
-    #params:
-        #peaks_dir  = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/peaks/SE",
-        #gsize      = config['genome_size_bp'],
-        #qvalue     = config['peaks_qvalue'],
-        #outdir     = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/peaks/SE"
-    #resources: name = "macs2_ATAC_downsample", time_min=50000, mem_mb=64000, cpus=1
-    #conda:
-        #"macs2"
-    #shell:
-       #"""
-        #mkdir -p {params.peaks_dir}
-    
-        #macs2 callpeak -t {input.downsample_treatment} --name {wildcards.mysample_atac} --outdir {params.outdir} --gsize {params.gsize} --shift -75 --extsize 150 --nomodel --call-summits --nolambda --keep-dup all  --qvalue {params.qvalue}  
-    
-        #"""
-
-rule Gopeaks_P4_downsample:
+rule Gopeaks:
     input:
         downsample_treatment = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{pups}.bam",
         #control= expand("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/{igp4}.bam",igp4=IGP4, myrun=RUNID)
@@ -297,29 +265,6 @@ rule Gopeaks_P4_downsample:
         mkdir -p {params.peaks_dir}
     
         /home/mattia/miniconda3/envs/gopeaks/bin/gopeaks -b {input.downsample_treatment} -o {params.outdir}/{wildcards.pups} -p {params.qvalue} 
-        
-        """
-
-rule Gopeaks_mature_downsample:
-    input:
-        downsample_treatment = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{mature}.bam",
-        #control= expand("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/{ig2m}.bam",ig2m=IG2M, myrun=RUNID)
-    output:
-        downsample_peaks_mature =  "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/peaks/Gopeaks/{mature}_peaks.bed"
-    params:
-        peaks_dir  = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/peaks/Gopeaks",
-        qvalue     = config['peaks_qvalue'],
-        outdir     = "/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/peaks/Gopeaks"
-    resources:
-        mem_mb=64000
-    threads: 20
-    #conda:
-        #"/home/mattia/miniconda3/envs/gopeaks"
-    shell:
-        """
-        mkdir -p {params.peaks_dir}
-    
-        /home/mattia/miniconda3/envs/gopeaks/bin/gopeaks -b {input.downsample_treatment} -o {params.outdir}/{wildcards.mature} -p {params.qvalue}
         
         """
 
