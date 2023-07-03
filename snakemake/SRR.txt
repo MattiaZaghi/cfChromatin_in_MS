@@ -1,2 +1,2 @@
-sample_name fastq_name  factor  assay
-SciFi_H3K27me3 P29054  H3K27me3  Cut_Tag    
+sample_name	fastq_name	factor	assay	type	
+SciFi_H3K27me3	P29054_1005	H3K27me3	Cut_Tag	broad	
