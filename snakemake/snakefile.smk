@@ -26,14 +26,14 @@ print(CUT_TAGS)
 print(CHIPS)
 ## list BAM files
 ALL_SAMPLES = CUT_TAGS + CHIPS
-BAM=expand("{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}.bam", sample=ALL_SAMPLES, myrun=RUNID)
+print(ALL_SAMPLES)
+BAM=expand("{myrun}/filter/samtools/{sample}.bam", sample=ALL_SAMPLES, myrun=RUNID)
 print(BAM)
-ALL_FLAGSTAT = expand("{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}.stat", sample = ALL_SAMPLES,myrun=RUNID)
+ALL_FLAGSTAT = expand("{myrun}/filter/samtools/{sample}.flagstat", sample = ALL_SAMPLES,myrun=RUNID)
 print(ALL_FLAGSTAT)
-#ALL_DOWNSAMPLE_BAM = expand("{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}_downsample.bam", sample = ALL_SAMPLES,myrun=RUNID)
-#print(ALL_DOWNSAMPLE_BAM)
-#ALL_BAM=ALL_DOWNSAMPLE_BAM+BAM
-ALL_BIGWIG = expand("{myrun}/coverage/{sample}_RPKM.bw", sample = ALL_SAMPLES,myrun=RUNID)
+ALL_DOWNSAMPLE_BAM = expand("{myrun}/downsample/sambamba/{sample}.bam", sample = ALL_SAMPLES,myrun=RUNID)
+print(ALL_DOWNSAMPLE_BAM)
+ALL_BIGWIG = expand("{myrun}/coverage/deeptools/{sample}_RPKM.bw", sample = ALL_SAMPLES,myrun=RUNID)
 print(ALL_BIGWIG)
 GOPEAKS = expand("{myrun}/peaks/gopeaks/{sample}_peaks.bed", sample = CUT_TAGS,myrun=RUNID)
 print(GOPEAKS)
@@ -42,7 +42,7 @@ print(MACS2)
 
 TARGETS = []
 TARGETS.extend(BAM)
-#TARGETS.extend(ALL_DOWNSAMPLE_BAM)
+TARGETS.extend(ALL_DOWNSAMPLE_BAM)
 TARGETS.extend(GOPEAKS)
 TARGETS.extend(ALL_BIGWIG)
 TARGETS.extend(MACS2)
@@ -60,16 +60,19 @@ rule all:
     input: TARGETS
 
 rule merge_fastq:
-	input:
-		R1_fq = [path for path in fastq_paths if "_R1_" in path],
-		R2_fq = [path for path in fastq_paths if "_R1_" in path]
-	output:	"{myrun}/cat/{sample}_R1.fastq", "{myrun}/cat/{sample}_R2.fastq"
-	threads: 20
-	shell:
-		"""
-		gunzip -c {input.R1_fq} > {output[0]} 
-		gunzip -c {input.R2_fq} > {output[1]} 
-		"""
+    input:
+        fq_1= [path for path in fastq_paths if "_R1_" in path],
+        fq_2= [path for path in fastq_paths if "_R2_" in path]
+    output:	
+        R1 = temp("{myrun}/cat/{sample}_R1.fastq"),
+        R2 = temp("{myrun}/cat/{sample}_R2.fastq")
+    threads: 20
+    shell:
+        """
+        gunzip -c {input.fq_1} > {output.R1} 
+        gunzip -c {input.fq_2} > {output.R2} 
+        """
+
 
 rule fastq_trimming:  
     input:
@@ -82,7 +85,7 @@ rule fastq_trimming:
         Unpaired1 = temp("{myrun}/trimmed/trimmomatic/{sample}_R1_unpaired.fastq"),
         Unpaired2 = temp("{myrun}/trimmed/trimmomatic/{sample}_R2_unpaired.fastq")
     params:
-        dir = "trimmed/trimmomatic/"
+        dir = "{myrun}/trimmed/trimmomatic/"
     resources:
         mem_mb=64000
     threads: 20
@@ -92,7 +95,7 @@ rule fastq_trimming:
         """
         mkdir -p {params.dir} 
         
-        trimmomatic PE -threads {threads} -phred33 {input.R1} {input.R2} {output.Paired1} {output.Unpaired1} {output.Paired2} {output.Unpaired2} ILLUMINACLIP:{input.adapters}:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36"
+        trimmomatic PE -threads {threads} -phred33 {input.R1} {input.R2} {output.Paired1} {output.Unpaired1} {output.Paired2} {output.Unpaired2} ILLUMINACLIP:{input.adapters}:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
         """    
 
 rule bam__bowtie2:
@@ -118,7 +121,7 @@ rule bam__bowtie2:
         """
         mkdir -p {params.dir}
         
-        bowtie2 --very-sensitive-local -x {params.index} -1 {input.Paired1} -2 {input.Paired2} -S {output.sam} -p {threads} > "{log.error}"
+        bowtie2 --very-sensitive-local -x {params.index} -1 {input.Paired1} -2 {input.Paired2} -S {output.sam} -p {threads} 
         """
         
 
@@ -126,9 +129,9 @@ rule bam__sorted:
     input:
         sam = "{myrun}/mapped/bowtie2/{sample}.sam"
     output:
-        bam = temp("{myrun}/mapped/bowtie2/sorted/samtools/{sample}.bam")
+        bam = temp("{myrun}/sorted/samtools/{sample}.bam")
     params:
-        dir = "{myrun}/mapped/bowtie2/sorted/samtools"
+        dir = "{myrun}/sorted/samtools/"
     threads: 20
     resources:
         mem_mb=64000
@@ -146,14 +149,14 @@ rule bam__sorted:
 
 rule bam__dedup:
     input:
-        markdup = "{myrun}/mapped/bowtie2/sorted/samtools/{sample}.bam"
+        markdup = "{myrun}/sorted/samtools/{sample}.bam"
     output:
-        dedup = temp("{myrun}/mapped/bowtie2/sorted/samtools/dedup/{sample}.bam"),
-        bai   = temp("{myrun}/mapped/bowtie2/sorted/samtools/dedup/{sample}.bam.bai"),
-        metrics = temp("{myrun}/mapped/bowtie2/sorted/samtools/dedup/{sample}.bam_metrics.txt")
+        dedup = temp("{myrun}/dedup/picard/{sample}.bam"),
+        bai   = temp("{myrun}/dedup/picard/{sample}.bam.bai"),
+        metrics = temp("{myrun}/dedup/picard/{sample}.bam_metrics.txt")
     params:
-        dir="{myrun}/mapped/bowtie2/sorted/samtools/dedup/",
-        tmp="{myrun}/mapped/bowtie2/sorted/samtools/dedup/tmp"
+        dir="{myrun}/dedup/picard/",
+        tmp="{myrun}/dedup/picard/tmp"
     resources:
         mem_mb=140000
     threads: 20
@@ -174,12 +177,12 @@ rule bam__filter:
     Filter out Non-canonical chromosomes, Y and X  and mitochondrial
     """
     input:
-        dedup  = "{myrun}/mapped/bowtie2/sorted/samtools/dedup/{sample}.bam"
+        dedup  = "{myrun}/dedup/picard/{sample}.bam"
     output:
-        filter = "{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}.bam",
-        bai="{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}.bam.bai"
+        filter = "{myrun}/filter/samtools/{sample}.bam",
+        bai="{myrun}/filter/samtools/{sample}.bam.bai"
     params:
-        dir    = "{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter"
+        dir    = "{myrun}/filter/samtools/"
     resources:
         mem_mb=140000
     threads: 20
@@ -199,9 +202,9 @@ rule stat:
     Filter out Non-canonical chromosomes, Y and X  and mitochondrial
     """
     input:
-        filter = "{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}.bam"
+        filter = "{myrun}/filter/samtools/{sample}.bam"
     output:
-        flagstat = "{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}.stat"
+        flagstat = "{myrun}/filter/samtools/{sample}.flagstat"
     resources:
         mem_mb=140000
     threads: 20
@@ -214,11 +217,11 @@ rule stat:
         """
 rule down_sample:
     input:  
-        filter ="{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}.bam",
-        stat ="{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}.bam.flagstat"
+        filter ="{myrun}/filter/samtools/{sample}.bam",
+        stat ="{myrun}/filter/samtools/{sample}.flagstat"
     output: 
-        downsample_bam="{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{sample}.bam", 
-        downsample_bai="{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{sample}.bam.bai"
+        downsample_bam="{myrun}/downsample/sambamba/{sample}.bam", 
+        downsample_bai="{myrun}/downsample/sambamba/{sample}.bam.bai"
     resources:
         mem_mb=64000, cpus=20
     threads: 20
@@ -243,9 +246,9 @@ rule down_sample:
 
 rule downsample_stat:
     input:
-        downsample_bam = "{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{sample}.bam"
+        downsample_bam = "{myrun}/downsample/sambamba/{sample}.bam"
     output:
-        downsample_flagstat = "{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{sample}.stat"
+        downsample_flagstat = "{myrun}/downsample/sambamba/{sample}.flagstat"
     resources: mem_mb=64000
     threads: 20
     conda:
@@ -258,10 +261,10 @@ rule downsample_stat:
 
 rule coverage:
     input: 
-        filter ="{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}.bam",
-        bai="{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}.bam.bai"
+        filter ="{myrun}/filter/samtools/{sample}.bam",
+        bai="{myrun}/filter/samtools/{sample}.bam.bai"
     output:
-        bw="{myrun}/coverage/{sample}_RPKM.bw"
+        bw="{myrun}/coverage/deeptools/{sample}_RPKM.bw"
     params:
         genome_size_bp  = config['genome_size_bp'],
         mapping_qual_bw = config['binsize'],
@@ -280,7 +283,7 @@ rule coverage:
 
 rule Gopeaks:
     input:
-        treatment = "{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}.bam",
+        treatment = "{myrun}/filter/samtools/{sample}.bam",
         #control= expand("/proj/tmp/tmp_MZ/{myrun}/fastq/trimmed/trimmomatic/mapped/bowtie2/sorted/samtools/dedup/filter/{igp4}.bam",igp4=IGP4, myrun=RUNID)
     output:
         peaks =  "{myrun}/peaks/gopeaks/{sample}_peaks.bed"
@@ -303,7 +306,7 @@ rule Gopeaks:
 
 rule macs2:
     input:
-         treatment = "{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}.bam",
+         treatment = "{myrun}/filter/samtools/{sample}.bam",
     output:
         peaks_narrow =  "{myrun}/peaks/macs2/{sample}_peaks.narrowPeak",
         bed   =  "{myrun}/peaks/macs2/{sample}_summits.bed"
