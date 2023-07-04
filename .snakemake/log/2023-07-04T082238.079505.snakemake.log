@@ -1,0 +1,35 @@
+Building DAG of jobs...
+WorkflowError:
+InputFunctionException (rule merge_fastq, line 65, /home/mattia/cfChromatin_in_MS/snakemake/snakefile.smk):
+    Error:
+      KeyError: 'dedup/filter/SciFi_H3K27me3_Cut-Tag'
+    Wildcards:
+      myrun=SCIFI_H3K27me3
+      sample=dedup/filter/SciFi_H3K27me3_Cut-Tag
+    Traceback:
+      File "/home/mattia/cfChromatin_in_MS/snakemake/snakefile.smk", line 56, in <lambda>
+InputFunctionException (rule merge_fastq, line 65, /home/mattia/cfChromatin_in_MS/snakemake/snakefile.smk):
+    Error:
+      KeyError: 'filter/SciFi_H3K27me3_Cut-Tag'
+    Wildcards:
+      myrun=SCIFI_H3K27me3
+      sample=filter/SciFi_H3K27me3_Cut-Tag
+    Traceback:
+      File "/home/mattia/cfChromatin_in_MS/snakemake/snakefile.smk", line 56, in <lambda>
+WorkflowError:
+    InputFunctionException (rule merge_fastq, line 65, /home/mattia/cfChromatin_in_MS/snakemake/snakefile.smk):
+        Error:
+          KeyError: 'dedup/SciFi_H3K27me3_Cut-Tag'
+        Wildcards:
+          myrun=SCIFI_H3K27me3
+          sample=dedup/SciFi_H3K27me3_Cut-Tag
+        Traceback:
+          File "/home/mattia/cfChromatin_in_MS/snakemake/snakefile.smk", line 56, in <lambda>
+    InputFunctionException (rule merge_fastq, line 65, /home/mattia/cfChromatin_in_MS/snakemake/snakefile.smk):
+        Error:
+          KeyError: 'SciFi_H3K27me3_Cut-Tag'
+        Wildcards:
+          myrun=SCIFI_H3K27me3
+          sample=SciFi_H3K27me3_Cut-Tag
+        Traceback:
+          File "/home/mattia/cfChromatin_in_MS/snakemake/snakefile.smk", line 56, in <lambda>

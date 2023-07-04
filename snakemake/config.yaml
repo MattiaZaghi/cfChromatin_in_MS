@@ -1,30 +1,21 @@
 # proj parameters
-RAWDATA: "/beegfs/scratch/ric.broccoli/ric.broccoli/Cut_Tag_Astro"
 RUN_ID: "SCIFI_H3K27me3" # "RUN_id"
-# genome
-genome: "mm10"
-ref_genome_fa: "/beegfs/scratch/ric.broccoli/ric.broccoli/Genomes/mm10/fa/mm10.fa" 
-chrom_sizes: "/beegfs/scratch/ric.broccoli/ric.broccoli/Genomes/mm10/mm10.chrom.sizes"
 # trimming
 adapters: "/home/mattia/Trimmomatic/adapters/NexteraPE-PE.fa"
-# blacklist
-blacklist: "/beegfs/scratch/ric.broccoli/ric.broccoli/Cut_Tag_Astro/ABC/mm10.blacklist.bed"
 # peaks
 genome_size_bp: 2730871774
 peaks_qvalue: 0.01
+#Coverage
+binsize: "10"
+norm_method: "RPKM"
+smooth_length: "300"
 #Cut&Tag or ChIP
-c_t: 'Cut_Tag'
+c_t: 'Cut-Tag'
 chip: 'ChIP'
-# genes
-BEDgened: "genomes/hg38/genes.bed"
 #index Bowtie2
 index_bt2_hg: "/home/mattia/Genomes/hg38/fa/hg38"
 #downsample target
-target_reads: "10000000"
-#gene
-gene: "/beegfs/scratch/ric.broccoli/ric.broccoli/Cut_Tag_Astro/mm10_refseq_collapsed_curated.bed"
+target_reads: "3000000"
 # Path to a JSON file with samples and their corresponding FASTQ files.
-SAMPLES: './SRR.txt'
-SAMPLES_JSON: './samples.json'
-
-CLUSTER_JSON: './cluster.json'
+SAMPLES: './snakemake/SRR.txt'
+SAMPLES_JSON: './snakemake/samples.json'

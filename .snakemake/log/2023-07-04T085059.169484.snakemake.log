@@ -1,0 +1,9 @@
+Config file ./snakemake/config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+InputFunctionException in rule merge_fastq in file /home/mattia/cfChromatin_in_MS/snakemake/test.smk, line 32:
+Error:
+  AttributeError: 'Wildcards' object has no attribute 'sample'
+Wildcards:
+
+Traceback:
+  File "/home/mattia/cfChromatin_in_MS/snakemake/test.smk", line 34, in <lambda>

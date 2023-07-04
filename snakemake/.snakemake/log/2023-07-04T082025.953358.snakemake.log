@@ -1,0 +1,3 @@
+WorkflowError in file /home/mattia/cfChromatin_in_MS/snakemake/snakefile.smk, line 2:
+Workflow defines configfile cfChromatin_in_MS/snakemake/Cut&Tag_bulk/config.yaml but it is not present or accessible (full checked path: /home/mattia/cfChromatin_in_MS/snakemake/cfChromatin_in_MS/snakemake/Cut&Tag_bulk/config.yaml).
+  File "/home/mattia/cfChromatin_in_MS/snakemake/snakefile.smk", line 2, in <module>

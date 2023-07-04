@@ -1,0 +1,29 @@
+Config file ./snakemake/config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 1 (use --cores to define parallelism)
+Rules claiming more threads will be scaled down.
+Job stats:
+job            count    min threads    max threads
+-----------  -------  -------------  -------------
+all                1              1              1
+merge_fastq        1              1              1
+total              2              1              1
+
+Select jobs to execute...
+
+[Tue Jul  4 09:43:56 2023]
+rule merge_fastq:
+    input: /date/gcb/GCB_MK/P29054/P29054_1005/02-FASTQ/230510_A00187_0957_BH2CM3DRX3/P29054_1005_S1_L001_R1_001.fastq.gz, /date/gcb/GCB_MK/P29054/P29054_1005/02-FASTQ/230510_A00187_0957_BH2CM3DRX3/P29054_1005_S1_L002_R1_001.fastq.gz, /date/gcb/GCB_MK/P29054/P29054_1005/02-FASTQ/230510_A00187_0957_BH2CM3DRX3/P29054_1005_S1_L001_R1_001.fastq.gz, /date/gcb/GCB_MK/P29054/P29054_1005/02-FASTQ/230510_A00187_0957_BH2CM3DRX3/P29054_1005_S1_L002_R1_001.fastq.gz
+    output: cat/SciFi_H3K27me3_Cut-Tag_R1.fastq, cat/SciFi_H3K27me3_Cut-Tag_R2.fastq
+    jobid: 1
+    reason: Missing output files: cat/SciFi_H3K27me3_Cut-Tag_R1.fastq, cat/SciFi_H3K27me3_Cut-Tag_R2.fastq
+    wildcards: sample=SciFi_H3K27me3_Cut-Tag
+    resources: tmpdir=/tmp
+
+RuleException in rule merge_fastq in file /home/mattia/cfChromatin_in_MS/snakemake/test.smk, line 39:
+AttributeError: 'InputFiles' object has no attribute 'r1', when formatting the following:
+
+        gunzip -c {input.r1} | gzip > {output[0]} 
+        gunzip -c {input.r2} | gzip > {output[1]} 
+        

@@ -1,0 +1,6 @@
+Config file ./snakemake/config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+MissingInputException in rule all in file /home/mattia/cfChromatin_in_MS/snakemake/test.smk, line 34:
+Missing input files for rule all:
+    affected files:
+        SCIFI_H3K27me3/01seq/SciFi_H3K27me3_Cut-Tag.fastq
