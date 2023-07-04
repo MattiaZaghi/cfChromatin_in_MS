@@ -30,10 +30,10 @@ BAM=expand("{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}.bam", s
 print(BAM)
 ALL_FLAGSTAT = expand("{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}.stat", sample = ALL_SAMPLES,myrun=RUNID)
 print(ALL_FLAGSTAT)
-ALL_DOWNSAMPLE_BAM = expand("{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}_downsample.bam", sample = ALL_SAMPLES,myrun=RUNID)
-print(ALL_DOWNSAMPLE_BAM)
-ALL_BAM=ALL_DOWNSAMPLE_BAM+BAM
-ALL_BIGWIG = expand("{myrun}/coverage/{sample}_RPKM.bw", sample = ALL_BAM,myrun=RUNID)
+#ALL_DOWNSAMPLE_BAM = expand("{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}_downsample.bam", sample = ALL_SAMPLES,myrun=RUNID)
+#print(ALL_DOWNSAMPLE_BAM)
+#ALL_BAM=ALL_DOWNSAMPLE_BAM+BAM
+ALL_BIGWIG = expand("{myrun}/coverage/{sample}_RPKM.bw", sample = ALL_SAMPLES,myrun=RUNID)
 print(ALL_BIGWIG)
 GOPEAKS = expand("{myrun}/peaks/gopeaks/{sample}_peaks.bed", sample = CUT_TAGS,myrun=RUNID)
 print(GOPEAKS)
@@ -42,7 +42,7 @@ print(MACS2)
 
 TARGETS = []
 TARGETS.extend(BAM)
-TARGETS.extend(ALL_DOWNSAMPLE_BAM)
+#TARGETS.extend(ALL_DOWNSAMPLE_BAM)
 TARGETS.extend(GOPEAKS)
 TARGETS.extend(ALL_BIGWIG)
 TARGETS.extend(MACS2)
