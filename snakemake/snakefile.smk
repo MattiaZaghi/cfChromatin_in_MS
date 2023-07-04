@@ -26,17 +26,14 @@ print(CUT_TAGS)
 print(CHIPS)
 ## list BAM files
 ALL_SAMPLES = CUT_TAGS + CHIPS
-MERGE_R1=expand("{myrun}/cat/{sample}_R1.fastq", sample=ALL_SAMPLES, myrun=RUNID)
-MERGE_R2=expand("{myrun}/cat/{sample}_R2.fastq", sample=ALL_SAMPLES, myrun=RUNID)
-TRIMMED_R1=expand("{myrun}/trimmed/trimmomatic/{sample}_R1_paired.fastq",sample=ALL_SAMPLES, myrun=RUNID)
-TRIMMED_R2=expand("{myrun}/trimmed/trimmomatic/{sample}_R2_paired.fastq",sample=ALL_SAMPLES, myrun=RUNID)
 BAM=expand("{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}.bam", sample=ALL_SAMPLES, myrun=RUNID)
 print(BAM)
 ALL_FLAGSTAT = expand("{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}.stat", sample = ALL_SAMPLES,myrun=RUNID)
 print(ALL_FLAGSTAT)
 ALL_DOWNSAMPLE_BAM = expand("{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}_downsample.bam", sample = ALL_SAMPLES,myrun=RUNID)
 print(ALL_DOWNSAMPLE_BAM)
-ALL_BIGWIG = expand("{myrun}/coverage/{sample}_RPKM.bw", sample = ALL_SAMPLES,myrun=RUNID)
+ALL_BAM=ALL_DOWNSAMPLE_BAM+BAM
+ALL_BIGWIG = expand("{myrun}/coverage/{sample}_RPKM.bw", sample = ALL_BAM,myrun=RUNID)
 print(ALL_BIGWIG)
 GOPEAKS = expand("{myrun}/peaks/gopeaks/{sample}_peaks.bed", sample = CUT_TAGS,myrun=RUNID)
 print(GOPEAKS)
@@ -44,10 +41,6 @@ MACS2 = expand("{myrun}/peaks/macs2/{sample}_peaks.narrowPeak", sample = CHIPS,m
 print(MACS2)
 
 TARGETS = []
-TARGETS.extend(MERGE_R1)
-TARGETS.extend(MERGE_R2)
-TARGETS.extend(TRIMMED_R1)
-TARGETS.extend(TRIMMED_R2)
 TARGETS.extend(BAM)
 TARGETS.extend(ALL_DOWNSAMPLE_BAM)
 TARGETS.extend(GOPEAKS)
@@ -224,8 +217,8 @@ rule down_sample:
         filter ="{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}.bam",
         stat ="{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}.bam.flagstat"
     output: 
-        downsample_bam="{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}_downsample.bam", 
-        downsample_bai="{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}_downsample.bam.bai"
+        downsample_bam="{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{sample}.bam", 
+        downsample_bai="{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{sample}.bam.bai"
     resources:
         mem_mb=64000, cpus=20
     threads: 20
@@ -250,9 +243,9 @@ rule down_sample:
 
 rule downsample_stat:
     input:
-        downsample_bam = "{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}_downsample.bam"
+        downsample_bam = "{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{sample}.bam"
     output:
-        downsample_flagstat = "{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/{sample}_downsample.stat"
+        downsample_flagstat = "{myrun}/mapped/bowtie2/sorted/samtools/dedup/filter/downsample/{sample}.stat"
     resources: mem_mb=64000
     threads: 20
     conda:
