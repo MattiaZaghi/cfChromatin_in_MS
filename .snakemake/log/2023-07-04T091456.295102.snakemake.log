@@ -1,4 +1,0 @@
-Config file ./snakemake/config.yaml is extended by additional config specified via the command line.
-WildcardError in file /home/mattia/cfChromatin_in_MS/snakemake/test.smk, line 33:
-No values given for wildcard 'myrun'.
-  File "/home/mattia/cfChromatin_in_MS/snakemake/test.smk", line 33, in <module>

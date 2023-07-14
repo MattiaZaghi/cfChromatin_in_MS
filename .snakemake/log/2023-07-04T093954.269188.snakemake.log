@@ -1,4 +1,0 @@
-Config file ./snakemake/config.yaml is extended by additional config specified via the command line.
-NameError in file /home/mattia/cfChromatin_in_MS/snakemake/test.smk, line 33:
-name 'mark' is not defined
-  File "/home/mattia/cfChromatin_in_MS/snakemake/test.smk", line 33, in <module>

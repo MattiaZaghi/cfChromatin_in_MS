@@ -1,3 +1,0 @@
-FileNotFoundError in file /home/mattia/cfChromatin_in_MS/snakemake/snakefile.smk, line 5:
-[Errno 2] No such file or directory: './snakemake/samples.json'
-  File "/home/mattia/cfChromatin_in_MS/snakemake/snakefile.smk", line 5, in <module>

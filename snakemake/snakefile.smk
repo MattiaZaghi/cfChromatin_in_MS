@@ -66,11 +66,14 @@ rule merge_fastq:
     output:	
         R1 = temp("{myrun}/cat/{sample}_R1.fastq"),
         R2 = temp("{myrun}/cat/{sample}_R2.fastq")
-    threads: 20
+    log: 
+        R1="{myrun}/cat/{sample}_1.log", 
+        R2="{myrun}/cat/{sample}_2.log"
+    threads: 5
     shell:
         """
-        gunzip -c {input.fq_1} > {output.R1} 
-        gunzip -c {input.fq_2} > {output.R2} 
+        gunzip -c {input.fq_1} > {output.R1}  > {log.R1}
+        gunzip -c {input.fq_2} > {output.R2}  > {log.R2}
         """
 
 
@@ -84,18 +87,19 @@ rule fastq_trimming:
         Paired2       = temp("{myrun}/trimmed/trimmomatic/{sample}_R2_paired.fastq"),
         Unpaired1 = temp("{myrun}/trimmed/trimmomatic/{sample}_R1_unpaired.fastq"),
         Unpaired2 = temp("{myrun}/trimmed/trimmomatic/{sample}_R2_unpaired.fastq")
+    log: "{myrun}/trimmed/trimmomatic/{sample}.log"
     params:
         dir = "{myrun}/trimmed/trimmomatic/"
     resources:
         mem_mb=64000
-    threads: 20
+    threads: config['THREADS']
     conda:
         "/home/mattia/miniconda3/envs/trimmomatic.yml"
     shell:
         """
         mkdir -p {params.dir} 
         
-        trimmomatic PE -threads {threads} -phred33 {input.R1} {input.R2} {output.Paired1} {output.Unpaired1} {output.Paired2} {output.Unpaired2} ILLUMINACLIP:{input.adapters}:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
+        trimmomatic PE -threads {threads} -phred33 {input.R1} {input.R2} {output.Paired1} {output.Unpaired1} {output.Paired2} {output.Unpaired2} ILLUMINACLIP:{input.adapters}:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 > {log}
         """    
 
 rule bam__bowtie2:
@@ -112,7 +116,8 @@ rule bam__bowtie2:
     params:
         index    = config['index_bt2_hg'] ,
         dir      = "{myrun}/mapped/bowtie2"
-    threads: 20
+    log: "{myrun}/mapped/bowtie2/{sample}.log"
+    threads: config['THREADS']
     resources:
         mem_mb=64000
     conda:
@@ -121,7 +126,7 @@ rule bam__bowtie2:
         """
         mkdir -p {params.dir}
         
-        bowtie2 --very-sensitive-local -x {params.index} -1 {input.Paired1} -2 {input.Paired2} -S {output.sam} -p {threads} 
+        bowtie2 --very-sensitive-local -x {params.index} -1 {input.Paired1} -2 {input.Paired2} -S {output.sam} -p {threads} > {log}
         """
         
 
@@ -132,16 +137,18 @@ rule bam__sorted:
         bam = temp("{myrun}/sorted/samtools/{sample}.bam")
     params:
         dir = "{myrun}/sorted/samtools/"
-    threads: 20
+    threads: config['THREADS'] 
+    log: "{myrun}/sorted/samtools/{sample}.log"
     resources:
         mem_mb=64000
+    
     conda:
         "/home/mattia/miniconda3/envs/samtools.yml"
     shell:
         """
         mkdir -p {params.dir}
         
-        samtools sort -o {output.bam} -O bam {input.sam} -@ {threads}
+        samtools sort -o {output.bam} -O bam {input.sam} -@ {threads} > {log}
         
         samtools index {output.bam} -@ {threads}
         """
@@ -159,14 +166,15 @@ rule bam__dedup:
         tmp="{myrun}/dedup/picard/tmp"
     resources:
         mem_mb=140000
-    threads: 20
+    threads: config['THREADS'] 
+    log: "{myrun}/dedup/picard/{sample}.log"
     conda:
         "/home/mattia/miniconda3/envs/samtools.yml"
     shell:
         """
         mkdir -p {params.dir}
         
-        java -Xmx120g -jar /home/mattia/picard.jar MarkDuplicates I={input.markdup} O={output.dedup} M={output.metrics} VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=coordinate REMOVE_DUPLICATES=true TMP_DIR={params.tmp}
+        java -Xmx120g -jar /home/mattia/picard.jar MarkDuplicates I={input.markdup} O={output.dedup} M={output.metrics} VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=coordinate REMOVE_DUPLICATES=true TMP_DIR={params.tmp} > {log}
         
         samtools index {output.dedup} -@ {threads}
         
@@ -185,14 +193,15 @@ rule bam__filter:
         dir    = "{myrun}/filter/samtools/"
     resources:
         mem_mb=140000
-    threads: 20
+    threads: config['THREADS']
+    log: "{myrun}/filter/samtools/{sample}.log"
     conda:
         "/home/mattia/miniconda3/envs/samtools.yml"
     shell:
         """
         mkdir -p {params.dir}
 
-        samtools view  -@ {threads} -b {input.dedup} chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX > {output.filter} -@ {threads}
+        samtools view  -@ {threads} -b {input.dedup} chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX > {output.filter} > {log}
         
         samtools index {output.filter} -@ {threads}
         
@@ -207,7 +216,7 @@ rule stat:
         flagstat = "{myrun}/filter/samtools/{sample}.flagstat"
     resources:
         mem_mb=140000
-    threads: 20
+    threads: config['THREADS']
     conda:
         "/home/mattia/miniconda3/envs/samtools"
     shell:
@@ -224,7 +233,7 @@ rule down_sample:
         downsample_bai="{myrun}/downsample/sambamba/{sample}.bam.bai"
     resources:
         mem_mb=64000, cpus=20
-    threads: 20
+    threads: config['THREADS']
     run:
         import re
         import subprocess
@@ -250,7 +259,7 @@ rule downsample_stat:
     output:
         downsample_flagstat = "{myrun}/downsample/sambamba/{sample}.flagstat"
     resources: mem_mb=64000
-    threads: 20
+    threads: config['THREADS']
     conda:
         "/home/mattia/miniconda3/envs/samtools"
     shell:
@@ -272,12 +281,13 @@ rule coverage:
         smooth= config['smooth_length']
     resources:
         mem_mb=64000
-    threads: 20
+    threads: config['THREADS']
+    log: "{myrun}/coverage/deeptools/{sample}.log"
     conda:
         "/home/mattia/minconda3/envs/deeptools"
     shell:
         """
-        bamCoverage -b {input.filter} --outFileName {output.bw} --normalizeUsing {params.norm} --binSize {params.mapping_qual_bw} --smoothLength {params.smooth} --numberOfProcessors {threads} --effectiveGenomeSize {params.genome_size_bp}  --ignoreDuplicates  --skipNAs --exactScaling  
+        bamCoverage -b {input.filter} --outFileName {output.bw} --normalizeUsing {params.norm} --binSize {params.mapping_qual_bw} --smoothLength {params.smooth} --numberOfProcessors {threads} --effectiveGenomeSize {params.genome_size_bp}  --ignoreDuplicates  --skipNAs --exactScaling  > {log}
           
         """
 
@@ -293,14 +303,15 @@ rule Gopeaks:
         outdir     = "{myrun}/peaks/gopeaks/"
     resources:
         mem_mb=64000
-    threads: 20
+    threads: config['THREADS']
+    log: "{myrun}/peaks/gopeaks/{sample}.log"
     conda:
         "/home/mattia/miniconda3/envs/gopeaks.yml"
     shell:
         """
         mkdir -p {params.peaks_dir}
     
-        gopeaks -b {input.treatment} -o {params.outdir}/{wildcards.sample} -p {params.qvalue} --broad
+        gopeaks -b {input.treatment} -o {params.outdir}/{wildcards.sample} -p {params.qvalue} --broad > {log}
         
         """
 
@@ -316,7 +327,8 @@ rule macs2:
         qvalue     = config['peaks_qvalue'],
         outdir     = "{myrun}/peaks/macs2/"
     resources: mem_mb=64000
-    threads: 20
+    threads: config['THREADS']
+    log: "{myrun}/peaks/macs2/{sample}.log"
     conda:
         "/home/mattia/miniconda3/envs/macs2.yml"
     shell:

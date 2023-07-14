@@ -1,4 +1,0 @@
-Config file ./snakemake/config.yaml is extended by additional config specified via the command line.
-TypeError in file /home/mattia/cfChromatin_in_MS/snakemake/test.smk, line 34:
-'function' object is not iterable
-  File "/home/mattia/cfChromatin_in_MS/snakemake/test.smk", line 34, in <module>

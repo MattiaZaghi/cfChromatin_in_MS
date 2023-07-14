@@ -1,4 +1,0 @@
-Config file ./snakemake/config.yaml is extended by additional config specified via the command line.
-ImportError in file /home/mattia/cfChromatin_in_MS/snakemake/test.smk, line 44:
-cannot import name 'rule' from 'snakemake' (/home/mattia/miniconda3/envs/snakemake/lib/python3.11/site-packages/snakemake/__init__.py)
-  File "/home/mattia/cfChromatin_in_MS/snakemake/test.smk", line 44, in <module>

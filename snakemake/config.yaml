@@ -1,5 +1,6 @@
 # proj parameters
 RUN_ID: "SCIFI_H3K27me3" # "RUN_id"
+THREADS: 5
 # trimming
 adapters: "/home/mattia/Trimmomatic/adapters/NexteraPE-PE.fa"
 # peaks
