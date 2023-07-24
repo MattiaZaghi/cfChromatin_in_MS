@@ -1,0 +1,112 @@
+{
+    "04061-P-100": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/P29307/P29307_1029/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1029_S5_L004_R1_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P29307/P29307_1029/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1029_S5_L004_R2_001.fastq.gz"
+            ]
+        }
+    },
+    "04061-P-200": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/P29307/P29307_1028/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1028_S4_L004_R1_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P29307/P29307_1028/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1028_S4_L004_R2_001.fastq.gz"
+            ]
+        }
+    },
+    "12097-C": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/P29307/P29307_1035/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1035_S11_L004_R2_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P29307/P29307_1035/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1035_S11_L004_R1_001.fastq.gz"
+            ]
+        },
+        "H3K36me3": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/P29307/P29307_1036/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1036_S12_L004_R2_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P29307/P29307_1036/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1036_S12_L004_R1_001.fastq.gz"
+            ]
+        }
+    },
+    "14223-C": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/P29307/P29307_1038/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1038_S14_L004_R2_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P29307/P29307_1038/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1038_S14_L004_R1_001.fastq.gz"
+            ]
+        },
+        "H3K27me3": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/P29307/P29307_1039/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1039_S15_L004_R1_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P29307/P29307_1039/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1039_S15_L004_R2_001.fastq.gz"
+            ]
+        }
+    },
+    "14223-P": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/P29307/P29307_1037/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1037_S13_L004_R2_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P29307/P29307_1037/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1037_S13_L004_R1_001.fastq.gz"
+            ]
+        }
+    },
+    "16057-P-100": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/P29307/P29307_1027/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1027_S3_L004_R1_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P29307/P29307_1027/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1027_S3_L004_R2_001.fastq.gz"
+            ]
+        }
+    },
+    "16057-P-200": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/P29307/P29307_1026/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1026_S2_L004_R2_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P29307/P29307_1026/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1026_S2_L004_R1_001.fastq.gz"
+            ]
+        }
+    },
+    "17170-P": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/P29307/P29307_1025/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1025_S1_L004_R2_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P29307/P29307_1025/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1025_S1_L004_R1_001.fastq.gz"
+            ]
+        }
+    },
+    "19019-C": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/P29307/P29307_1032/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1032_S8_L004_R1_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P29307/P29307_1032/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1032_S8_L004_R2_001.fastq.gz"
+            ]
+        },
+        "H3K27me3": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/P29307/P29307_1033/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1033_S9_L004_R2_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P29307/P29307_1033/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1033_S9_L004_R1_001.fastq.gz"
+            ]
+        },
+        "H3K36me3": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/P29307/P29307_1034/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1034_S10_L004_R1_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P29307/P29307_1034/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1034_S10_L004_R2_001.fastq.gz"
+            ]
+        }
+    },
+    "19019-P": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/P29307/P29307_1030/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1030_S6_L004_R2_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P29307/P29307_1030/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1030_S6_L004_R1_001.fastq.gz"
+            ]
+        },
+        "H3K27me3": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/P29307/P29307_1031/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1031_S7_L004_R2_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P29307/P29307_1031/02-FASTQ/230707_A00187_0977_AHTFY7DSX5/P29307_1031_S7_L004_R1_001.fastq.gz"
+            ]
+        }
+    }
+}

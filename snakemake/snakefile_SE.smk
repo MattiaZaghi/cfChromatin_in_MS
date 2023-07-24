@@ -19,13 +19,13 @@ for sample in SAMPLES:
 # which sample_type is used as control for calling peaks: e.g. Input, IgG...
 CUT_TAG = config["c_t"]
 CHIP = config["chip"]
+CHIP_SE= config["chip-se"]
 CUT_TAGS  = [sample for sample in MARK_SAMPLES if CUT_TAG in sample]
 CHIPS = [sample for sample in MARK_SAMPLES if CHIP in sample]
 CHIPS_SE = [sample for sample in MARK_SAMPLES if CHIP in sample]
 RUNID = config["RUN_ID"]
 ## list BAM files
-ALL_SAMPLES =  CHIPS + CUT_TAGS
-
+ALL_SAMPLES = CHIPS_SE
 BAM=expand("{myrun}/filter/samtools/{sample}.bam", sample=ALL_SAMPLES, myrun=RUNID)
 ALL_FLAGSTAT = expand("{myrun}/filter/samtools/{sample}.flagstat", sample = ALL_SAMPLES,myrun=RUNID)
 ALL_DOWNSAMPLE_BAM = expand("{myrun}/downsample/sambamba/{sample}.bam", sample = ALL_SAMPLES,myrun=RUNID)
@@ -41,7 +41,6 @@ MACS2_BROAD = expand("{myrun}/peaks/macs2/{sample}_peaks.broadPeak", sample = AL
 
 TARGETS = []
 TARGETS.extend(BAM)
-#TARGETS.extend(ALL_DOWNSAMPLE_BAM)
 TARGETS.extend(GOPEAKS)
 TARGETS.extend(GOPEAKS_BROAD)
 TARGETS.extend(ALL_BIGWIG_SORTED)
@@ -55,7 +54,7 @@ TARGETS.extend(ALL_FLAGSTAT)
 
 
 
-ruleorder: merge_fastq >  fastq_trimming >  bam__bowtie2 >  bam__sorted > coverage_sorted > bam__dedup > coverage_dedup > bam__filter > stat > down_sample > downsample_stat > coverage > Gopeaks > Gopeaks_broad > macs2 > macs2_broad 
+ruleorder:  merge_fastq_SE >  fastq_trimming_SE > bam__bowtie2_SE > bam__sorted_SE > coverage_sorted > bam__dedup > coverage_dedup > bam__filter > stat > down_sample > downsample_stat > coverage > Gopeaks > Gopeaks_broad > macs2 > macs2_broad 
 
 
 
@@ -63,36 +62,27 @@ ruleorder: merge_fastq >  fastq_trimming >  bam__bowtie2 >  bam__sorted > covera
 rule all:
     input: TARGETS
 
-rule merge_fastq:
+
+rule merge_fastq_SE:
     input:
-        fq_1=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][0],
-        fq_2=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][1]
+        fq_1=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][0]
     output:
-        R1=temp("{myrun}/cat/{sample}_R1.fastq"),
-        R2=temp("{myrun}/cat/{sample}_R2.fastq")
+        R1=temp("{myrun}/cat/{sample}.fastq")
     log:
-        R1="{myrun}/cat/{sample}_1.log",
-        R2="{myrun}/cat/{sample}_2.log"
+        R1="{myrun}/cat/{sample}.log"
     threads: config['THREADS']
     shell:
         """
         gunzip -c {input.fq_1} > {output.R1}
 
-        gunzip -c {input.fq_2} > {output.R2}
-
         """
 
-
-rule fastq_trimming:  
+rule fastq_trimming_SE:  
     input:
-        R1       = "{myrun}/cat/{sample}_R1.fastq", 
-        R2       = "{myrun}/cat/{sample}_R2.fastq",
+        R1       = "{myrun}/cat/{sample}.fastq", 
         adapters = config['adapters'] #"adapters/trimmomatic/adapters-pe.fa"
     output:
-        Paired1       = temp("{myrun}/trimmed/trimmomatic/{sample}_R1_paired.fastq"),
-        Paired2       = temp("{myrun}/trimmed/trimmomatic/{sample}_R2_paired.fastq"),
-        Unpaired1 = temp("{myrun}/trimmed/trimmomatic/{sample}_R1_unpaired.fastq"),
-        Unpaired2 = temp("{myrun}/trimmed/trimmomatic/{sample}_R2_unpaired.fastq")
+        Paired1       = temp("{myrun}/trimmed/trimmomatic/{sample}_trimmed.fastq")
     log: "{myrun}/trimmed/trimmomatic/{sample}.log"
     params:
         dir = "{myrun}/trimmed/trimmomatic/"
@@ -105,26 +95,22 @@ rule fastq_trimming:
         """
         mkdir -p {params.dir} 
         
-        trimmomatic PE -threads {threads} -phred33 {input.R1} {input.R2} {output.Paired1} {output.Unpaired1} {output.Paired2} {output.Unpaired2} ILLUMINACLIP:{input.adapters}:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 
+        trimmomatic SE -threads {threads} -phred33 {input.R1} {output.Paired1} ILLUMINACLIP:{input.adapters}:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 
 
         """    
 
-
-rule bam__bowtie2:
+rule bam__bowtie2_SE:
     """
     Align reads with bowtie2
     """
     input:
-        Paired1= "{myrun}/trimmed/trimmomatic/{sample}_R1_paired.fastq",
-        Paired2 = "{myrun}/trimmed/trimmomatic/{sample}_R2_paired.fastq",
-    log:
-        error    = "{myrun}/mapped/bowtie2/{sample}.log"
+        Paired1= "{myrun}/trimmed/trimmomatic/{sample}_trimmed.fastq"
     output:
         sam = temp("{myrun}/mapped/bowtie2/{sample}.sam")
     params:
         index    = config['index_bt2_hg'] ,
-        dir      = "{myrun}/mapped/bowtie2"
-    log: "{myrun}/mapped/bowtie2/{sample}.log"
+        dir      = "{myrun}/mapped/bowtie2/"
+    log: "{myrun}/mapped/bowtie2/SE/{sample}.log"
     threads: config['THREADS']
     resources:
         mem_mb=64000
@@ -134,12 +120,10 @@ rule bam__bowtie2:
         """
         mkdir -p {params.dir}
         
-        bowtie2 --very-sensitive-local -x {params.index} -1 {input.Paired1} -2 {input.Paired2} -S {output.sam} -p {threads} --no-mixed --no-discordant
+        bowtie2 --very-sensitive-local -x {params.index} -U {input.Paired1} -S {output.sam} -p {threads} --no-mixed --no-discordant
 
         """
-
-
-rule bam__sorted:
+rule bam__sorted_SE:
     input:
         sam = "{myrun}/mapped/bowtie2/{sample}.sam"
     output:
@@ -325,7 +309,7 @@ rule downsample_stat:
         "/home/mattia/miniconda3/envs/samtools.yml"
     shell:
         """        
-        samtools flagstat -@ {threads} {input.downsample_bam} > {output.downsample_flagstat} 
+        /proj/tmp/tmp_MZ/anaconda3/envs/samtools/bin/samtools flagstat -@ {threads} {input.downsample_bam} > {output.downsample_flagstat} 
         
         """
 

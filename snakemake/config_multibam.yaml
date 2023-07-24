@@ -1,0 +1,18 @@
+# proj parameters
+RUN_ID: "Round1" # "RUN_id"
+THREADS: 30
+# multibam
+binsize: "50000"
+#correlation
+corplot: heatmap
+method: pearson
+Acetylation: 'H3K27ac'
+Methylation: 'H3K36me3'
+Polycomb: 'H3K27me3'
+#Cut&Tag or ChIP
+c_t: 'Cut-Tag'
+chip: 'ChIP'
+chip-se: 'ChIP-SE'
+# Path to a JSON file with samples and their corresponding FASTQ files.
+SAMPLES: './snakemake/SRR.txt'
+SAMPLES_JSON: './snakemake/samples_chip_all.json'
