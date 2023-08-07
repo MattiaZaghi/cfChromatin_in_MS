@@ -1,0 +1,7 @@
+sample_name	fastq_name	factor	assay	type	reference
+PBMC	E062-H3K27ac	H3K27ac	Tag	narrow	human
+PBMC	E062-H3K27ac	H3K27me3	Tag	broad	human
+PBMC	E062-H3K36me3	H3K36me3	Tag	broad	human
+Fetal_brain	E073-H3K27ac	H3K27ac	Tag	narrow	human
+Fetal_brain	E073-H3K27me3	H3K27me3	Tag	broad	human
+Fetal_brain	E073-H3K36me3	H3K36me3	Tag	broad	human

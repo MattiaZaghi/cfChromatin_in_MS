@@ -1,0 +1,36 @@
+{
+    "Fetal_brain": {
+        "H3K27ac": {
+            "Tag": [
+                "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E073-H3K27ac.tagAlign.gz"
+            ]
+        },
+        "H3K27me3": {
+            "Tag": [
+                "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E073-H3K27me3.tagAlign.gz"
+            ]
+        },
+        "H3K36me3": {
+            "Tag": [
+                "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E073-H3K36me3.tagAlign.gz"
+            ]
+        }
+    },
+    "PBMC": {
+        "H3K27ac": {
+            "Tag": [
+                "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E062-H3K27ac.tagAlign.gz"
+            ]
+        },
+        "H3K27me3": {
+            "Tag": [
+                "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E062-H3K27ac.tagAlign.gz"
+            ]
+        },
+        "H3K36me3": {
+            "Tag": [
+                "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E062-H3K36me3.tagAlign.gz"
+            ]
+        }
+    }
+}

@@ -1,5 +1,5 @@
 #config
-#configfile: "./snakemake/config_tagAlign.yaml"
+#configfile: "./snakemake/config_Cut_Tag.yaml"
 
 
 FILES = json.load(open(config['SAMPLES_JSON']))
@@ -20,13 +20,12 @@ for sample in SAMPLES:
 CUT_TAG = config["c_t"]
 CHIP = config["chip"]
 CHIP_SE= config["chip-se"]
-TAG=config["tag"]
 CUT_TAGS  = [sample for sample in MARK_SAMPLES if CUT_TAG in sample]
 CHIPS = [sample for sample in MARK_SAMPLES if CHIP in sample]
 CHIPS_SE = [sample for sample in MARK_SAMPLES if CHIP in sample]
 RUNID = config["RUN_ID"]
 ## list BAM files
-ALL_SAMPLES = CHIPS_SE
+ALL_SAMPLES = CHIPS
 BAM=expand("{myrun}/filter/samtools/{sample}.bam", sample=ALL_SAMPLES, myrun=RUNID)
 ALL_FLAGSTAT = expand("{myrun}/filter/samtools/{sample}.flagstat", sample = ALL_SAMPLES,myrun=RUNID)
 ALL_DOWNSAMPLE_BAM = expand("{myrun}/downsample/sambamba/{sample}.bam", sample = ALL_SAMPLES,myrun=RUNID)
@@ -55,7 +54,7 @@ TARGETS.extend(ALL_FLAGSTAT)
 
 
 
-ruleorder:  merge_fastq_SE >  fastq_trimming_SE > bam__bowtie2_SE > bam__sorted_SE > coverage_sorted > bam__dedup > coverage_dedup > bam__filter > stat > down_sample > downsample_stat > coverage > Gopeaks > Gopeaks_broad > macs2 > macs2_broad 
+ruleorder:  bam__bowtie2_tag > bam__sorted_tag > coverage_sorted > bam__dedup > coverage_dedup > bam__filter > stat > down_sample > downsample_stat > coverage > Gopeaks > Gopeaks_broad > macs2 > macs2_broad 
 
 
 
@@ -64,54 +63,17 @@ rule all:
     input: TARGETS
 
 
-rule merge_fastq_SE:
-    input:
-        fq_1=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][0]
-    output:
-        R1=temp("{myrun}/cat/{sample}.fastq")
-    log:
-        R1="{myrun}/cat/{sample}.log"
-    threads: config['THREADS']
-    shell:
-        """
-        gunzip -c {input.fq_1} > {output.R1}
-
-        """
-
-rule fastq_trimming_SE:  
-    input:
-        R1       = "{myrun}/cat/{sample}.fastq", 
-        adapters = config['adapters'] #"adapters/trimmomatic/adapters-pe.fa"
-    output:
-        Paired1       = temp("{myrun}/trimmed/trimmomatic/{sample}_trimmed.fastq")
-    log: "{myrun}/trimmed/trimmomatic/{sample}.log"
-    params:
-        dir = "{myrun}/trimmed/trimmomatic/"
-    resources:
-        mem_mb=64000
-    threads: config['THREADS']
-    conda:
-        "/home/mattia/miniconda3/envs/trimmomatic.yml"
-    shell:
-        """
-        mkdir -p {params.dir} 
-        
-        trimmomatic SE -threads {threads} -phred33 {input.R1} {output.Paired1} ILLUMINACLIP:{input.adapters}:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 
-
-        """    
-
-rule bam__bowtie2_SE:
+rule bam__bowtie2_tag:
     """
     Align reads with bowtie2
     """
     input:
-        Paired1= "{myrun}/trimmed/trimmomatic/{sample}_trimmed.fastq"
+        tag=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][0]
     output:
         sam = temp("{myrun}/mapped/bowtie2/{sample}.sam")
     params:
         index    = config['index_bt2_hg'] ,
         dir      = "{myrun}/mapped/bowtie2/"
-    log: "{myrun}/mapped/bowtie2/SE/{sample}.log"
     threads: config['THREADS']
     resources:
         mem_mb=64000
@@ -121,10 +83,10 @@ rule bam__bowtie2_SE:
         """
         mkdir -p {params.dir}
         
-        bowtie2 --very-sensitive-local -x {params.index} -U {input.Paired1} -S {output.sam} -p {threads} --no-mixed --no-discordant
+        bowtie2 --very-sensitive-local -x {params.index} -U {input.tag} -S {output.sam} -p {threads} --no-mixed --no-discordant
 
         """
-rule bam__sorted_SE:
+rule bam__sorted_tag:
     input:
         sam = "{myrun}/mapped/bowtie2/{sample}.sam"
     output:
