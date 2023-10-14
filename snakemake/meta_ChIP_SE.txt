@@ -6,3 +6,5 @@ CD19-Roadmap-1	SRR609630	H3K27ac	ChIP-SE	narrow	human
 CD19-Roadmap-2	SRR609631	H3K27ac	ChIP-SE	narrow	human
 CD3-Roadmap-1	SRR642538	H3K27ac	ChIP-SE	narrow	human
 CD3-Roadmap-2	SRR642539	H3K27ac	ChIP-SE	narrow	human
+Fetal-Brain	SRR1068400	H3K27me3	ChIP-SE	broad	human
+Fetal-Brain	SRR1068397	H3K36me3	ChIP-SE	broad	human

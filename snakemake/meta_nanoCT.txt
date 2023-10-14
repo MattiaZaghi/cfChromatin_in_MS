@@ -1,0 +1,15 @@
+sample_name	bam	factor	assay	type	reference
+AST	AST_H3K27ac_fragments.bed.sorted	H3K27ac	Cut-Tag	narrow	human
+AST	AST_H3K27me3_fragments.bed.sorted	H3K27me3	Cut-Tag	broad	human
+Neu-ex	CXEX_H3K27ac_fragments.bed.sorted	H3K27ac	Cut-Tag	narrow	human
+Neu-ex	CXEX_H3K27ac_fragments.bed.sorted	H3K27me3	Cut-Tag	broad	human
+Neu-in	CXINH_H3K27ac_fragments.bed.sorted.bam	H3K27ac	Cut-Tag	narrow	human
+Neu-in	CXINH_H3K27me3_fragments.bed.sorted.bam	H3K27me3	Cut-Tag	broad	human
+Endo	ENDO_H3K27ac_fragments.bed.sorted.bam	H3K27ac	Cut-Tag	narrow	human
+Endo	ENDO_H3K27me3_fragments.bed.sorted.bam	H3K27me3	Cut-Tag	broad	human
+Micro	MIGL_H3K27ac_fragments.bed.sorted.bam	H3K27ac	Cut-Tag	narrow	human
+Micro	MIGL_H3K27me3_fragments.bed.sorted.bam	H3K27me3	Cut-Tag	broad	human
+MOL	MOL_H3K27ac_fragments.bed.sorted.bam	H3K27ac	Cut-Tag	narrow	human
+MOL	MOL_H3K27me3_fragments.bed.sorted.bam	H3K27me3	Cut-Tag	broad	human
+OPC	OPC_H3K27ac_fragments.bed.sorted.bam	H3K27ac	Cut-Tag	narrow	human
+OPC	OPC_H3K27me3_fragments.bed.sorted.bam	H3K27me3	Cut-Tag	broad	human

@@ -1,0 +1,86 @@
+{
+    "AST": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/nanoct_czi_bam/AST_H3K27ac_fragments.bed.sorted.bam"
+            ]
+        },
+        "H3K27me3": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/nanoct_czi_bam/AST_H3K27me3_fragments.bed.sorted.bam"
+            ]
+        }
+    },
+    "Endo": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/nanoct_czi_bam/ENDO_H3K27ac_fragments.bed.sorted.bam"
+            ]
+        },
+        "H3K27me3": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/nanoct_czi_bam/ENDO_H3K27me3_fragments.bed.sorted.bam"
+            ]
+        }
+    },
+    "MOL": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/nanoct_czi_bam/MOL_H3K27ac_fragments.bed.sorted.bam"
+            ]
+        },
+        "H3K27me3": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/nanoct_czi_bam/MOL_H3K27me3_fragments.bed.sorted.bam"
+            ]
+        }
+    },
+    "Micro": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/nanoct_czi_bam/MIGL_H3K27ac_fragments.bed.sorted.bam"
+            ]
+        },
+        "H3K27me3": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/nanoct_czi_bam/MIGL_H3K27me3_fragments.bed.sorted.bam"
+            ]
+        }
+    },
+    "Neu-ex": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/nanoct_czi_bam/CXEX_H3K27ac_fragments.bed.sorted.bam"
+            ]
+        },
+        "H3K27me3": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/nanoct_czi_bam/CXEX_H3K27ac_fragments.bed.sorted.bam"
+            ]
+        }
+    },
+    "Neu-in": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/nanoct_czi_bam/CXINH_H3K27ac_fragments.bed.sorted.bam"
+            ]
+        },
+        "H3K27me3": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/nanoct_czi_bam/CXINH_H3K27me3_fragments.bed.sorted.bam"
+            ]
+        }
+    },
+    "OPC": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/nanoct_czi_bam/OPC_H3K27ac_fragments.bed.sorted.bam"
+            ]
+        },
+        "H3K27me3": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/nanoct_czi_bam/OPC_H3K27me3_fragments.bed.sorted.bam"
+            ]
+        }
+    }
+}

@@ -1,5 +1,56 @@
 {
-    "Fetal_brain": {
+    "Bcells": {
+        "H3K27ac": {
+            "Tag": [
+                "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E032-H3K27ac.tagAlign.gz"
+            ]
+        },
+        "H3K27me3": {
+            "Tag": [
+                "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E032-H3K27me3.tagAlign.gz"
+            ]
+        },
+        "H3K36me3": {
+            "Tag": [
+                "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E032-H3K36me3.tagAlign.gz"
+            ]
+        }
+    },
+    "Brain-ant-caud": {
+        "H3K27ac": {
+            "Tag": [
+                "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E068-H3K27ac.tagAlign.gz"
+            ]
+        },
+        "H3K27me3": {
+            "Tag": [
+                "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E068-H3K27me3.tagAlign.gz"
+            ]
+        },
+        "H3K36me3": {
+            "Tag": [
+                "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E068-H3K36me3.tagAlign.gz"
+            ]
+        }
+    },
+    "Brain-hippo": {
+        "H3K27ac": {
+            "Tag": [
+                "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E071-H3K27ac.tagAlign.gz"
+            ]
+        },
+        "H3K27me3": {
+            "Tag": [
+                "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E071-H3K27me3.tagAlign.gz"
+            ]
+        },
+        "H3K36me3": {
+            "Tag": [
+                "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E071-H3K36me3.tagAlign.gz"
+            ]
+        }
+    },
+    "Brain-pfc": {
         "H3K27ac": {
             "Tag": [
                 "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E073-H3K27ac.tagAlign.gz"
@@ -13,6 +64,23 @@
         "H3K36me3": {
             "Tag": [
                 "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E073-H3K36me3.tagAlign.gz"
+            ]
+        }
+    },
+    "Mono": {
+        "H3K27ac": {
+            "Tag": [
+                "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E029-H3K27ac.tagAlign.gz"
+            ]
+        },
+        "H3K27me3": {
+            "Tag": [
+                "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E029-H3K27me3.tagAlign.gz"
+            ]
+        },
+        "H3K36me3": {
+            "Tag": [
+                "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E029-H3K36me3.tagAlign.gz"
             ]
         }
     },
@@ -30,6 +98,23 @@
         "H3K36me3": {
             "Tag": [
                 "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E062-H3K36me3.tagAlign.gz"
+            ]
+        }
+    },
+    "Tcells": {
+        "H3K27ac": {
+            "Tag": [
+                "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E034-H3K27ac.tagAlign.gz"
+            ]
+        },
+        "H3K27me3": {
+            "Tag": [
+                "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E034-H3K27me3.tagAlign.gz"
+            ]
+        },
+        "H3K36me3": {
+            "Tag": [
+                "/date/gcb/gcb_MZ/roadmap_epigenomics/Tag_align/E034-H3K36me3.tagAlign.gz"
             ]
         }
     }

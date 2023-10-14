@@ -23,7 +23,7 @@ fastq_paths = []
 
 for root, dirs, files in os.walk(args.fastq_dir):
     for file in files:
-        if file.endswith(".gz"):
+        if file.endswith("bam"):
             full_path = join(root, file)
             fastq_paths.append(full_path)
 
@@ -62,4 +62,4 @@ print ("------------------------------------------")
 print("check the samples.json file for fastqs belong to each sample")
 print()
 js = json.dumps(FILES, indent = 4, sort_keys=True)
-open('samples_all.json', 'w').writelines(js)
+open('samples_bam.json', 'w').writelines(js)

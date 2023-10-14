@@ -28,14 +28,14 @@ ALL_SAMPLES =  CHIPS + CUT_TAGS
 
 BAM=expand("{myrun}/filter/samtools/{sample}.bam", sample=ALL_SAMPLES, myrun=RUNID)
 ALL_FLAGSTAT = expand("{myrun}/filter/samtools/{sample}.flagstat", sample = ALL_SAMPLES,myrun=RUNID)
-ALL_DOWNSAMPLE_BAM = expand("{myrun}/downsample/sambamba/{sample}.bam", sample = ALL_SAMPLES,myrun=RUNID)
-ALL_BIGWIG_SORTED = expand("{myrun}/coverage/deeptools/sorted/{sample}_RPKM.bw", sample = ALL_SAMPLES,myrun=RUNID)
-ALL_BIGWIG_DEDUP = expand("{myrun}/coverage/deeptools/dedup/{sample}_RPKM.bw", sample = ALL_SAMPLES,myrun=RUNID)
-ALL_BIGWIG= expand("{myrun}/coverage/deeptools/{sample}_RPKM.bw", sample = ALL_SAMPLES,myrun=RUNID)
+#ALL_DOWNSAMPLE_BAM = expand("{myrun}/downsample/sambamba/{sample}.bam", sample = ALL_SAMPLES,myrun=RUNID)
+ALL_BIGWIG_DEDUP = expand("{myrun}/coverage/deeptools/dedup/CPM/{sample}_CPM.bw", sample = ALL_SAMPLES,myrun=RUNID)
+ALL_BIGWIG= expand("{myrun}/coverage/deeptools/CPM/{sample}_CPM.bw", sample = ALL_SAMPLES,myrun=RUNID)
 GOPEAKS = expand("{myrun}/peaks/gopeaks/{sample}_peaks.bed", sample = CUT_TAGS,myrun=RUNID)
 GOPEAKS_BROAD = expand("{myrun}/peaks/gopeaks/{sample}_broad_peaks.bed", sample = CUT_TAGS,myrun=RUNID)
 MACS2 = expand("{myrun}/peaks/macs2/{sample}_peaks.narrowPeak", sample = ALL_SAMPLES,myrun=RUNID)
 MACS2_BROAD = expand("{myrun}/peaks/macs2/{sample}_peaks.broadPeak", sample = ALL_SAMPLES,myrun=RUNID)
+SIZE=expand("{myrun}/dedup/picard/insert/{sample}_insert.pdf", sample = ALL_SAMPLES,myrun=RUNID)
 
 
 
@@ -44,18 +44,19 @@ TARGETS.extend(BAM)
 #TARGETS.extend(ALL_DOWNSAMPLE_BAM)
 TARGETS.extend(GOPEAKS)
 TARGETS.extend(GOPEAKS_BROAD)
-TARGETS.extend(ALL_BIGWIG_SORTED)
 TARGETS.extend(ALL_BIGWIG_DEDUP)
 TARGETS.extend(ALL_BIGWIG)
 TARGETS.extend(MACS2)
 TARGETS.extend(MACS2_BROAD)
 TARGETS.extend(ALL_FLAGSTAT)
+TARGETS.extend(SIZE)
 
 
 
 
 
-ruleorder: merge_fastq >  fastq_trimming >  bam__bowtie2 >  bam__sorted > coverage_sorted > bam__dedup > coverage_dedup > bam__filter > stat > down_sample > downsample_stat > coverage > Gopeaks > Gopeaks_broad > macs2 > macs2_broad 
+
+ruleorder: merge_fastq >  trimming_trimmomatic >  aligning_bowtie2 >  sorted_samtools > dedup_picard > dedup_coverage_deeptools > filter_chr_samtools > stat_samtools > down_sample > downsample_stat_samtools > coverage_deeptools > Gopeaks > Gopeaks_broad > macs2 > macs2_broad > insertsize_picard
 
 
 
@@ -83,7 +84,7 @@ rule merge_fastq:
         """
 
 
-rule fastq_trimming:  
+rule trimming_trimmomatic:  
     input:
         R1       = "{myrun}/cat/{sample}_R1.fastq", 
         R2       = "{myrun}/cat/{sample}_R2.fastq",
@@ -110,7 +111,7 @@ rule fastq_trimming:
         """    
 
 
-rule bam__bowtie2:
+rule aligning_bowtie2:
     """
     Align reads with bowtie2
     """
@@ -139,11 +140,11 @@ rule bam__bowtie2:
         """
 
 
-rule bam__sorted:
+rule sorted_samtools:
     input:
         sam = "{myrun}/mapped/bowtie2/{sample}.sam"
     output:
-        bam = "{myrun}/sorted/samtools/{sample}.bam",
+        bam = temp("{myrun}/sorted/samtools/{sample}.bam"),
         flagstat = "{myrun}/sorted/samtools/{sample}.flagstat",
         #insert_size_metrics="{myrun}/sorted/samtools/{sample}_insert.txt",
         #insert_size_histogram="{myrun}/sorted/samtools/{sample}_insert.pdf"
@@ -167,29 +168,7 @@ rule bam__sorted:
 
         """
 
-rule coverage_sorted:
-    input: 
-        bam = "{myrun}/sorted/samtools/{sample}.bam",
-    output:
-        bw="{myrun}/coverage/deeptools/sorted/{sample}_RPKM.bw"
-    params:
-        genome_size_bp  = config['genome_size_bp'],
-        mapping_qual_bw = config['binsize'],
-        norm= config['norm_method'],
-        smooth= config['smooth_length']
-    resources:
-        mem_mb=64000
-    threads: config['THREADS']
-    log: "{myrun}/coverage/deeptools/sorted/{sample}.log"
-    conda:
-        "/home/mattia/miniconda3/envs/deeptools.yml"
-    shell:
-        """
-        bamCoverage -b {input.bam} --outFileName {output.bw} --normalizeUsing {params.norm} --binSize {params.mapping_qual_bw} --smoothLength {params.smooth} --numberOfProcessors {threads} --effectiveGenomeSize {params.genome_size_bp}  --exactScaling  
-
-        """
-
-rule bam__dedup:
+rule dedup_picard:
     input:
         markdup = "{myrun}/sorted/samtools/{sample}.bam"
     output:
@@ -219,11 +198,11 @@ rule bam__dedup:
         samtools flagstat -@ {threads} {output.dedup} > {output.flagstat}
 
         """
-rule coverage_dedup:
+rule dedup_coverage_deeptools:
     input: 
         dedup = "{myrun}/dedup/picard/{sample}.bam"
     output:
-        bw="{myrun}/coverage/deeptools/dedup/{sample}_RPKM.bw"
+        bw="{myrun}/coverage/deeptools/dedup/CPM/{sample}_CPM.bw"
     params:
         genome_size_bp  = config['genome_size_bp'],
         mapping_qual_bw = config['binsize'],
@@ -241,7 +220,7 @@ rule coverage_dedup:
 
         """
 #  Non canonical chromosomes, Y and X unmapped and mitochondrial are removed
-rule bam__filter:
+rule filter_chr_samtools:
     """
     Filter out Non-canonical chromosomes, Y and X  and mitochondrial
     """
@@ -269,7 +248,7 @@ rule bam__filter:
         samtools index {output.filter} -@ {threads}
         
         """
-rule stat:
+rule stat_samtools:
     input:
         filter = "{myrun}/filter/samtools/{sample}.bam",
         dedup  = "{myrun}/dedup/picard/{sample}.bam"
@@ -314,7 +293,7 @@ rule down_sample:
 
         shell("/home/mattia/miniconda3/envs/samtools/bin/samtools index {outbam}".format(outbam = output[0]))
 
-rule downsample_stat:
+rule downsample_stat_samtools:
     input:
         downsample_bam = "{myrun}/downsample/sambamba/{sample}.bam"
     output:
@@ -329,11 +308,11 @@ rule downsample_stat:
         
         """
 
-rule coverage:
+rule coverage_deeptools:
     input: 
         filter ="{myrun}/filter/samtools/{sample}.bam"
     output:
-        bw="{myrun}/coverage/deeptools/{sample}_RPKM.bw"
+        bw="{myrun}/coverage/deeptools/CPM/{sample}_CPM.bw"
     params:
         genome_size_bp  = config['genome_size_bp'],
         mapping_qual_bw = config['binsize'],
@@ -373,7 +352,6 @@ rule Gopeaks:
         gopeaks -b {input.treatment} -o {params.outdir}/{wildcards.sample} -p {params.qvalue} 
 
         """
-
 rule Gopeaks_broad:
     input:
         treatment = "{myrun}/filter/samtools/{sample}.bam",
@@ -446,4 +424,24 @@ rule macs2_broad:
         
         """
         
+rule insertsize_picard:
+    input:
+        dedup = "{myrun}/dedup/picard/{sample}.bam"
+    output:
+        metrics="{myrun}/dedup/picard/insert/{sample}_insert.txt",
+        pdf="{myrun}/dedup/picard/insert/{sample}_insert.pdf"
+    params:
+        dir="{myrun}/dedup/picard/insert",
+        tmp="{myrun}/dedup/picard/tmp"
+    resources:
+        mem_mb=140000
+    threads: config['THREADS'] 
+    conda:
+        "/home/mattia/miniconda3/envs/samtools.yml"
+    shell:
+        """
+        mkdir -p {params.dir}
         
+        picard CollectInsertSizeMetrics I={input.dedup} O={output.metrics} H={output.pdf} M=0.5
+
+        """

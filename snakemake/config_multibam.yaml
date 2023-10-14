@@ -1,6 +1,6 @@
 # proj parameters
-RUN_ID: "Round1" # "RUN_id"
-THREADS: 30
+RUN_ID: "Round1_hg19" # "RUN_id"
+THREADS: 5
 # multibam
 binsize: "50000"
 #correlation
@@ -15,4 +15,4 @@ chip: 'ChIP'
 chip-se: 'ChIP-SE'
 # Path to a JSON file with samples and their corresponding FASTQ files.
 SAMPLES: './snakemake/SRR.txt'
-SAMPLES_JSON: './snakemake/samples_chip_all.json'
+SAMPLES_JSON: './snakemake/samples_all.json'

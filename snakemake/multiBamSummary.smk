@@ -25,16 +25,16 @@ for sample in SAMPLES:
 #CHIPS_SE = [sample for sample in MARK_SAMPLES if CHIP in sample]
 #ACETYLATION=config['Acetylation']
 #ACETYLATIONS = [sample for sample in MARK_SAMPLES if ACETYLATION in sample]
-#METHYLATION=config['Methylation']
-#METHYLATIONS = [sample for sample in MARK_SAMPLES if METHYLATION in sample]
-POLYCOMB=config['Polycomb']
-POLYCOMBS = [sample for sample in MARK_SAMPLES if POLYCOMB in sample]
+METHYLATION=config['Methylation']
+METHYLATIONS = [sample for sample in MARK_SAMPLES if METHYLATION in sample]
+#POLYCOMB=config['Polycomb']
+#POLYCOMBS = [sample for sample in MARK_SAMPLES if POLYCOMB in sample]
 RUNID = config["RUN_ID"]
 
-ALL_SAMPLES = POLYCOMBS
-MULTIBAM = expand("{myrun}/deeptools/summary/multibamSummary_po.npz", myrun=RUNID)
-PCA = expand("{myrun}/deeptools/correlation/pca_po.png", sample = ALL_SAMPLES,myrun=RUNID)
-CORRELATION = expand("{myrun}/deeptools/correlation/pearson_po.png", sample = ALL_SAMPLES,myrun=RUNID)
+ALL_SAMPLES = METHYLATIONS 
+MULTIBAM = expand("{myrun}/coverage/deeptools/summary/multiBigwigSummary_36.npz", myrun=RUNID,sample = ALL_SAMPLES)
+PCA = expand("{myrun}/coverage/deeptools/correlation/pca_36.png", sample = ALL_SAMPLES,myrun=RUNID)
+CORRELATION = expand("{myrun}/coverage/deeptools/correlation/pearson_36.png", sample = ALL_SAMPLES,myrun=RUNID)
 
 
 TARGETS = []
@@ -51,10 +51,10 @@ rule all:
 
 rule multibamsummary:
     input: 
-        bam =expand("{myrun}/dedup/picard/{sample}.bam", sample = ALL_SAMPLES,myrun=RUNID)
+        bam =expand("{myrun}/coverage/deeptools/dedup/CPM/{sample}_CPM.bw", sample = ALL_SAMPLES,myrun=RUNID)
     output:
-        multibamsummary= "{myrun}/deeptools/summary/multibamSummary_po.npz",
-        tab="{myrun}/deeptools/summary/multibamSummary_po.tab"
+        multibamsummary= "{myrun}/coverage/deeptools/summary/multiBigwigSummary_36.npz",
+        tab="{myrun}/coverage/deeptools/summary/multiBigwigSummary_36.tab"
     params:
         bins=config['binsize']
     resources:
@@ -65,15 +65,15 @@ rule multibamsummary:
         "/home/mattia/miniconda3/envs/deeptools.yml"
     shell:
         """
-        multiBamSummary bins --bamfiles {input.bam} -o {output.multibamsummary} -bs {params.bins} -p {threads} --outRawCounts {output.tab}
+        multiBigwigSummary bins -b {input.bam} -o {output.multibamsummary} -bs {params.bins} -p {threads} --outRawCounts {output.tab}
 
         """
 rule plot_correlation:
     input: 
-        multibamsummary= "{myrun}/deeptools/summary/multibamSummary_po.npz"
+        multibamsummary= "{myrun}/coverage/deeptools/summary/multiBigwigSummary_36.npz"
     output:
-        correlation= "{myrun}/deeptools/correlation/pearson_po.png",
-        cor_tab="{myrun}/deeptools/correlation/pearson_po.tab"
+        correlation= "{myrun}/coverage/deeptools/correlation/pearson_36.png",
+        cor_tab="{myrun}/coverage/deeptools/correlation/pearson_36.tab"
     params:
         plot= config['corplot'],
         stat=config['method']
@@ -92,10 +92,10 @@ rule plot_correlation:
 
 rule plot_pca:
     input: 
-        multibamsummary= "{myrun}/deeptools/summary/multibamSummary_po.npz"
+        multibamsummary= "{myrun}/coverage/deeptools/summary/multiBigwigSummary_36.npz"
     output:
-        pca= "{myrun}/deeptools/correlation/pca_po.png",
-        pca_tab="{myrun}/deeptools/correlation/pca_po.tab"
+        pca= "{myrun}/coverage/deeptools/correlation/pca_36.png",
+        pca_tab="{myrun}/coverage/deeptools/correlation/pca_36.tab"
     params:
     resources:
         mem_mb=64000

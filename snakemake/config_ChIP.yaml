@@ -1,6 +1,6 @@
 # proj parameters
-RUN_ID: "Round1" # "RUN_id"
-THREADS: 5
+RUN_ID: "Round1_hg19" # "RUN_id"
+THREADS: 2
 # trimming
 adapters: "/home/mattia/Trimmomatic/adapters/TruSeq3-PE.fa"
 # peaks
@@ -8,7 +8,7 @@ genome_size_bp: 2730871774
 peaks_qvalue: 0.01
 #Coverage
 binsize: "10"
-norm_method: "RPKM"
+norm_method: "CPM"
 smooth_length: "300"
 #Cut&Tag or ChIP
 c_t: 'Cut-Tag'
@@ -18,7 +18,7 @@ Acetylation: 'H3K27ac'
 Methylation: 'H3K36me3'
 Polycomb: 'H3K27me3'
 #index Bowtie2
-index_bt2_hg: "/home/mattia/Genomes/hg38/fa/hg38"
+index_bt2_hg: "/home/mattia/Genomes/hg19/fa/hg19"
 #downsample target
 target_reads: "5000000"
 # Path to a JSON file with samples and their corresponding FASTQ files.

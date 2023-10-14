@@ -1,0 +1,3 @@
+FileNotFoundError in file /proj/tmp/tmp_MZ/cfChromatin_R1/snakemake/snakefile.smk, line 5:
+[Errno 2] No such file or directory: './snakemake/samples_chip.json'
+  File "/proj/tmp/tmp_MZ/cfChromatin_R1/snakemake/snakefile.smk", line 5, in <module>
