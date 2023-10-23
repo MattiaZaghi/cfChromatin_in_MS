@@ -10,18 +10,18 @@ import argparse
 from collections import defaultdict
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--fastq_dir", help="Required. the FULL path to the fastq folder")
+parser.add_argument("--bam_dir", help="Required. the FULL path to the fastq folder")
 parser.add_argument("--meta", help="Required. the FULL path to the tab delimited meta file")
 args = parser.parse_args()
 
-assert args.fastq_dir is not None, "please provide the path to the fastq folder"
+assert args.bam_dir is not None, "please provide the path to the fastq folder"
 assert args.meta is not None, "please provide the path to the meta file"
 
 
 ## collect all the fastq.gz full path in to a list
 fastq_paths = []
 
-for root, dirs, files in os.walk(args.fastq_dir):
+for root, dirs, files in os.walk(args.bam_dir):
     for file in files:
         if file.endswith("bam"):
             full_path = join(root, file)
@@ -54,7 +54,7 @@ print ("------------------------------------------")
 for sample_name in sorted(FILES.keys()):
 	for sample_type in FILES[sample_name]:
 		fastq_file = "".join(FILES[sample_name][sample_type][assay])
-		print("sample {sample_name}'s {sample_type} fastq path is {fastq_file}".format(sample_name = sample_name, sample_type = sample_type, fastq_file = fastq_file))
+		print("sample {sample_name}'s {sample_type} bam path is {fastq_file}".format(sample_name = sample_name, sample_type = sample_type, fastq_file = fastq_file))
 print ("------------------------------------------")
 for sample in FILES.keys():
 	print ("{sample} has {n} marks".format(sample = sample, n = len(FILES[sample])))
