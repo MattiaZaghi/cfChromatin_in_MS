@@ -32,9 +32,9 @@ ACETYLATIONS = [sample for sample in MARK_SAMPLES if ACETYLATION in sample]
 RUNID = config["RUN_ID"]
 
 ALL_SAMPLES = ACETYLATIONS
-MULTIBAM = expand("{myrun}/coverage/deeptools/summary/multiBamSummary_TSS_K27ac.npz", myrun=RUNID,sample = ALL_SAMPLES)
-PCA = expand("{myrun}/coverage/deeptools/correlation/pca_TSS_K27ac.png", sample = ALL_SAMPLES,myrun=RUNID)
-CORRELATION = expand("{myrun}/coverage/deeptools/correlation/pearson_TSS_K27ac.png", sample = ALL_SAMPLES,myrun=RUNID)
+MULTIBAM = expand("{myrun}/deeptools/summary/multiBamSummary_TSS_K27ac.npz", myrun=RUNID,sample = ALL_SAMPLES)
+PCA = expand("{myrun}/deeptools/correlation/pca_TSS_K27ac.png", sample = ALL_SAMPLES,myrun=RUNID)
+CORRELATION = expand("{myrun}/deeptools/correlation/pearson_TSS_K27ac.png", sample = ALL_SAMPLES,myrun=RUNID)
 
 
 TARGETS = []
@@ -42,7 +42,6 @@ TARGETS.extend(MULTIBAM)
 TARGETS.extend(PCA)
 TARGETS.extend(CORRELATION)
 
-bam_files = glob.glob("*.bam")
 
 ruleorder: multibamsummary > plot_correlation > plot_pca
 
@@ -53,12 +52,12 @@ rule all:
 
 rule multibamsummary:
     input: 
-        bam =expand("{myrun}/dedup/picard/H3K27ac/{bamfile}", bamfile=bam_files,myrun=RUNID),
-        bed=expand("{myrun}/dedup/picard/H3K27ac/TSS_hg38_list.bed", sample = ALL_SAMPLES,myrun=RUNID),
+        bam =expand("{myrun}/dedup/picard/{sample}.bam", sample = ALL_SAMPLES,myrun=RUNID),
+        bed=expand("{myrun}/TSS_hg38_list.bed", sample = ALL_SAMPLES,myrun=RUNID),
     output:
-        multibamsummary= "{myrun}/coverage/deeptools/summary/multiBamSummary_TSS_K27ac.npz",
-        tab="{myrun}/coverage/deeptools/summary/multiBamSummary_TSS_K27ac.tab",
-        norm_factor="{myrun}/coverage/deeptools/summary/norm_factor_TSS_K27ac.tab"
+        multibamsummary= "{myrun}/deeptools/summary/multiBamSummary_TSS_K27ac.npz",
+        tab="{myrun}/deeptools/summary/multiBamSummary_TSS_K27ac.tab",
+        norm_factor="{myrun}/deeptools/summary/norm_factor_TSS_K27ac.tab"
     params:
         bins=config['binsize']
     resources:
@@ -69,15 +68,15 @@ rule multibamsummary:
         "/home/mattia/miniconda3/envs/deeptools.yml"
     shell:
         """
-        multiBamSummary BED-file -b {input.bam} -o {output.multibamsummary} -bs {params.bins} -p {threads} --outRawCounts {output.tab} --BED {input.bed} --scalingFactors {output.norm_factor} 
+        multiBamSummary BED-file -b {input.bam} -o {output.multibamsummary}  -p {threads} --outRawCounts {output.tab} --BED {input.bed} --scalingFactors {output.norm_factor} 
 
         """
 rule plot_correlation:
     input: 
-        multibamsummary= "{myrun}/coverage/deeptools/summary/multiBamSummary_TSS_K27ac.npz"
+        multibamsummary= "{myrun}/deeptools/summary/multiBamSummary_TSS_K27ac.npz"
     output:
-        correlation= "{myrun}/coverage/deeptools/correlation/pearson_TSS_K27ac.png",
-        cor_tab="{myrun}/coverage/deeptools/correlation/pearson_TSS_K27ac.tab"
+        correlation= "{myrun}/deeptools/correlation/pearson_TSS_K27ac.png",
+        cor_tab="{myrun}/deeptools/correlation/pearson_TSS_K27ac.tab"
     params:
         plot= config['corplot'],
         stat=config['method']
@@ -96,10 +95,10 @@ rule plot_correlation:
 
 rule plot_pca:
     input: 
-        multibamsummary= "{myrun}/coverage/deeptools/summary/multiBamSummary_TSS_K27ac.npz"
+        multibamsummary= "{myrun}/deeptools/summary/multiBamSummary_TSS_K27ac.npz"
     output:
-        pca= "{myrun}/coverage/deeptools/correlation/pca_TSS_K27ac.png",
-        pca_tab="{myrun}/coverage/deeptools/correlation/pca_TSS_K27ac.tab"
+        pca= "{myrun}/deeptools/correlation/pca_TSS_K27ac.png",
+        pca_tab="{myrun}/deeptools/correlation/pca_TSS_K27ac.tab"
     params:
     resources:
         mem_mb=64000

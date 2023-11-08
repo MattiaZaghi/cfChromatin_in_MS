@@ -1,0 +1,260 @@
+{
+    "04061-C-100": {
+        "H3K27ac": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/04061-C-100_H3K27ac_ChIP.bam"
+            ]
+        }
+    },
+    "04061-C-200": {
+        "H3K27ac": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/04061-C-200_H3K27ac_ChIP.bam"
+            ]
+        }
+    },
+    "04061-P-100": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/04061-P-100_H3K27ac_Cut-Tag.bam"
+            ]
+        }
+    },
+    "04061-P-200": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/04061-P-200_H3K27ac_Cut-Tag.bam"
+            ]
+        }
+    },
+    "12097-C": {
+        "H3K27ac": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/12097-C_H3K27ac_ChIP.bam"
+            ],
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/12097-C_H3K27ac_Cut-Tag.bam"
+            ]
+        },
+        "H3K27me3": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/12097-C_H3K27me3_ChIP.bam"
+            ]
+        },
+        "H3K36me3": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/12097-C_H3K36me3_ChIP.bam"
+            ],
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/12097-C_H3K36me3_Cut-Tag.bam"
+            ]
+        }
+    },
+    "12097-P": {
+        "H3K27ac": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/12097-P_H3K27ac_ChIP.bam"
+            ]
+        },
+        "H3K27me3": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/12097-P_H3K27me3_ChIP.bam"
+            ]
+        },
+        "H3K36me3": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/12097-P_H3K36me3_ChIP.bam"
+            ]
+        }
+    },
+    "14223-C": {
+        "H3K27ac": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/14223-C_H3K27ac_ChIP.bam"
+            ],
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/14223-C_H3K27ac_Cut-Tag.bam"
+            ]
+        },
+        "H3K27me3": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/14223-C_H3K27me3_ChIP.bam"
+            ],
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/14223-C_H3K27me3_Cut-Tag.bam"
+            ]
+        },
+        "H3K36me3": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/14223-C_H3K36me3_ChIP.bam"
+            ]
+        }
+    },
+    "14223-P": {
+        "H3K27ac": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/14223-P_H3K27ac_ChIP.bam"
+            ],
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/14223-P_H3K27ac_Cut-Tag.bam"
+            ]
+        },
+        "H3K27me3": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/14223-P_H3K27me3_ChIP.bam"
+            ],
+            "Cut-Tag": []
+        },
+        "H3K36me3": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/14223-P_H3K36me3_ChIP.bam"
+            ]
+        }
+    },
+    "16057-P-100": {
+        "H3K27ac": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/16057-P-100_H3K27ac_ChIP.bam"
+            ],
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/16057-P-100_H3K27ac_Cut-Tag.bam"
+            ]
+        }
+    },
+    "16057-P-200": {
+        "H3K27ac": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/16057-P-200_H3K27ac_ChIP.bam"
+            ],
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/16057-P-200_H3K27ac_Cut-Tag.bam"
+            ]
+        }
+    },
+    "16170-C": {
+        "H3K27ac": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/16170-C_H3K27ac_ChIP.bam"
+            ]
+        }
+    },
+    "16170-P": {
+        "H3K27ac": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/16170-P_H3K27ac_ChIP.bam"
+            ]
+        }
+    },
+    "17170-P": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/17170-P_H3K27ac_Cut-Tag.bam"
+            ]
+        }
+    },
+    "19019-C": {
+        "H3K27ac": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/19019-C_H3K27ac_ChIP.bam"
+            ],
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/19019-C_H3K27ac_Cut-Tag.bam"
+            ]
+        },
+        "H3K27me3": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/19019-C_H3K27me3_ChIP.bam"
+            ],
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/19019-C_H3K27me3_Cut-Tag.bam"
+            ]
+        },
+        "H3K36me3": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/19019-C_H3K36me3_ChIP.bam"
+            ],
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/19019-C_H3K36me3_Cut-Tag.bam"
+            ]
+        }
+    },
+    "19019-P": {
+        "H3K27ac": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/19019-P_H3K27ac_ChIP.bam"
+            ],
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/19019-P_H3K27ac_Cut-Tag.bam"
+            ]
+        },
+        "H3K27me3": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/19019-P_H3K27me3_ChIP.bam"
+            ],
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/19019-P_H3K27me3_Cut-Tag.bam"
+            ]
+        },
+        "H3K36me3": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/19019-P_H3K36me3_ChIP.bam"
+            ]
+        }
+    },
+    "AST": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/nanoct_czi_bam/AST_H3K27ac_fragments.bed.sorted.bam"
+            ]
+        }
+    },
+    "CD19-GSE172116-1": {
+        "H3K27ac": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/CD19-GSE172116-1_H3K27ac_ChIP.bam"
+            ]
+        }
+    },
+    "CD19-GSE172116-2": {
+        "H3K27ac": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/Round1/dedup/picard/CD19-GSE172116-2_H3K27ac_ChIP.bam"
+            ]
+        }
+    },
+    "Neu-ex": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/nanoct_czi_bam/CXEX_H3K27ac_fragments.bed.sorted.bam"
+            ]
+        }
+    },
+    "Neu-in": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/nanoct_czi_bam/CXINH_H3K27ac_fragments.bed.sorted.bam"
+            ]
+        }
+    },
+    "Endo": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/nanoct_czi_bam/ENDO_H3K27ac_fragments.bed.sorted.bam"
+            ]
+        }
+    },
+    "MOL": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/nanoct_czi_bam/MOL_H3K27ac_fragments.bed.sorted.bam"
+            ]
+        }
+    },
+    "OPC": {
+        "H3K27ac": {
+            "Cut-Tag": [
+                "/date/gcb/gcb_MZ/nanoct_czi_bam/OPC_H3K27ac_fragments.bed.sorted.bam"
+            ]
+        }
+    }
+}

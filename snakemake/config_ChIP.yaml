@@ -1,5 +1,5 @@
 # proj parameters
-RUN_ID: "Round1_hg19" # "RUN_id"
+RUN_ID: "Round1" # "RUN_id"
 THREADS: 2
 # trimming
 adapters: "/home/mattia/Trimmomatic/adapters/TruSeq3-PE.fa"
@@ -8,7 +8,7 @@ genome_size_bp: 2730871774
 peaks_qvalue: 0.01
 #Coverage
 binsize: "10"
-norm_method: "CPM"
+norm_method: "RPKM"
 smooth_length: "300"
 #Cut&Tag or ChIP
 c_t: 'Cut-Tag'
@@ -18,12 +18,12 @@ Acetylation: 'H3K27ac'
 Methylation: 'H3K36me3'
 Polycomb: 'H3K27me3'
 #index Bowtie2
-index_bt2_hg: "/home/mattia/Genomes/hg19/fa/hg19"
+index_bt2_hg: "/home/mattia/Genomes/hg38/fa/hg38"
 #downsample target
 target_reads: "5000000"
 # Path to a JSON file with samples and their corresponding FASTQ files.
-SAMPLES: './snakemake/SRR.txt'
-SAMPLES_JSON: './snakemake/samples_chip.json'
+SAMPLES: '/home/mattia/cfChromatin_in_MS/snakemake/SRR.txt'
+SAMPLES_JSON: '/home/mattia/cfChromatin_in_MS/snakemake/samples_chip.json'
 
 # Set the location of your Snakemake log files
 log: snakemake.log

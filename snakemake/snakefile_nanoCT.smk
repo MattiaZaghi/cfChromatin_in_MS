@@ -27,22 +27,22 @@ RUNID = config["RUN_ID"]
 ALL_SAMPLES =  CUT_TAGS
 
 ALL_BIGWIG= expand("{myrun}/coverage/deeptools/{sample}_RPKM.bw", sample = ALL_SAMPLES,myrun=RUNID)
-GOPEAKS = expand("{myrun}/peaks/gopeaks/{sample}_peaks.bed", sample = CUT_TAGS,myrun=RUNID)
-GOPEAKS_BROAD = expand("{myrun}/peaks/gopeaks/{sample}_broad_peaks.bed", sample = CUT_TAGS,myrun=RUNID)
-MACS2 = expand("{myrun}/peaks/macs2/{sample}_peaks.narrowPeak", sample = ALL_SAMPLES,myrun=RUNID)
-MACS2_BROAD = expand("{myrun}/peaks/macs2/{sample}_peaks.broadPeak", sample = ALL_SAMPLES,myrun=RUNID)
-ALL_FLAGSTAT = expand("{myrun}/filter/samtools/{sample}.flagstat", sample = ALL_SAMPLES,myrun=RUNID)
+#GOPEAKS = expand("{myrun}/peaks/gopeaks/{sample}_peaks.bed", sample = CUT_TAGS,myrun=RUNID)
+#GOPEAKS_BROAD = expand("{myrun}/peaks/gopeaks/{sample}_broad_peaks.bed", sample = CUT_TAGS,myrun=RUNID)
+#MACS2 = expand("{myrun}/peaks/macs2/{sample}_peaks.narrowPeak", sample = ALL_SAMPLES,myrun=RUNID)
+#MACS2_BROAD = expand("{myrun}/peaks/macs2/{sample}_peaks.broadPeak", sample = ALL_SAMPLES,myrun=RUNID)
+#ALL_FLAGSTAT = expand("{myrun}/filter/samtools/{sample}.flagstat", sample = ALL_SAMPLES,myrun=RUNID)
 
 
 
 
 TARGETS = []
-TARGETS.extend(GOPEAKS)
-TARGETS.extend(GOPEAKS_BROAD)
+#TARGETS.extend(GOPEAKS)
+#TARGETS.extend(GOPEAKS_BROAD)
 TARGETS.extend(ALL_BIGWIG)
-TARGETS.extend(MACS2)
-TARGETS.extend(MACS2_BROAD)
-TARGETS.extend(ALL_FLAGSTAT)
+#TARGETS.extend(MACS2)
+#TARGETS.extend(MACS2_BROAD)
+#TARGETS.extend(ALL_FLAGSTAT)
 
 
 
@@ -57,9 +57,9 @@ rule all:
 
 rule mv_bam:
     input:
-        bam=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][0]
+        bam=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]]
     output:
-        filter = temp("{myrun}/filter/samtools/{sample}.bam")
+        filter = "{myrun}/dedup/picard/{sample}.bam"
     threads: config['THREADS']
     conda:
         "/home/mattia/miniconda3/envs/samtools.yml"
@@ -72,7 +72,7 @@ rule mv_bam:
         """
 rule coverage:
     input: 
-        filter = "{myrun}/filter/samtools/{sample}.bam"
+        filter = "{myrun}/dedup/picard/{sample}.bam"
     output:
         bw="{myrun}/coverage/deeptools/{sample}_RPKM.bw"
     params:
