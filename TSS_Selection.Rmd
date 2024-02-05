@@ -1,0 +1,118 @@
+---
+title: "Create TSS window for cfChIP"
+author: "Mattia Zaghi"
+date: "2024-02-01"
+output: html_document
+---
+
+```{r setup 1}
+.libPaths(c("/home/mattia/R/x86_64-redhat-linux-gnu-library/4.3/"))
+```
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(ggpubr)
+library(clipr)
+library(GenomicRanges)
+library(regioneR)
+library(rtracklayer)
+library(IRanges)
+library(dplyr)
+library(plyranges)
+library(org.Hs.eg.db)
+library(DESeq2)
+library(Rsubread)
+library(biomaRt)
+library(AnnotationHub)
+```
+
+## Constructing a TSS/Enhancers catalogue for cfChip-seq analysis 
+
+First we need to load the whole catalogue fo encode tissue. We will use the regions that have been lifted over to Hg38 genome.
+
+```{r}
+files <- list.files("/date/gcb/gcb_MZ/Chrom_HMM_hg38_annotation/", pattern = "\\.bed", full.names = T)
+encode <-  lapply(files, read_bed)
+```
+
+To create a cataolog of regions that might act as ground truth for H3K27ac we select all the regions that were marked with states "1_TssA", "2_TssAFlnk”, “6_EnhG” and “7_Enh” to include both TSS and enhancers which are the regions that are mostly considered positive for this type of marker. 
+
+First let´s start by selecting and filtering active TSS
+
+```{r}
+encode_df<-list()
+
+for (i in 1:length(encode)){
+  Tissue<-as.data.frame(encode[[i]]) 
+  Tissue<-Tissue[(Tissue$name %in% c("1_TssA", "2_TssAFlnk")), ]
+
+    encode_df[[i]] <- Tissue
+    names(encode_df)[i] <-  names(encode)[i]
+}
+
+TSS<- bind_rows(encode_df)
+
+TSS<-makeGRangesFromDataFrame(TSS,keep.extra.columns = T) %>% reduce()
+```
+
+The we Need to interpolate this list of TSS with UCSC list and Ensembl to validate the ones that have been annotated 
+
+```{r}
+
+# Path to UCSC TSS list
+TSS_UCSC <- read_tsv("/date/gcb/gcb_MZ/knownGene.txt", col_names = F) %>% 
+  dplyr::rename(Transcript_id=1,chr=2,strand=3,start=4,end=5) %>%
+  dplyr::select(chr,start,end,strand,Transcript_id) %>% 
+  makeGRangesFromDataFrame(keep.extra.columns = T)
+
+# Display the first few rows of the BED file
+head(TSS_UCSC)
+
+```
+```{r}
+ah = AnnotationHub()
+dm <- query(ah, c( "ENSEMBL", "Homo Sapiens"))
+f<-dm[["AH5046"]]
+```
+
+```{r}
+
+listMarts()
+
+# Connect to the ENSEMBL Biomart
+
+ensembl <- useMart("ENSEMBL_MART_ENSEMBL", host = 'www.ensembl.org', path = '/biomart/martservice', dataset = 'hsapiens_gene_ensembl')
+
+
+# Get TSS positions for ENSEMBL transcripts in hg38
+ENSEMBL_TSS <- getBM(attributes = c("chromosome_name", "start_position", "end_position", "strand", "ensembl_transcript_id"), mart = ensembl) %>% 
+  dplyr::rename(chr=2,start=3,end=4) 
+  ENSEMBL_TSS$chr<-paste0("chr", ENSEMBL_TSS$chr) 
+  ENSEMBL_TSS$strand<- ifelse(ENSEMBL_TSS$strand == 1, "+", "-")
+  ENSEMBL_TSS$chr<- ifelse(ENSEMBL_TSS$chr== "chrMT", "chrM",ENSEMBL_TSS$chr)
+ENSEMBL_TSS<-makeGRangesFromDataFrame(ENSEMBL_TSS,keep.extra.columns = T)
+
+# Print the first few rows of the resulting data
+head(ENSEMBL_TSS)
+```
+First we will look for overlap between our list of putative TSS and the UCSC known gene list and ENSEMBL transcipts list 
+```{r}
+TSS_overlap_UCSC <- find_overlaps_within(TSS,TSS_UCSC,maxgap = 2500)
+
+
+
+
+TSS_ENSEMBL<-find_overlaps_within(TSS,ENSEMBL_TSS,maxgap = 2500)
+
+TSS_ENSEMBL_unique <-subsetByOverlaps(TSS_ENSEMBL,TSS_overlap_UCSC,invert = T)
+# Concatenate the two GRanges objects
+TSS_overlap_UCSC <-as.data.frame(TSS_overlap_UCSC)
+TSS_overlap_UCSC <-TSS_overlap_UCSC[1:12]
+TSS_overlap_UCSC <-TSS_overlap_UCSC %>% dplyr::rename(itemRgb=8,name=6,score=7,ensembl_transcript_id=12)
+
+TSS_first_selection <- rbind.data.frame(TSS_overlap_UCSC,TSS_non_overlapping)
+
+head(TSS_first_selection)
+```
+
