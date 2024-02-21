@@ -30,7 +30,8 @@ BAM=expand("{myrun}/filter/samtools/{sample}.bam", sample=ALL_SAMPLES, myrun=RUN
 ALL_FLAGSTAT = expand("{myrun}/filter/samtools/{sample}.flagstat", sample = ALL_SAMPLES,myrun=RUNID)
 #ALL_DOWNSAMPLE_BAM = expand("{myrun}/downsample/sambamba/{sample}.bam", sample = ALL_SAMPLES,myrun=RUNID)
 ALL_BIGWIG_DEDUP = expand("{myrun}/coverage/deeptools/{sample}_RPKM.bw", sample = ALL_SAMPLES,myrun=RUNID)
-BED=expand("{myrun}/bed/bedtools/{sample}.bed", sample = ALL_SAMPLES,myrun=RUNID)
+BEDPE=expand("{myrun}/bed/bedtools/{sample}.bed", sample = ALL_SAMPLES,myrun=RUNID)
+BED=expand("{myrun}/bed/bedtools/normal/{sample}.bed", sample = ALL_SAMPLES,myrun=RUNID)
 #ALL_BIGWIG= expand("{myrun}/coverage/deeptools/CPM/{sample}_CPM.bw", sample = ALL_SAMPLES,myrun=RUNID)
 #GOPEAKS = expand("{myrun}/peaks/gopeaks/{sample}_peaks.bed", sample = CUT_TAGS,myrun=RUNID)
 #GOPEAKS_BROAD = expand("{myrun}/peaks/gopeaks/{sample}_broad_peaks.bed", sample = CUT_TAGS,myrun=RUNID)
@@ -51,6 +52,7 @@ TARGETS.extend(ALL_BIGWIG_DEDUP)
 #TARGETS.extend(MACS2_BROAD)
 TARGETS.extend(ALL_FLAGSTAT)
 TARGETS.extend(SIZE)
+TARGETS.extend(BEDPE)
 TARGETS.extend(BED)
 
 
@@ -449,5 +451,26 @@ rule bam_to_bed:
         mkdir -p {params.dir}
 
         bedtools bamtobed -bedpe -i {input.dedup}  > {output.bed}
+
+        """
+
+rule bam_to_bed2:
+    input: 
+        dedup  = "{myrun}/dedup/picard/{sample}.bam"
+    output:
+        bed="{myrun}/bed/bedtools/normal/{sample}.bed"
+    params:
+        dir  = "{myrun}/bed/bedtools/"
+    resources:
+        mem_mb=64000
+    threads: config['THREADS']
+    conda:
+        "/home/mattia/miniconda3/envs/bedtools.yml"
+    shell:
+        """
+
+        mkdir -p {params.dir}
+
+        bedtools bamtobed  -i {input.dedup}  > {output.bed}
 
         """

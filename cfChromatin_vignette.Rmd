@@ -1,0 +1,748 @@
+---
+title: "CfChromatin analysis script"
+author: "Mattia Zaghi"
+date: "2024-02-01"
+output: html_document
+---
+
+```{r setup 1}
+.libPaths(c("/home/mattia/R/x86_64-redhat-linux-gnu-library/4.3/"))
+setwd(dir = "/home/mattia/cfChromatin_in_MS/")
+```
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(ggpubr)
+library(clipr)
+library(GenomicRanges)
+library(regioneR)
+library(rtracklayer)
+library(IRanges)
+library(dplyr)
+library(plyranges)
+library(org.Hs.eg.db)
+library(DESeq2)
+library(Rsubread)
+library(biomaRt)
+library(AnnotationHub)
+library(BSgenome.Hsapiens.UCSC.hg38)
+library(parallel)
+library(GenomeInfoDb)
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+library(limma)
+```
+
+## 1.Constructing a TSS/Enhancers catalogue for cfChip-seq analysis 
+
+As explained in the manual Page 5-6. The first step is creating a catalogue of regions with bonafide signal based on the ChromHMM annotation derived from 111 tissues abalyzed in the roadmap epigenomics project selecting only the genome portions annotated as TSS or TSS flanking regions.
+
+```{r}
+# Get the list of .bed files containing the specific ChromHMM annotations
+files <- list.files("/date/gcb/gcb_MZ/Chrom_HMM_hg38_annotation/", pattern = "\\.bed", full.names = T)
+
+# Load the .bed files into a list of Grange objects
+encode <- lapply(files, read_bed)
+
+# Rename the data frames in the encode list based on the file names
+names(encode) <- sapply(files, function(file) {
+  # Extract the base name of the file (without path)
+  base_name <- basename(file)
+  
+  # Extract the first part of the name (e.g., "E001")
+  new_name <- strsplit(base_name, "_")[[1]][1]
+  
+  # Return the new name
+  return(new_name)
+})
+
+# Initialize an empty list to store the filtered data frames
+encode_df <- list()
+
+# Load the Glossary file which contains the code name corresponding to each Roadmap tissue
+Glossary <- read_delim("/date/gcb/gcb_MZ/Chrom_HMM_hg38_annotation/Glossary.txt", 
+delim = "\t", escape_double = FALSE, 
+  trim_ws = TRUE)
+
+# Convert the Glossary to a data frame
+Glossary <-as.data.frame(Glossary)
+
+# Loop over the encode list
+for (i in 1:length(encode[1:111])){
+  # Convert the list element to a data frame
+  Tissue <- as.data.frame(encode[[i]]) 
+  
+  # Filter rows where 'name' is either "1_TssA" or "2_TssAFlnk"
+  Tissue_TSS <- Tissue[(Tissue$name %in% c("1_TssA", "2_TssAFlnk")), ]
+  
+  # Convert the tissue in a Grange and reduce the range within each tissue
+  Tissue_TSS<-makeGRangesFromDataFrame(Tissue_TSS,keep.extra.columns = T) %>% reduce()
+  
+  # Convert the GRanges object back to a data frame and store it in the list
+  encode_df[[i]] <- as.data.frame(Tissue_TSS)
+
+  # Get the current data frame
+  df <- encode_df[[i]]
+  
+  # Get the EID from the name of the data frame
+  eid <- names(encode)[i]
+  
+  # Get the corresponding STD_NAME from the Glossary data frame
+  std_name <- Glossary$STD_NAME[Glossary$EID == eid]
+
+  # Add the new column to the data frame
+  df$tissue <- std_name
+  
+  # Store the modified data frame back in the list with the original name
+  names(encode_df)[i] <- names(encode)[i]
+  encode_df[[i]] <- df
+}
+
+# Combine all the merged regions from each tissue into a single data frame
+ChromHMM_TSS <- do.call(rbind, encode_df)
+
+# Group by seqnames, start, and end, and concatenate tissue values within each group
+df <- df %>%
+  group_by(seqnames, start, end) %>%
+  summarise(tissue = paste(unique(tissue), collapse = ";"))
+
+# Convert the data frame back to a GRanges object for further analysis
+ChromHMM_TSS <- makeGRangesFromDataFrame(ChromHMM_TSS, keep.extra.columns = T) 
+ChromHMM_TSS <- sort.GenomicRanges(ChromHMM_TSS)
+
+# Merge overlapping ranges and concatenate the tissue names
+gr <- reduce(ChromHMM_TSS , ignore.strand=TRUE)
+
+gr<-join_overlap_inner(gr,ChromHMM_TSS)
+
+# Group by seqnames, start, and end, and concatenate tissue values within each group
+df <- as.data.frame(gr) %>%
+  group_by(seqnames, start, end) %>%
+  summarise(tissue = paste(unique(tissue), collapse = ";"))
+
+# Convert the data frame back to a GRanges object for further analysis
+Window <- makeGRangesFromDataFrame(df , keep.extra.columns = T) 
+
+# Remove temporary variables to free up memory
+rm(df)
+rm(ChromHMM_TSS)
+rm (gr)
+rm(encode)
+rm(encode_df)
+
+```
+
+The next step is to associate a gene to the as many as possible of those regions using the strategy that is explained in the manual which uses annotation from UCSC known genes and Ensembl to map to each one of those regions at list one transcript. 
+
+```{r}
+
+# Load the UCSC TSS list from the specified path
+ucsc_genes<- read_tsv("/date/gcb/gcb_MZ/knownGene.txt", col_names = F) %>% 
+  # Rename the columns for better readability
+  dplyr::rename(Transcript_id=1,chr=2,strand=3,start=4,end=5) %>%
+  # Select only the necessary columns
+  dplyr::select(chr,start,end,strand,Transcript_id) 
+
+# Define the list of chromosomes
+chromosomes <- c("chr1", "chr2", "chr3", "chr4", "chr5", "chr6", "chr7", "chr8", "chr9", "chr10", "chr11", "chr12", "chr13", "chr14", "chr15", "chr16", "chr17", "chr18", "chr19", "chr20", "chr21", "chr22", "chrX", "chrY", "chrM")
+
+# Filter the UCSC genes to include only the defined chromosomes
+ucsc_genes <- ucsc_genes[ucsc_genes$chr %in% chromosomes, ]
+
+# Convert the data frame to a GRanges object
+ucsc_genes <- makeGRangesFromDataFrame(ucsc_genes, keep.extra.columns = TRUE)
+
+
+
+# Connect to the Ensembl database
+ensembl <- useMart("ensembl")
+
+# Select the human dataset from the Ensembl database
+ensembl <- useDataset("hsapiens_gene_ensembl", mart = ensembl)
+
+# Retrieve the transcript annotations from the Ensembl database
+ensembl_transcripts <- getBM(attributes = c('ensembl_transcript_id', 'chromosome_name', 'start_position', 'end_position', 'strand', 'ensembl_gene_id', 'external_gene_name'), mart = ensembl)%>%
+  # Replace "MT" with "M" in the chromosome names
+  mutate(chromosome_name = ifelse(chromosome_name == "MT", "M", chromosome_name),
+         # Add "chr" prefix to the chromosome names
+         chromosome_name = paste0("chr", chromosome_name)) %>% 
+   # Convert the strand values to "+" and "-"
+   mutate(strand = ifelse(strand == 1, "+", 
+                      ifelse(strand == -1, "-", strand))) %>% 
+  # Rename the columns for better readability
+  dplyr::rename(chr=2,start=3,end=4) 
+
+# Filter the Ensembl transcripts to include only the defined chromosomes
+ensembl_transcripts <- ensembl_transcripts[ensembl_transcripts$chr %in% chromosomes, ]
+
+# Convert the data frame to a GRanges object
+ensembl_transcripts <- makeGRangesFromDataFrame(ensembl_transcripts,keep.extra.columns = TRUE)
+
+# Display the first few rows of the UCSC genes
+head(ucsc_genes)
+# Display the first few rows of the Ensembl transcripts
+head(ensembl_transcripts)
+
+```
+
+The first step in order to associate a gene to each one of those regions is to find all the known TSS which are within 2.5 kb from the list of regions we have created using the collection from UCSC and Ensembl
+
+```{r}
+# Define the dimension for resizing the regions
+distance <- 1
+
+
+# Resize the gene or transcript regions from UCSC and Ensembl to the defined distance
+# The resizing is done from the start of the regions
+ucsc_genes_TSS<- resize(ucsc_genes, width = distance, fix="start")
+ensembl_transcripts_TSS <-  resize(ensembl_transcripts, width = distance, fix="start")
+
+# Find the overlaps between the TSS catalogue and the UCSC genes
+# This will give us the annotations from UCSC that are nearby the TSS regions
+Window_UCSC <- join_overlap_left(Window,ucsc_genes_TSS, maxgap = 2500) 
+
+# After having annotated the TSS catalogue with UCSC we want to convert the transcript id into Gene names
+transcript_ids <- mcols(Window_UCSC)$Transcript_id
+
+# First, get the gene IDs corresponding to the transcript IDs
+gene_ids <- mapIds(TxDb.Hsapiens.UCSC.hg38.knownGene, keys = transcript_ids, column = "GENEID", keytype = "TXNAME") 
+
+# Get the number of cores
+num_cores <- 40
+
+# Create a function to process each element
+process_element <- function(i) {
+  # Get the current TranscriptID and GeneID(s)
+  transcript_id <- names(gene_ids)[i]
+  gene_id <- gene_ids[[i]]
+  
+  # If there are multiple GeneIDs, repeat the TranscriptID
+  if (length(gene_id) > 1) {
+    transcript_id <- rep(transcript_id, length(gene_id))
+  }
+  
+  # Check if gene_id is empty
+  if (length(gene_id) == 0) {
+    # If gene_id is empty, assign it as NA
+    gene_id <- NA
+  }
+  
+  # Combine the current TranscriptID(s) and GeneID(s) into a data frame
+  df_i <- data.frame(TranscriptID = transcript_id, GeneID = gene_id)
+  
+  return(df_i)
+}
+
+# Apply the function in parallel to each element in the list
+df_list <- mclapply(seq_along(gene_ids), process_element, mc.cores = num_cores)
+
+# Combine the list of data frames into one data frame
+gene_ids_convert <- do.call(rbind, df_list)
+
+
+
+# Then, map the gene IDs to gene symbols using org.Hs.eg.db
+
+gene_symbols <- mapIds(org.Hs.eg.db, keys =gene_ids_convert$GeneID, column = "SYMBOL", keytype = "ENTREZID")
+
+# Get the number of cores
+num_cores <- 40
+
+# Create a function to process each element
+process_element <- function(i) {
+  # Get the current TranscriptID and GeneID(s)
+  Gene_id <- names(gene_symbols)[i]
+  gene_symbols <- gene_symbols[[i]]
+  
+  # If there are multiple GeneIDs, repeat the TranscriptID
+  if (length(gene_symbols) > 1) {
+    transcript_id <- rep(Gene_id, length(gene_symbols))
+  }
+  
+  # Check if gene_symbols is empty
+  if (length(gene_symbols) == 0) {
+    # If gene_symbols is empty, assign it as NA
+    gene_symbols <- NA
+  }
+  
+  # Combine the current TranscriptID(s) and GeneID(s) into a data frame
+  df_i <- data.frame(GeneID = Gene_id, SYMBOL= gene_symbols)
+  
+  return(df_i)
+}
+
+# Apply the function in parallel to each element in the list
+df_list <- mclapply(seq_along(gene_symbols), process_element, mc.cores = num_cores)
+
+# Combine the list of data frames into one data frame
+gene_symbols_convert <- do.call(rbind, df_list)
+
+# Add the gene symbols to the metadata columns of the GRanges object
+mcols(Window_UCSC)$name <- gene_symbols_convert$SYMBOL
+
+#Now that we have the gene symbol associated with each UCSC annotation we can create a column name type in Which the annotated TSS will be names TSS_UCSC if annotated otherwise just TSS
+Window_UCSC$type <- ifelse(!is.na(Window_UCSC$Transcript_id), "TSS_UCSC", "TSS")
+
+                      
+# Find the overlaps between the non-overlapping TSS regions and the Ensembl transcripts
+# This will give us the annotations from Ensembl that are nearby the remaining TSS regions and not annotated using UCSC
+Window_UCSC_ENSEMBL <- join_overlap_left(Window_UCSC,ensembl_transcripts_TSS, maxgap = 2500)
+
+#We then convert the Grange into a dataframe to perform the final modification to the catalogue 
+Window_UCSC_ENSEMBL <-as.data.frame(Window_UCSC_ENSEMBL)
+
+#First in the column type all the TSS that have been annotated using ENSEMBL but not UCSC will be named TSS_ENSEMBL all the non annotated just TSS
+Window_UCSC_ENSEMBL$type <- ifelse(!is.na(Window_UCSC_ENSEMBL$Transcript_id), "TSS_UCSC",
+                  ifelse(!is.na(Window_UCSC_ENSEMBL$ensembl_transcript_id), "TSS_ENSEMBL", "TSS"))
+
+# Use coalesce to fill NA values in 'name' with 'external_gene_name'
+Window_UCSC_ENSEMBL$name <- coalesce(Window_UCSC_ENSEMBL$name, Window_UCSC_ENSEMBL$external_gene_name)
+
+Window_UCSC_ENSEMBL[Window_UCSC_ENSEMBL == ""] <- NA
+
+# Finally all the genomics windows with the same identical coordinates are merged together and the annotation are pull together in the different metadata column
+Windows <- Window_UCSC_ENSEMBL %>%
+  dplyr::select(-Transcript_id, -ensembl_transcript_id) %>%
+  group_by(seqnames, start, end,type) %>%
+  summarise(across(c(tissue, name), list(~paste(unique(.[!is.na(.)]), collapse = ";"))))
+saveRDS(Windows, "Windows.rds")
+```
+
+To increase the number of annotated regions that are present in our catalouge now we will expand the region flanking our TSS to 3kb and try to find other overlapping TSS among the non assigned regions in the TSS catalouge
+
+```{r}
+# Increase the distance to 3kb for expanding the region flanking our TSS
+distance<-3000
+
+# Define TSS windows for each gene in UCSC and Ensembl by expanding the region flanking the TSS to 3kb
+ucsc_tss_windows <- promoters(ucsc_genes_TSS, upstream = distance, downstream = distance)
+ensembl_tss_windows <- promoters(ensembl_transcripts, upstream = distance, downstream = distance)
+
+#To continue this operation we first need to retransfrom the windows dataset into a Grange object again
+Windows<-readRDS("Windows.rds")
+Windows<-makeGRangesFromDataFrame(Windows,keep.extra.columns = T)
+# Find the overlaps between the non-annotated TSS regions and the UCSC TSS windows
+# This will give us the non-annotated TSS regions that are nearby a UCSC gene
+Windows_3Kb <- join_overlap_left(Windows,ucsc_tss_windows)
+
+# Find the overlaps between the non-annotated TSS regions and the ENSEMBL TSS windows
+# This will give us the non-annotated TSS regions that are nearby a ENSEMBL gene
+Windows_3Kb <- join_overlap_left(Windows_3Kb,ensembl_tss_windows)
+
+#Again transform the dataset into a df
+Windows_3Kb<-as.data.frame(Windows_3Kb)
+#Associate the correct TSS type to each line
+Windows_3Kb$type <- ifelse(!is.na(Windows_3Kb$Transcript_id), "TSS_UCSC",
+                  ifelse(!is.na(Windows_3Kb$ensembl_transcript_id), "TSS_ENSEMBL", "TSS"))
+
+# Use coalesce to fill NA values in 'name' with 'external_gene_name'
+Windows_3Kb$name <- coalesce(Windows_3Kb$name, Windows_3Kb$external_gene_name)
+
+Windows_3Kb[Windows_3Kb == ""] <- NA
+
+# Assuming 'Windows_3Kb' is your data frame
+Windows_3Kb <-Windows_3Kb %>%
+  dplyr::select(-Transcript_id, -ensembl_transcript_id) %>%
+  group_by(seqnames, start, end,type) %>%
+  summarise(across(c(tissue_1, name_1), list(~paste(unique(.[!is.na(.)]), collapse = ";"))))
+
+Windows<-readRDS("Windows.rds")
+# Use coalesce to fill NA values in 'name' with 'external_gene_name' and assocate the new tissue annotation to the old dataset
+Windows$tissue_1<- coalesce(Windows$tissue_1, Windows_3Kb$tissue_1_1)
+# Use coalesce to fill NA values in 'name' with 'external_gene_name' and associate the new name annotation to the old dataset
+Windows$name_1<- coalesce(Windows$name_1, Windows_3Kb$name_1_1)
+
+saveRDS(Windows,"Windows.rds")
+```
+
+The final step that now is missing is to add the the flanking and backgorund regions as described in the manual. Flakning regions of TSS will have a size of 1kb or lower. Background regions that are all the regions from the genome that not included in the TSS catalogue will be tiled into 5kb or lower windows and named as background for the subsequent analysis. 
+
+```{r}
+#first load the catalouge
+Windows<-readRDS("Windows.rds")
+#transform the Windows dataframe into a genomic ranges object again 
+
+Windows<-makeGRangesFromDataFrame(Windows,keep.extra.columns = T)
+# Create flanking regions at start and end of Windows dataset
+flank_start <- IRanges::flank(Windows, 1000)
+flank_end <-IRanges::flank(Windows,width = 1000,start = F)
+#merge and sort them
+flank<-c(flank_start,flank_end)
+flank <- sort(flank)
+
+# Name them as 'flanking'
+mcols(flank)$type <- "flanking"
+mcols(flank)$tissue_1 <- NA
+mcols(flank)$name_1 <- NA
+# Add the flanking regions to the Windows object
+Windows<-c(Windows,flank)
+Windows<-sort(Windows)
+
+
+#The last step the needs to be performed is to tile the remaining regions at 5kb or lower and name them as background
+# We first transform Windows into a Grange object named gr
+gr <-Windows
+
+# Get the sequence lengths for the genome of interest
+seqinfo <- Seqinfo(genome="hg38")
+
+# Create a GRanges object that represents the entire genome tiled at 5kb
+genome_tiles <- tileGenome(seqinfo, tilewidth=5000, cut.last.tile.in.chrom=TRUE)
+
+# Find the set difference between the genome tiles and your GRanges object
+background <- setdiff_ranges(genome_tiles, gr)
+background<-tile_ranges(background,width = 5000)
+# Add the "background" type to these new regions
+background$type <- "background"
+
+# Combine your original GRanges object with the background regions and transform it in a dataframe
+gr_with_background <- c(gr, background) 
+gr_with_background <-sort.GenomicRanges(gr_with_background)%>% as.data.frame()
+
+#finally the grange + background is reconverted into what will be the final Window object that we will use during our analysis
+Windows<-gr_with_background %>% dplyr::select(seqnames,start,end,width,type,name_1,tissue_1) %>% dplyr::rename(name=6,tissue=7)
+
+Windows<-makeGRangesFromDataFrame(Windows,keep.extra.columns = T)
+
+
+#In the subsequent steps I realized that one range had a negative value so I use this code to modify it before going on
+
+old_value <- '-799'  # replace this with the actual value
+
+# Find the index of the range with the start value equal to 'old_value'
+index <- which(start(Windows) == old_value)
+
+# Change the start value of the range at 'index' to 1
+start(Windows)[index] <- 1
+
+saveRDS(Windows,"Windows.rds")
+
+#N.B. the final windows object strucutre has been modelled after this dataset downloaded from the Sadeh et al. paper zenodo repo. you can check this dataset at this path "/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K4me3/Windows.csv" to see if I get the point
+```
+
+
+Now let´s create also a set of enhancers derived from ChromHMM annotation using “6_EnhG” and “7_Enh” marked regions to produce set of putative enhancers (N.B: this is still in development since I am using H3K27ac which should also map enhancers, but for now I am focusing my attention only on the widows TSS catalogue skip this part for now).
+
+```{r}
+# Initialize an empty list to store enhancer data
+encode_enh<-list()
+
+# Loop over each element in the 'encode' list
+for (i in 1:length(encode)){
+  # Convert the i-th element of 'encode' to a data frame
+  Tissue<-as.data.frame(encode[[i]]) 
+
+  # Filter rows where the 'name' column is either "6_EnhG" or "7_Enh"
+  Tissue_enh<-Tissue[(Tissue$name %in% c("6_EnhG", "7_Enh")), ]
+
+  # Add the filtered data frame to the 'encode_enh' list
+  encode_enh[[i]] <- Tissue_enh
+
+  # Set the name of the i-th element in 'encode_df' to the name of the i-th element in 'encode'
+  names(encode_df)[i] <-  names(encode)[i]
+}
+
+# Combine all data frames in the 'encode_enh' list into a single data frame
+ChromHMM_Ehn<- bind_rows(encode_enh)
+
+# Convert the data frame to a GRanges object and reduce it to merge overlapping ranges
+ChromHMM_Ehn<-makeGRangesFromDataFrame(ChromHMM_Ehn,keep.extra.columns = T) %>% reduce()
+
+```
+
+## 2.Constructing a Count Matrix of each chip-seq based on the Windows set of regions
+
+ Now using the methodology described at page 7 of the manual we will construct a cont matrix of our chip samples over the windows catalouge.
+
+```{r}
+
+# Specify the directory where your BED files are stored
+dir <- "/date/gcb/gcb_MZ/Round1/bed/bedtools/normal/"
+
+# Get a list of all BED files in the directory that end with "H3K27ac_ChIP.bed"
+bed_files <- list.files(path = dir, pattern = "H3K27ac_ChIP\\.bed$", full.names = TRUE)
+
+#define regions
+Windows<-readRDS("Windows.rds")
+
+regions<- Windows
+
+# Define a function to process a single BED file and a set of regions
+process_bed_file <- function(bed_file, regions) {
+  # Load the BED file
+  bed <- import.bed(bed_file)
+
+  # Resize the fragments to length 1, maintaining their center
+  bed_resized <- resize(bed, width = 1, fix = "center")
+  
+  # Count overlaps
+  counts <- countOverlaps(regions, bed_resized)
+
+  # Add counts to the metadata columns of the regions GRanges object
+  mcols(regions)$counts <- counts
+
+  # Return the regions GRanges object
+  return(regions)
+}
+
+# Use mclapply() to apply the function in parallel to the list of BED files
+# Set mc.cores to the number of cores you want to use
+results <- mclapply(bed_files, process_bed_file, regions = regions, mc.cores = 40)
+
+# Now 'results' is a list of GRanges objects
+# You can convert it to a named list of GRanges objects with the file names as the names of the list elements
+counts_list<- setNames(results, gsub("\\.bed$", "", basename(bed_files)))
+
+saveRDS(counts_list,"H3K27ac_ChIP_counts.rds")
+
+
+
+```
+
+## 3. Background Signal calculation
+
+The background signal calculation is based on the premises and the methodology described at page 7-8-9 of the manual. Mine is simplified since I do not have cancer patients and also I am for now considering all the individuals as normal since I do not know what MS implies on this regards. 
+
+```{r}
+#load regions in which the background has been computed
+
+counts_list<-readRDS("H3K27ac_ChIP_counts.rds")
+
+
+#this function is based on the theoretical premises of the manual
+estimateBackground <- function(gr) {
+  # Extract background regions
+  background_regions <- gr[gr$type == "background"]
+  
+  # Calculate the length of each region
+  region_lengths <- width(background_regions)
+  
+  # Filter regions that are longer than 4kb
+  long_background_regions <- background_regions[region_lengths >= 4000]
+  
+  # Extract counts from the filtered regions
+  X <- mcols(long_background_regions)$counts
+  
+  # Find the 95th quantile of X
+  T <- quantile(X, 0.95)
+  
+  # Restrict ourselves to values below T
+  X <- X[X <= T]
+  
+  # Maximum likelihood of truncated poisson
+  lambda_hat <- which.max(dpois(X, lambda = 1:length(X)))
+  
+  # Convert to reads/Kb (the median length of background windows is 5KB)
+  lambda_hat <- lambda_hat / 5
+  
+  # Add the background estimate as a new column to the GRanges object
+  gr$background <- lambda_hat
+  
+  return(gr)
+}
+
+# Apply the estimateBackground function to each GRanges object in the list
+# Set mc.cores to the number of cores you want to use
+granges_list_with_background <- mclapply(counts_list, estimateBackground, mc.cores = detectCores())
+
+#Save the Grange object in which the bakcground computatio has been performed
+saveRDS(granges_list_with_background,"H3K27ac_ChIP_counts.rds")
+
+```
+
+## 4. Gene-level signal and normalization to produce normalized tracks and counts for the rest of the analysis
+
+This procedure follows what has been described in the manual at page 10- beginning of 11.
+
+```{r}
+#load the counts list needed to obtain the normalize signal in which the counts and the background signal has been already calculated
+
+counts_list<-readRDS("H3K27ac_ChIP_counts.rds")
+
+# Define the function to calculate raw signal at gene level
+rawSignal <- function(gr) {
+  # Extract counts and background from the GRanges object
+  C <- mcols(gr)$counts
+  B <- mcols(gr)$background * (width(gr)/1000)
+  
+  # Calculate raw signal based on what has been described in the manual. Therefore discard everything that is below the background level
+  S <- ifelse(C > B, C - B, 0)
+  
+  # Add the raw signal as a new column to the GRanges object
+  gr$rawSignal <- S
+  
+  return(gr)
+}
+
+# Apply the rawSignal function to each GRanges object in the list
+rawSignal_counts <- mclapply(counts_list, rawSignal, mc.cores = detectCores())
+rm(counts_list)
+
+#In the list of my bed files there are these ChIP datasets from the literature. I am using them as QC to see how this script is impacting a conventional dataset, but I am not using this dataset for the scaling factor calculation since they are completely different from what I have in my dataset
+exclude_samples <- c("CD19-GSE172116-1_H3K27ac_ChIP", "CD19-GSE172116-2_H3K27ac_ChIP")
+
+# Remove the samples from the GRanges list
+rawSignal_counts_blood_only <- rawSignal_counts[!names(rawSignal_counts) %in% exclude_samples]
+
+# Extract the 'name' AKA genes and 'rawSignal' columns from the GRanges list
+data <- do.call(rbind, lapply(rawSignal_counts_blood_only, function(gr) data.frame(name = gr$name, rawSignal = gr$rawSignal, stringsAsFactors = FALSE)))
+
+
+# This operation is performed because later in the script I need to have the full list of the raw signal associated to each single region of my window catalouge
+gr_list_modified <- lapply(rawSignal_counts_blood_only, function(gr) {
+  gr$region <- paste0(seqnames(gr), ":", start(gr), "-", end(gr), "-", seq_along(gr))
+  return(gr)
+})
+
+total_signal<-do.call(rbind, lapply(gr_list_modified, function(gr) data.frame(name = gr$region, rawSignal = gr$rawSignal, stringsAsFactors = FALSE)))
+
+# Remove row names
+rownames(total_signal) <- NULL
+
+
+# Group by 'region' and summarize 'rawSignal'
+total_signal<- total_signal %>%
+  group_by(name) %>%
+  summarize(rawSignal = sum(rawSignal, na.rm = TRUE))
+
+total_signal<-as.data.frame(total_signal)
+
+
+rownames(total_signal)<-total_signal$name
+
+
+total_signal$name<-NULL
+
+# Remove rows with NA in the 'name' column which correspond to the windows that have not been associated to any gene
+data <- data[!is.na(data$name) & data$name != "", ] 
+
+# Calculate the total signal for each gene across all samples
+total_signal_gene <- tapply(data$rawSignal, data$name, sum)
+
+# Calculate the standard deviation for each gene across all samples
+std_dev <- tapply(data$rawSignal, data$name, sd)
+
+# Calculate the median of the Poisson distribution (Since I did not know how to determine Housekeeping gene significance I set a casual value of the median on the poisson distribution and sd value across samples it can be modified to a strategy with more sense. I am open to any suggestion)
+# Assuming 'lambda' is the mean of your data
+lambda <- median(total_signal_gene)
+poisson_median <- qpois(0.7, lambda)
+
+# Define a standard deviation threshold
+std_dev_threshold <- 5  # replace with your actual threshold
+
+# Identify the housekeeping genes
+# Housekeeping genes are those with a signal above the median of the Poisson distribution and a standard deviation below a certain threshold
+housekeeping_genes <- names(total_signal_gene)[total_signal_gene > poisson_median & std_dev <= std_dev_threshold]
+
+# Now we will first generated a matrix contained the counts for each specific housekeeping gene resulting from the sum of all the samples that then will be used for calculating the scaling factor
+count_dfs <- list()
+
+# Loop over the GRanges list
+for(i in seq_along(rawSignal_counts_blood_only)) {
+  # Extract the 'name' and 'counts' columns from the GRanges object
+  data <- data.frame(name = rawSignal_counts_blood_only[[i]]$name, rawSignal = rawSignal_counts_blood_only[[i]]$rawSignal, stringsAsFactors = FALSE)
+  
+  # Group by 'name' and summarize 'counts'
+  Windows <- data %>%
+    group_by(name) %>%
+    summarize(rawSignal = mean(rawSignal))
+  
+  # Remove rows with NA in the 'name' column
+  All_genes <- Windows[!is.na(Windows$name) & Windows$name != "", ] 
+  
+  All_genes<-as.data.frame(All_genes)
+  
+  # Let's filter only the housekeeping genes that will be used in the analysis
+  housekeeping <- All_genes %>% dplyr::filter(name %in% housekeeping_genes)
+  
+  # Set the 'name' column as row names
+  row.names(housekeeping) <- housekeeping$name
+  
+  # Remove the 'name' column
+  housekeeping$name <- NULL
+  
+  # Add the data frame to the list
+  count_dfs[[i]] <- housekeeping
+}
+# Combine all data frames into a single count matrix
+count_matrix <- do.call(cbind, count_dfs)
+
+# Set the column names of the count matrix as the names of the GRanges objects
+colnames(count_matrix) <- names(rawSignal_counts_blood_only)
+
+#filter housekeeping genes from the gene count matrix
+
+S_housekeeping <-as.matrix(count_matrix)
+
+normalizeSignal <- function(gr_list, housekeeping_genes, reference_set) {
+
+# I realize that in this part of the normalization there are issues that I would like to discuss with you directly to know what you think because I think this procedure is not fully correct but I do not know how to modify it at he moment 
+# Loop over the GRanges list
+for(i in seq_along(gr_list)) {
+  # Apply quantile normalization to the raw signal of the housekeeping genes
+  normalized_housekeeping_genes <- limma::normalizeQuantiles(S_housekeeping)
+  
+  # Extract the raw signal for all genes
+  S_all <- as.matrix(total_signal)
+  
+  # Use linear regression to estimate a multiplicative normalization factor for each sample
+  scaling_factor <- coef(lm(normalized_housekeeping_genes ~ S_housekeeping))[2]
+  
+  # Rescale the scaling factors so that the total normalized signal at the set of samples will be a million on average
+  scaling_factor <- scaling_factor * 1e6 / scaling_factor * total_signal
+  
+ 
+  # Add the normalized signal as a metadata column of each Grange object by multiplying the raw signal for scaling factor 
+  mcols(gr_list)$normalizedSignal <-  mcols(gr_list)$rawSignal * scaling_factor# replace 'column_name' with your actual column name
+  
+    }
+    
+    return(gr_list)
+}
+
+
+# replace with your actual housekeeping genes
+reference_set <- names(rawSignal_counts_blood_only)  # replace with your actual reference set
+
+# Apply the normalizeSignal function to each GRanges object in the list
+normalizedSignal_counts <-normalizeSignal(gr_list = rawSignal_counts,housekeeping_genes = housekeeping_genes,reference_set = reference_set)
+
+
+# Assuming 'gr_list' is your list of GRanges objects, 'old_name' is the old column name
+# and 'new_name' is the new column name you want to use
+
+# Apply the operation to all GRanges objects in the list
+normalizedSignal_counts  <- lapply(gr_list, function(gr) {
+  # Get the current column names
+  col_names <- colnames(mcols(gr))
+  
+  # Find the index of the column you want to rename
+  index <- which(col_names == "old_name")
+  
+  # Change the column name
+  col_names[index] <- "new_name"
+  
+  # Assign the new column names back to the GRanges object
+  colnames(mcols(gr)) <- col_names
+  
+  return(gr)
+})
+
+
+# Define a function to create a BigWig file from a GRanges object
+createBigWig <- function(gr, filename) {
+  # Create a GRanges object with the normalized signal as the score
+  gr_with_score <- GRanges(seqnames = seqnames(gr),
+                           ranges = ranges(gr),
+                           strand = strand(gr),
+                           score = mcols(gr)$normalizedSignal)
+  
+  # Export the GRanges object to a BigWig file
+  export.bw(gr_with_score, filename)
+}
+
+# Apply the createBigWig function to each GRanges object in the list
+filenames <- paste0("/date/gcb/gcb_MZ/Round1/R_bigiwig/", seq_along(normalizedSignal_counts), ".bw")  # replace with your actual filenames
+mapply(createBigWig, normalizedSignal_counts, filenames)
+```
+
