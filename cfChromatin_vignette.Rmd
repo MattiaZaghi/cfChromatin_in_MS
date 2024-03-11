@@ -76,7 +76,8 @@ for (i in 1:length(encode[1:111])){
   Tissue_TSS <- Tissue[(Tissue$name %in% c("1_TssA", "2_TssAFlnk")), ]
   
   # Convert the tissue in a Grange and reduce the range within each tissue
-  Tissue_TSS<-makeGRangesFromDataFrame(Tissue_TSS,keep.extra.columns = T) %>% reduce()
+  Tissue_TSS<-makeGRangesFromDataFrame(Tissue_TSS,keep.extra.columns = T) 
+  Tissue_TSS<-IRanges::reduce(Tissue_TSS)
   
   # Convert the GRanges object back to a data frame and store it in the list
   encode_df[[i]] <- as.data.frame(Tissue_TSS)
@@ -111,7 +112,7 @@ ChromHMM_TSS <- makeGRangesFromDataFrame(ChromHMM_TSS, keep.extra.columns = T)
 ChromHMM_TSS <- sort.GenomicRanges(ChromHMM_TSS)
 
 # Merge overlapping ranges and concatenate the tissue names
-gr <- reduce(ChromHMM_TSS , ignore.strand=TRUE)
+gr <- IRanges::reduce(ChromHMM_TSS , ignore.strand=TRUE)
 
 gr<-join_overlap_inner(gr,ChromHMM_TSS)
 
