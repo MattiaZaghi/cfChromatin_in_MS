@@ -1,15 +1,3 @@
----
-title: "CfChromatin analysis script"
-author: "Mattia Zaghi"
-date: "2024-02-01"
-output: html_document
----
-
-```{r setup 1}
-.libPaths(c("/home/mattia/R/x86_64-redhat-linux-gnu-library/4.3/"))
-```
-
-```{r}
 library(plyranges)
 library(readr)
 library(stringr)
@@ -19,33 +7,28 @@ library(org.Hs.eg.db)
 library(parallel)
 library(rtracklayer)
 library(preprocessCore)
-library(BSgenome.Hsapiens.UCSC.hg38)
 
 sessionInfo()
-```
+
 #############################################################################################################################
 ###                                                          IMPORT                                                       ###
 #############################################################################################################################
-```{r}
-source(paste0("/home/mattia/cfChromatin_in_MS/cfChromatin_fun.R"))
+
 #working_path <- "/media/sf_ubuntu_music/cfChromatin/"
-working_path <- "/date/gcb/gcb_MZ/"
+working_path <- "/date/gcb/gcb_BH/Data/cfChromatin/"
 annotation_dir_path <- paste0(working_path, "Chrom_HMM_hg38_annotation/")
 glossary_path <- paste0(annotation_dir_path, "Glossary.txt")
 bed_dir_path <- "/date/gcb/gcb_MZ/Round1/bed/bedtools/normal/"
 
 core <- 6
 
-setwd(dir = "/date/gcb/gcb_MZ/Round1/R/")
+setwd(dir = working_path)
+source(paste0(working_path,"../../Proj/cfChromatin/cfChromatin_func.R"))
 
-```
-## 1.Constructing a TSS/Enhancers catalogue for cfChip-seq analysis 
-
-As explained in the manual Page 5-6. The first step is creating a catalogue of regions with bonafide signal based on the ChromHMM annotation derived from 111 tissues abalyzed in the roadmap epigenomics project selecting only the genome portions annotated as TSS or TSS flanking regions.
 #############################################################################################################################
 ###                                                    CATALOGUES CREATION                                                ###
 #############################################################################################################################
-```{r}
+
 ###### TSS
 # Catalog part 1
 windows <- load_catalog(annotation_dir = annotation_dir_path,glossary = glossary_path, glossary_group = "ANATOMY", states = c("1_TssA", "2_TssAFlnk"))
@@ -70,15 +53,11 @@ df_windows <- data.frame(
   type=windows$type)
 
 write.table(df_windows, file=paste0(working_path,"TSS.bed"), quote=F, sep=",", row.names=F, col.names=F)
-```
-## 2.Constructing a Count Matrix of each chip-seq based on the Windows set of regions
-
- Now using the methodology described at page 7 of the manual we will construct a cont matrix of our chip samples over the windows catalouge.
 
 #############################################################################################################################
 ###                                                 PROCESSING SEQUENCING FILES                                           ###
 #############################################################################################################################
-```{r}
+
 ### Process fastq files separetly to get BED files
 
 histone_mark <- "H3K27ac"
@@ -95,14 +74,11 @@ results <- mclapply(bed_files, process_bed_file, regions = windows, mc.cores = c
 counts_list <- setNames(results, gsub("\\.bed$", "", basename(bed_files)))
 
 saveRDS(counts_list, paste0(working_path,paste0(histone_mark,"_counts.rds")))
-```
-## 3. Background Signal calculation
 
-The background signal calculation is based on the premises and the methodology described at page 7-8-9 of the manual. Mine is simplified since I do not have cancer patients and also I am for now considering all the individuals as normal since I do not know what MS implies on this regards. 
 #############################################################################################################################
 ###                                                 ESTIMATING BACKGROUNG SIGNAL                                          ###
 #############################################################################################################################
-```{r}
+
 #counts_list <- readRDS(paste0(working_path,paste0(histone_mark,"_counts.rds")))
 
 # Apply the estimateBackground function to each GRanges object in the list
@@ -110,32 +86,27 @@ The background signal calculation is based on the premises and the methodology d
 granges_list_with_background <- mclapply(counts_list, estimateBackground, tag = "BACKGROUND", background_cutOff = 4000, quantile_cutOff = 0.95, mc.cores = core)
 
 saveRDS(granges_list_with_background, paste0(working_path,paste0(histone_mark,"_counts_bg.rds")))
-```
-## 4. Gene-level signal and normalization to produce normalized tracks and counts for the rest of the analysis
-
-This procedure follows what has been described in the manual at page 10- beginning of 11.
 
 #############################################################################################################################
 ###                                                     FEATURE LEVEL SIGNAL                                              ###
 #############################################################################################################################
-```{r}
-# Remove the samples from the GRanges list
 
-#granges_list_with_background_rm <- granges_list_with_background[!names(granges_list_with_background) %in% exclude_samples]
+# Remove the samples from the GRanges list
+exclude_samples <- c("CD19-GSE172116-1_H3K27ac_ChIP", "CD19-GSE172116-2_H3K27ac_ChIP")
+granges_list_with_background_rm <- granges_list_with_background[!names(granges_list_with_background) %in% exclude_samples]
 
 # Apply the calculationSignal function to each GRanges object in the list
 # Set mc.cores to the number of cores you want to use
-granges_list_geneSignal <- mclapply(granges_list_with_background, calculationSignal, tag_list = c("TSS","EXTRA_TSS"), rm_feature_list=c("UNKNOWN"), mc.cores = core)
+granges_list_geneSignal <- mclapply(granges_list_with_background_rm, calculationSignal, tag_list = c("TSS","EXTRA_TSS"), rm_feature_list=c("UNKNOWN"), mc.cores = core)
 df_geneSignal <- t(as.data.frame(do.call(rbind, granges_list_geneSignal)))
 
 saveRDS(granges_list_geneSignal, paste0(working_path,paste0(histone_mark,"_signal.rds")))
 saveRDS(df_geneSignal, paste0(working_path,paste0(histone_mark,"_df_signal.rds")))
-```
-##############################################################################################################
+
+#############################################################################################################################
 ###                                                    CALCULATE SIZE FACTOR                                           ###
 #############################################################################################################################
-```{r}
-###############
+
 #df_geneSignal <- as.data.frame(readRDS(paste0(histone_mark,"_df_signal.rds")))
 
 # Create different dataframe for each type of sample
@@ -164,4 +135,41 @@ saveRDS(df_plasma_geneSignal, paste0(working_path,paste0(histone_mark,"_plasma_d
 saveRDS(df_csf_geneSignal, paste0(working_path,paste0(histone_mark,"_csf_df_signal_norm.rds")))
 saveRDS(granges_list_with_background, paste0(working_path,paste0(histone_mark,"_counts_norm.rds")))
 
-```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Define a function to create a BigWig file from a GRanges object
+createBigWig <- function(gr, filename) {
+  # Create a GRanges object with the normalized signal as the score
+  gr_with_score <- GRanges(seqnames = seqnames(gr),
+                           ranges = ranges(gr),
+                           strand = strand(gr),
+                           score = mcols(gr)$normalizedSignal)
+  
+  # Export the GRanges object to a BigWig file
+  export.bw(gr_with_score, filename)
+}
+
+# Apply the createBigWig function to each GRanges object in the list
+filenames <- paste0("/date/gcb/gcb_MZ/Round1/R_bigiwig/", seq_along(normalizedSignal_counts), ".bw")  # replace with your actual filenames
+mapply(createBigWig, normalizedSignal_counts, filenames)
