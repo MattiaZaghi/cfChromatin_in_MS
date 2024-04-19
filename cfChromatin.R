@@ -15,15 +15,15 @@ sessionInfo()
 #############################################################################################################################
 
 #working_path <- "/media/sf_ubuntu_music/cfChromatin/"
-working_path <- "/date/gcb/gcb_BH/Data/cfChromatin/"
+working_path <- "/date/gcb/gcb_MZ/"
 annotation_dir_path <- paste0(working_path, "Chrom_HMM_hg38_annotation/")
 glossary_path <- paste0(annotation_dir_path, "Glossary.txt")
 bed_dir_path <- "/date/gcb/gcb_MZ/Round1/bed/bedtools/normal/"
 
-core <- 6
+core <- 40
 
 setwd(dir = working_path)
-source(paste0(working_path,"../../Proj/cfChromatin/cfChromatin_func.R"))
+source("/home/mattia/cfChromatin_in_MS/cfChromatin_fun.R")
 
 #############################################################################################################################
 ###                                                    CATALOGUES CREATION                                                ###
@@ -48,8 +48,8 @@ df_windows <- data.frame(
   seqnames=seqnames(windows),
   starts=start(windows)-1,
   ends=end(windows),
+  name=windows$name,
   tissue=windows$tissue,
-  feature=windows$feature,
   type=windows$type)
 
 write.table(df_windows, file=paste0(working_path,"TSS.bed"), quote=F, sep=",", row.names=F, col.names=F)

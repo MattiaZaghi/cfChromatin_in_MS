@@ -21,6 +21,8 @@ load_catalog <- function(
   
   # Load each file in granges and name them
   encode <- lapply(files, read_bed)
+  encode <- lapply(encode, function(gr) {
+    gr[seqnames(gr) != "chrM"]})
   names(encode) <- sapply(files, function(x) {strsplit(basename(x), "_")[[1]][1]})
   
   # Load tissue metadata file
@@ -105,7 +107,7 @@ annotate_catalog <- function(
   }
   
   # First database takes priority on the second one...
-  windows$feature <- "UNKNOWN"
+  windows$name <- "UNKNOWN"
   for (db_name in names(db)){
     
     if (verbose){print(paste0("Annotation from ", db_name,"..."))}
@@ -115,15 +117,15 @@ annotate_catalog <- function(
     #Annotation UCSC
     if(toupper(db_name)=="UCSC"){
       
-      windows[windows$feature == "UNKNOWN",]$feature <- windows[windows$feature == "UNKNOWN",]$SYMBOL
-      windows[is.na(windows$feature)]$feature <- "UNKNOWN"
+      windows[windows$name == "UNKNOWN",]$name <- windows[windows$name == "UNKNOWN",]$SYMBOL
+      windows[is.na(windows$name)]$name <- "UNKNOWN"
       windows$tx_name <- NULL
       windows$SYMBOL <- NULL
     }
     #Annotation Ensembl
     else if(toupper(db_name)=="ENSEMBL"){
-      windows[windows$feature == "UNKNOWN",]$feature <- windows[windows$feature == "UNKNOWN",]$tx_id
-      windows[is.na(windows$feature)]$feature <- "UNKNOWN"
+      windows[windows$name == "UNKNOWN",]$name <- windows[windows$name == "UNKNOWN",]$tx_id
+      windows[is.na(windows$name)]$name <- "UNKNOWN"
       windows$tx_id <- NULL
     }
   }
@@ -132,7 +134,7 @@ annotate_catalog <- function(
   if (verbose){print("Group ranges...")}
   windows <- windows %>% 
     group_by(seqnames, start, end, tissue) %>%
-    summarise(feature = paste(unique(feature), collapse = ";")) %>%
+    summarise(name = paste(unique(name), collapse = ";")) %>%
     makeGRangesFromDataFrame(keep.extra.columns = T)
   
   windows$type <- feature_tag
@@ -180,14 +182,14 @@ annotate_catalog <- function(
       
       #Annotation UCSC
       if(toupper(db_name)=="UCSC"){
-        db_specific$feature <- unlist(lapply(seq(1:length(db_specific)),function(i){
+        db_specific$name <- unlist(lapply(seq(1:length(db_specific)),function(i){
           ids_hit <- as.integer(names(db_hits[db_hits==i]))
           paste(collapse=';',unique(tmp_db_extend$SYMBOL[ids_hit]))
         }))
       }
       #Annotation Ensembl
       else if(toupper(db_name)=="ENSEMBL"){
-        db_specific$feature <- unlist(lapply(seq(1:length(db_specific)),function(i){
+        db_specific$name <- unlist(lapply(seq(1:length(db_specific)),function(i){
           ids_hit <- as.integer(names(db_hits[db_hits==i]))
           paste(collapse=';',unique(tmp_db_extend$tx_id[ids_hit]))
         }))
@@ -203,7 +205,7 @@ annotate_catalog <- function(
 
 # Add flanking regions to the catalog
 #	@windows			: Windows to annotate
-#	@feature_tag		: Tag name of the features of interest
+#	@name_tag		: Tag name of the features of interest
 #	@flanking_size		: Size of the flanking regions around the features
 #	@verbose			: Display verbose
 add_flank <- function(
@@ -337,244 +339,540 @@ disjoin_specific <- function(
   return(gr2_specific)
 }
 
-# Process BED file and a set of regions.
-#	@bed_file			: Bed file to process 
-#	@regions			: Granges of regions
-#	@verbose			: Display verbose
+#############################################################################################################################
+###                                                 5.GET COVERAGE READ from BED FILE                                     ###
+#############################################################################################################################
+Max.Matrix.Mult = 20000
 
-
-# The fixCoverage function ensures that the coverage data has the correct length for each chromosome.
-# It takes a 'Cov' parameter, which is expected to be a list of coverage data, where each element in the list corresponds to a chromosome.
-# The function iterates through each chromosome in the 'ChrList' (which should be a vector of chromosome names).
-# For each chromosome, it checks the length of the coverage data ('l = length(Cov[[c]])').
-# It then retrieves the sequence length of the corresponding chromosome ('m = seqlengths(genome.seqinfo[c])').
-# If the length of the coverage data is less than the sequence length of the chromosome, it appends zeros to the coverage data to make it the same length as the chromosome sequence.
-# Finally, it returns the updated 'Cov' list, which now has coverage data of the correct length for each chromosome.
-fixCoverage = function( Cov ) {
-  for( c in ChrList )
-  {
-    l = length(Cov[[c]])
-    m = seqlengths(genome.seqinfo[c])
-    if( l < m )
-      Cov[[c]] = append(Cov[[c]], rep(0,m-l))
-  }
-  Cov
+ComputeGeneCounts = function (A, W2G = Win2Gene.matrix) {
+  if(!is.list(A)) 
+    A = list(A)
+  breaks = c(seq(0,dim(W2G)[1], Max.Matrix.Mult), dim(W2G)[1])
+  L = lapply(1:(length(breaks)-1), function(i) {
+    Is = (breaks[i]+1):breaks[i+1]
+    M = W2G[Is,] 
+    do.call("cbind", lapply(A, function(v) t(v[Is] %*% M)))
+  })
+  G = Reduce("+", L)
+  matrix(G, nr = dim(G)[1], nc = dim(G)[2], dimnames = dimnames(G))
 }
-# The cfChIP.BuildFN function is used to construct a file path and filename based on the provided parameters.
-# It takes three parameters:
-#   - Name: The base name of the file (without the file extension)
-#   - param: A parameter object that may contain the DataDir information
-#   - suff: The file extension or suffix to be added to the filename (default is ".rdata")
-cfChIP.BuildFN <- function(Name, param, suff = ".rdata" ) {
-  # First, it checks if the param$DataDir parameter is NULL
-  if( is.null(param$DataDir) )
-    # If param$DataDir is NULL, it sets the f variable to an empty string ""
-    f = ""
-  else {
-    # If param$DataDir is not NULL, it assigns the value of param$DataDir to the f variable
-    f = DataDir
-    # If the DataDir does not end with a forward slash (/), it appends a forward slash to the f variable
-    if( !grepl("/$", DataDir))
-      f = paste0(param$DataDir,"/")
-  }
+
+MaxGeneCounts = function(A,W2G = Win2Gene.matrix) {
+  W2G.triplet = as(W2G, "TsparseMatrix")
+  W2G.lists = split(W2G.triplet@i+1, W2G.triplet@j+1)
+  X = sapply(W2G.lists, function(l) max(A[l]))
+  names(X) = colnames(W2G)
+  X
+}
+
+if( !exists("Win2Gene.matrix") ) {
+  Win2Gene.Matrix.filename = paste0(SetupDIR,"Win2Gene.rds")
+  print("Loading Window to Gene mapping")
+  L = readRDS(Win2Gene.Matrix.filename)
+  Win2Gene.matrix = L$Matrix
+  MultiPromoterGenes = L$Multi
+  rm(L)
+  #  colnames(Win2Gene.matrix)[is.na(colnames(Win2Gene.matrix))] = ""
+  Genes = colnames(Win2Gene.matrix)
+  GeneWindows = as.integer(rownames(Win2Gene.matrix))
   
-  # Finally, it constructs the full file path and filename by concatenating the f variable (the data directory)
-  # with the Name parameter and the suff parameter
+  W = width(TSS.windows[GeneWindows])/1000
+  GeneLength = ComputeGeneCounts(W)
+  names(GeneLength) = Genes
+  rm(W)
+  
+  Win2Gene.triplet = as(Win2Gene.matrix, "TsparseMatrix")
+  Win2Gene.rows = Win2Gene.triplet@i +1
+  Win2Gene.cols = Win2Gene.triplet@j +1
+  Win2Gene.lists = split(Win2Gene.rows, Win2Gene.cols)
+  names(Win2Gene.lists) = Genes
+  rm(Win2Gene.cols)
+  rm(Win2Gene.rows)
+  rm(Win2Gene.triplet)
+}
+
+
+cfChIP.Params <- function() {
+  list( 
+    Save = TRUE,
+    DataDir =NULL,
+    Background = FALSE,
+    GeneCounts = FALSE,
+    GeneBackground = FALSE,
+    Normalize = FALSE,
+    OverExpressedGenes = FALSE,
+    reuseSavedData = TRUE,
+    Verbose = TRUE,
+    TSS.windows = TSS.windows,
+    Win2Gene = Win2Gene.matrix,
+    #GeneWindows = GeneWindows,
+    #CommonGenes = CommonGenes,
+    #NormRef = Healthy.GeneCount,
+    #NormRef.var = Healthy.GeneCount.var,
+    #WinNormRef = Healthy.WinCount,
+    #WinNormRef.var = Healthy.WinCount.var,
+    #Signatures = Win.Sig,
+    #Signatures.Ref = Win.Sig.Ref,
+    MinFragLen = 50,
+    MaxFragLen = 800,
+    Heatmap.Type = "dot",
+    Heatmap.MaxCount = 15,
+    Heatmap.Prune.Cols = FALSE,
+    Heatmap.Prune.Rows = FALSE,
+    Heatmap.Cluster.Cols = FALSE,
+    Heatmap.Cluster.Rows = FALSE,
+    Heatmap.Qvalue.threshold = 0.0001,
+    Heatmap.Filter.threshold = 6,
+    PlotPrograms.GlobalHeatmap = TRUE,
+    Programs.Eval.Reference = TRUE,
+    Signatures.Eval.Reference = FALSE,
+    Heatmap.Detailed.Type = "plain",
+    Heatmap.Detailed.Prune.Cols = FALSE,
+    Heatmap.Detailed.Prune.Rows = FALSE,
+    Scatter.NormalizeByLength = FALSE,
+    Scatter.RefSeqOnly = FALSE,
+    Scatter.MarkGenePrograms = NULL,
+    Scatter.UpperQuantile = 0.995,
+    Scatter.LimitUnits = 2,
+    #Programs = Gene.Programs,
+    #Programs.Ref = Gene.Programs.Ref,
+    #Programs.Partition = Gene.Programs.Partition,
+    PlotEnrichments.MaxCount = 50,
+    PlotSignatures.IndividualHeatmap = FALSE,
+    PlotSignatures.MaxCount = 10,
+    PlotSignatures.MaxZscore = 20,
+    PlotSignatures.Height = 8,
+    PlotSignatures.Width = 10,
+    PlotPrograms.MaxCount = 10,
+    PlotPrograms.IndividualHeatmap = FALSE,
+    PlotPrograms.IndividualBarChart = FALSE,
+    PlotPrograms.IndividualCSV = FALSE,
+    PlotPrograms.IndividualCDT = FALSE,
+    PlotPrograms.MaxZscore = 20,
+    PlotPrograms.Height = 8,
+    PlotPrograms.Width = 10,
+    PlotPrograms.RowOrder = NA,
+    #MetaGene = MetaGene,
+    MetaGene.Offset = 5000,
+    MetaGene.Width = 25000,
+    MetaGene.Tick = 5000,
+    MetaGene.Label = "TSS",
+    MetaGene.Max = -1,
+    MetaGene.Color = "red",
+    MetaGene.BGColor = "black",
+    #MetaEnhancer = MetaEnhancer,
+    MetaEnhancer.Offset = 25000,
+    MetaEnhancer.Width = 50000,
+    MetaEnhancer.Tick = 10000,
+    MetaEnhancer.Label = "Enhancer",
+    MetaEnhancer.Max = -1,
+    MetaEnhancer.Color = "red",
+    MetaEnhancer.BGColor = "black",
+    #    BackgroundModel = NULL
+    QC.PositiveType = "TSS",
+    QC.PositiveNucs = 192015, # H3K4me3 in humans
+    QC.GenomeLength = 3.3e9,
+    QC.SampleVolume = 2, # 2ml per sample
+    QC.QuantileCutoff = 0.75, # cutoff of high peak coverage (see below)
+    QC.GenomeWeight = 6.6e-12, # molecular weight of 1 genome # CHECK. see http://www.bio.net/bionet/mm/methods/1999-December/080037.html
+    QC.NucleosomeLength = 200,
+    QC.cfDNA.ng = 10,
+    QCFields = paste("Total","Total.uniq","Total.uniq.est","TSS",
+                     "%Signal Total","%Background Total",
+                     "%Signal TSS","%Background TSS",
+                     "lambda.mix.poiss","Mito","%Mito","Global.signal.yield",
+                     "Local.signal.yield", "BG.yield","Global.SNR", "Local.SNR","Seq.factor", sep=";")
+  )
+}
+
+BaseFileName <- function( fname, extList = c(".bed$", ".rdata$", ".bw$", ".tagAlign$" #, "-H3K4me3", "-H3K4me2", "-H3K4me1", "-H3K36me3"
+) ) {
+  #  x = file_path_sans_ext(fname)
+  x = fname
+  x = sub(".gz$", "",x)
+  for( ext in extList )
+    x = sub(ext, "", x)
+  
+  y = strsplit(x,"/")[[1]]
+  n = length(y)
+  z = y[n]
+  return(z)
+}
+
+# The cfChIP.BuildFN function constructs a file name/path for saving data, based on the provided parameters.
+cfChIP.BuildFN <- function(Name, param, suff = ".rdata") {
+  # Check if the DataDir parameter is specified in the 'param' object.
+  if(is.null(param$DataDir))
+    f = ""  # If not specified, set 'f' to an empty string.
+  else {
+    f = DataDir  # Use the global DataDir variable as the default directory path.
+    # Ensure the directory path ends with a forward slash. If not, append it.
+    if(!grepl("/$", DataDir))
+      f = paste0(param$DataDir, "/")
+  }
+  # Construct the full file name/path by combining the directory path, file name, and file suffix.
   paste0(f, Name, suff)
 }
-process_bed_file <- function(
-    bed_file			= NULL,
-    regions				= NULL,
-    verbose				= TRUE
-) {
-  
-  if (verbose){print(paste0("Import bed files..."))}
-  
-  # Load the BED file
-  bed <- import(bed_file, format="bed")
-  
-  # Resize the fragments to length 1, maintaining their center
-  bed_resized <- resize(bed, width = 1, fix = "center")
-  
-  if (verbose){print(paste0("Count overlaps..."))}
-  
-  # Count overlaps
-  counts <- countOverlaps(regions, bed_resized)
-  
-  # Add counts to the metadata columns of the regions GRanges object
-  mcols(regions)$counts <- counts
-  
-  # Return the regions GRanges object
-  return(regions)
+
+# The fixCoverage function is designed to ensure that the coverage data for each chromosome
+# is of the correct length, matching the expected length of the chromosome.
+fixCoverage = function(Cov) {
+  # Iterate over each chromosome listed in ChrList.
+  for(c in ChrList) {
+    # Determine the current length of the coverage data for the chromosome.
+    l = length(Cov[[c]])
+    # Retrieve the expected length of the chromosome from the genome sequence information.
+    m = seqlengths(genome.seqinfo[c])
+    # If the current length of the coverage data is less than the expected length,
+    # append zeros to the coverage data to match the expected length.
+    if(l < m)
+      Cov[[c]] = append(Cov[[c]], rep(0, m - l))
+  }
+  # Return the adjusted coverage data.
+  Cov
 }
 
-# Estimate background for a specific histone mark
-#	@gr					: Grange of counts
-#	@tag				: Tag to use for background
-#	@background_cutOff	: All background region bigger than x will be kept to estimate the background signal
-#	@quantile_cutOff	: Quantile cut off to remove outlier
-#	@verbose			: Display verbose
-estimateBackground <- function(
-    gr					= NULL,
-    tag					= NULL,
-    background_cutOff   = 4000,
-    quantile_cutOff		= 0.95,
-    verbose				= TRUE
-) {
-  
-  if (verbose){print(paste0("Estimate background..."))}
-  
-  # Extract background regions
-  background_regions <- gr[gr$type == tag]
-  
-  # Filter regions that are longer than background_cutOff
-  long_background_regions <- background_regions[width(background_regions) >= background_cutOff]
-  
-  nb_kept <- round((length(long_background_regions)*100)/length(background_regions),2)
-  
-  if (verbose){print(paste0("Background windows kept ", nb_kept, "%"))}
-  if (verbose){print(paste0("Median of the windows is ", median(width(long_background_regions)), "bp"))}
-  
-  # Extract counts from the filtered regions
-  X <- mcols(long_background_regions)$counts
-  
-  # Find the 95th quantile of X
-  T <- quantile(X, quantile_cutOff)
-  
-  # Restrict ourselves to values below T
-  X <- X[X <= T]
-  
-  # Maximum likelihood of truncated poisson
-  lambda_hat <- which.max(dpois(X, lambda = 1:length(X)))
-  
-  # Convert to reads/Kb (the median length of background windows is 5KB)
-  lambda_hat <- lambda_hat / 5
-  
-  # Add the background estimate as a new column to the GRanges object
-  gr$background <- lambda_hat
-  
-  return(gr)
-}
+cfChIP.BED.suffixes = c(".bed", ".bed.gz", ".tagAlign", ".tagAlign.gz")
+cfChIP.BW.suffixes = c(".bw", ".bigWig", ".bw.gz", ".bigWig.gz")
+cfChIP.File.suffixes = c(cfChIP.BED.suffixes, cfChIP.BW.suffixes)
 
-# Calculate gene signal aggregating signal from windows while reducing background
-#	@gr					: Grange of counts
-#	@tag_list			: Tag to calculate feature signal
-#	@rm_feature_list	: List of features to exclude from the calculation
-#	@verbose			: Display verbose
-calculationSignal <- function(
-    gr					= NULL,
-    tag_list			= NULL,
-    rm_feature_list	    = NULL,
-    verbose				= TRUE
-) {
+cfChIP.FindFile <- function( filename, param = cfChIP.Params() ) {
+  FileType  = NA
+  BED.suffixes = cfChIP.BED.suffixes
+  BW.suffixes = cfChIP.BW.suffixes
+  if( any(sapply(BED.suffixes, function(s) grepl(paste0(s,"$"), filename))))
+    FileType = "BED"
+  if(  any(sapply(BW.suffixes, function(s) grepl(paste0(s,"$"), filename))))
+    FileType = "BW"
   
-  if (verbose){print(paste0("Calculate signal..."))}
-  
-  # Normalize background for the width
-  gr$bgNorm <- mcols(gr)$background * (width(gr)/1000)
-  # Extract only tagged features
-  gr <- gr[gr$type %in% tag_list,]
-  # Remove some unwanted features
-  gr <- gr[!gr$feature %in% rm_feature_list,]
-  
-  # Split features names by ; that we used to aggregated common windows
-  split_features <- strsplit(gr$feature, ";")
-  # Find out which rows are gonna have to be duplicated
-  expand_rows <- rep(1:length(gr), lengths(split_features))
-  
-  # Dupliate the rows
-  gr <- gr[expand_rows]
-  # Paste back the split feature names
-  gr$feature <- unlist(split_features)
-  # Sort the grange
-  gr <- sort(sortSeqlevels(gr), ignore.strand=TRUE)
-  
-  # Split the grange by feature (which should now by unique, without ;)
-  gr_split <- split(gr, ~feature)
-  
-  # Calculate the feature signal by substracting the sum of the background to the sum of counts
-  # Set signal to 0 if background > signal
-  # Takes around 30min
-  res <- unlist(lapply(gr_split, function(x){
-    C <- sum(x$counts)
-    B <- sum(x$bgNorm)
-    return(ifelse(C > B, C - B, 0))
-  }))
-  
-  return(res)
-}
-
-# Calculate size factor for each sample based on quantiles normalization in regard of contrl samples
-#	@df					: Dataframe of sample
-#	@ctrl			    : Vector of control sample names
-#	@housekeeping	    : Number of top expressed genes in normal samples to be considered as housekeeping genes for the normalization
-#	@verbose			: Display verbose
-calculation_sf <- function(
-    df					= NULL,
-    ctrl			    = NULL,
-    housekeeping	    = NULL,
-    verbose				= TRUE
-) {
-  
-  if (verbose){print(paste0("Calculate size factors..."))}
-  
-  # Create a separate df for control samples 
-  df_ctrl <- df[, ctrl, drop=FALSE]
-  
-  # Fetch highly expressed genes in Ctrl sample
-  housekeeping_genes <- head(sort(rowMeans(df), decreasing=TRUE), housekeeping)
-  df_house <- df[housekeeping_genes,]
-  df_house_norm <- df[housekeeping_genes,]
-  
-  # Quantiles normalization of the housekeeping genes for each sample in regard to the average of control samples
-  ctrl_values <- rowMeans(df_ctrl[housekeeping_genes,, drop=FALSE])
-  
-  # Create a temporary dataframe to calculate the quantile normalization between control and each sample
-  for (sample in colnames(df)){
-    tmp_df <- df[housekeeping_genes,sample, drop=FALSE]
-    tmp_df <- cbind(tmp_df, data.frame(Ctrl = ctrl_values))
-    df_house_norm[,sample] <- normalize.quantiles(as.matrix(tmp_df),copy=TRUE)[,1,drop=FALSE]
+  if( is.na(FileType) ) {
+    for( s in BED.suffixes )
+      if( file.exists(paste0(filename, s))) {
+        filename = paste0(filename, s)
+        FileType = "BED"
+      } 
+    if( is.na(FileType) ) 
+      for( s in BW.suffixes )
+        if( file.exists(paste0(filename, s))) {
+          filename = paste0(filename, s)
+          FileType = "BW"
+        } 
   }
   
-  # Generalize the normalization to all genes using linear regression
-  size.factor_list <- c()
-  for(sample in colnames(df_house)){
-    
-    if (verbose){print(paste0("Linear regression for ", sample))}
-    
-    # Create a temporary dataframe to genereate the linear model
-    tmp_df <- df_house[,sample, drop=FALSE]
-    colnames(tmp_df) <- "raw"
-    tmp_df <- cbind(tmp_df, data.frame(norm = df_house_norm[,sample]))
-    
-    # Calculate the linear regression
-    lm_tmp <- lm(raw~norm, data = tmp_df)
-    
-    # Outputs statistics
-    r_squared <- summary(lm_tmp)$r.squared
-    intercept <- pvalue <- summary(lm_tmp)$coefficients[,1][2]
-    pvalue <- summary(lm_tmp)$coefficients[,4][2]
-    # THe actual size factor is the inverse of the intercept
-    size.factor <- 1/intercept
-    
-    if (verbose){print(paste0("R² : ", r_squared))}
-    if (verbose){print(paste0("p-value : ", pvalue))}
-    if (verbose){print(paste0("Intercept : ", intercept))}
-    
-    size.factor_list <- c(size.factor_list, size.factor)
+  if( is.na(FileType ) ) {
+    catn(filename, ": Error, cannot determine file type of ",filename)
+    return(NULL)
   }
   
-  names(size.factor_list) <- colnames(df_house)
+  return(list(filename = filename, FileType = FileType))
+}
+
+cfChIP.RawData.Cache = list()
+cfChIP.RawData.CacheMaxSize = 100
+
+cfChIP.GetRawData = function(filename, param = cfChIP.Params) {
+  ll = cfChIP.FindFile(filename, param)
+  filename = ll$filename
+  FileType = ll$FileType
   
-  if (verbose){print(paste0("Size factor before scaling : "))}
-  if (verbose){print(size.factor_list)}
+  if( filename %in% cfChIP.RawData.Cache )  
+    return(cfChIP.RawData.Cache[[filename]])
   
-  # Normalize the size factor to reach 1000000 counts in the control sample on average
-  scaling.factor <- mean(sum(rowMeans(df_ctrl))*size.factor_list[names(size.factor_list) %in% ctrl])/1000000
-  size.factor_list <- size.factor_list/scaling.factor
+  if( length(cfChIP.RawData.Cache) >= cfChIP.RawData.CacheMaxSize )
+    cfChIP.RawData.Cache <<- list()
   
-  if (verbose){print(paste0("Size factor after scaling : "))}
-  if (verbose){print(size.factor_list)}
+  dat = list()
+  if( FileType == "BED") {     
+    if( param$Verbose ) catn(filename, ": Reading BED file")
+    
+    dat$RawBED = import(filename, format = "BED")
+    # Annotate the genome (assuming hg19 for this example)
+    seqlevelsStyle(dat$RawBED) <- "UCSC"
+    genome(dat$RawBED) <- "hg38"
+    
+    # Filter to keep only standard chromosomes
+    standard_chr <- c(paste0("chr", 1:22), "chrX", "chrY")
+    dat$RawBED <- dat$RawBED[seqnames(dat$RawBED) %in% standard_chr]
+    
+    # remove long/short fragments and non-unique copies
+    
+    # check for single end reads
+    if( max(width(dat$RawBED)) <  param$MinFragLen) {
+      dat$RawBED = resize(dat$RawBED, width = 166)
+    } else 
+      dat$RawBED = dat$RawBED[width(dat$RawBED) <= param$MaxFragLen & width(dat$RawBED) > param$MinFragLen]
+    
+    dat$BED = unique(dat$RawBED)
+    dat$Cov = coverage(dat$BED)
+  } 
+  cfChIP.RawData.Cache[[filename]] <<- dat
+  if( FileType == "BW" ) {     
+    if( param$Verbose ) catn(filename, ": Reading BigWig file", filename)
+    dat$BW = import(filename)
+    dat$Cov = coverage(dat$BW, weight="score")
+  } 
+  return(dat)
+}
+
+cfChIP.GetCoverage  = function(filename, param=cfChIP.Params()) {
+  dat = cfChIP.GetRawData(filename, param)
+  return(fixCoverage(dat$Cov))
+}
+
+# Define the cfChIP.ProcessFile function which processes a given file (either a new file or precomputed data) for cfChIP analysis.
+cfChIP.ProcessFile <- function(filename = NULL,
+                               dat = NULL,
+                               param = cfChIP.Params(),
+                               Force = FALSE,
+                               HardForce = FALSE,
+                               Change = FALSE) {
+  # Check if both 'filename' and 'dat' are NULL. If so, print an error message and return NULL.
+  if(is.null(filename) && is.null(dat)) {
+    catn("Need one of filename or dat be assigned!")
+    return(NULL)
+  }
   
-  return(size.factor_list)
+  # If 'dat' is NULL, extract the base name of the file without its directory path or extension.
+  # This name is used for further processing and saving the data.
+  if(is.null(dat)) {
+    Name = BaseFileName(filename)
+  } else {
+    # If 'dat' is not NULL, it means precomputed data is being processed. Use the name from 'dat'.
+    Name = dat$Name
+    if(param$Verbose) catn(Name, ": Processing precomputed data")
+  }
+  
+  # Construct the filename for saving or reading the processed data using the cfChIP.BuildFN function.
+  fn = cfChIP.BuildFN(Name, param)
+  
+  # If 'dat' is NULL, check if the data should be reused (if it exists) or if new data should be processed.
+  if(is.null(dat)) {
+    if(param$reuseSavedData && file.exists(fn)) {
+      # If reusing saved data and the file exists, read the precomputed data.
+      if(param$Verbose) catn(Name, ": Reading precomputed data", fn)
+      dat <- readRDS(fn)
+    } else {
+      # If not reusing or the file doesn't exist, initialize 'dat' with default values.
+      dat = list(Name = Name, 
+                 Cov = NULL,
+                 Counts = NULL,
+                 Heights = NULL,
+                 Background = NULL,
+                 GeneCounts = NULL,
+                 GeneHeights = NULL,
+                 GeneBackground = NULL, 
+                 Counts.QQnorm = NULL,
+                 GeneCounts.QQnorm = NULL, 
+                 QQNorm = 1,
+                 OverExpressedGenes = NULL)
+      Change = TRUE  # Indicate that the data has changed (or is new).
+    }
+  }
+  
+  # The rest of the function would typically include further processing of 'dat',
+  # but this snippet ends here. The function's purpose is to manage the loading and initialization
+  # of data for analysis, handling both new and precomputed datasets.
+
+  
+  # Enforce dependencies between different parameters to ensure logical consistency in the analysis.
+  # If normalization or overexpressed genes analysis is requested, ensure related parameters are set accordingly.
+  param$Normalize = param$Normalize || param$OverExpressedGenes
+  param$GeneCounts = param$GeneCounts || param$Normalize
+  param$GeneBackground = param$GeneBackground || param$Normalize
+  param$Background = param$Background || param$GeneBackground
+  
+  # If HardForce is TRUE, reset the Counts data and enforce reprocessing.
+  if(HardForce) {
+    dat$Counts = NULL
+    Force = TRUE
+  }
+  
+  # If Force is TRUE, clear various data fields to ensure data is reprocessed rather than reused.
+  if(Force) {
+    dat$Cov = NULL
+    dat$Background = NULL
+    dat$GeneCounts = NULL
+    dat$GeneBackground = NULL
+    dat$Counts.QQnorm = NULL
+    dat$GeneCounts.QQnorm = NULL
+    dat$QQNorm = 1
+  }
+  
+  # Process BED file to obtain genomic data if Counts data is not already available.
+  if(is.null(dat$Counts)) {
+    # Retrieve raw data from the file, which includes BED, BW, and coverage data.
+    dd = cfChIP.GetRawData(filename, param)
+    dat$BED = dd$BED
+    dat$BW = dd$BW
+    dat$Cov = dd$Cov
+    
+    # If raw BED data is available, calculate duplicate counts.
+    if(!is.null(dd$RawBED)) {
+      RawBED.dups <- countOverlaps(dat$BED, dd$RawBED, type = "equal")
+      dat$DupCount = as.data.frame(table(RawBED.dups))
+    }
+    
+    # Calculate fragment counts if BED data is available.
+    if(!is.null(dat$BED))
+      dat$FragCount = as.data.frame(table(width(dat$BED)), stringsAsFactors = FALSE)
+    
+    Change = TRUE
+    
+    # Count fragment overlaps with TSS windows if BED data is available.
+    if(!is.null(dat$BED)) {
+      if(param$Verbose) catn(Name, ": counting fragment overlap")
+      dat$Counts = countOverlaps(query = param$TSS.windows, 
+                                 subject = resize(dat$BED, width=1, fix="center"))
+    } else if(!is.null(dat$BW)) {
+      # If BigWig data is available, calculate coverage and counts.
+      if(param$Verbose) catn(Name, ": counting BigWig overlap")
+      dat$Cov = coverage(dat$BW, weight="score")
+      dat$Counts = rep(0, length(param$TSS.windows))
+      
+      # Ensure coverage for chromosome Y is accounted for.
+      if(!("chrY" %in% names(dat$Cov)))
+        dat$Cov[["chrY"]] = Rle(0, seqlengths(param$TSS.windows)["chrY"])
+      
+      # Aggregate coverage data across TSS windows.
+      ChrRle = Rle(chrom(params$TSS.windows))
+      ChrStarts = start(ChrRle)
+      ChrEnds = end(ChrRle)
+      ChrName = as.character(runValue(ChrRle))
+      for(i in 1:nrun(ChrRle)) {
+        catn(ChrName[i])
+        ws = ChrStarts[i]:ChrEnds[i]
+        dat$Counts[ws] = aggregate(dat$Cov[[ChrName[i]]], 
+                                   ranges(params$TSS.windows)[ws], 
+                                   sum)
+      }
+      # Normalize counts assuming a typical read length of 200bp.
+      dat$Counts = dat$Counts / 200
+      
+      # Calculate maximum coverage heights across TSS windows.
+      dat$Heights = max(dat$Cov[params$TSS.windows])
+    } else {
+      # If neither BED nor BigWig data could be processed, log an error.
+      catn(Name, ": error! cannot compute counts")
+      return(dat)
+    }
+    
+    # Normalize coverage data across all chromosomes.
+    dat$Heights = rep(0, length(params$TSS.windows))
+    dat$Cov = fixCoverage(dat$Cov)
+    for(chr in unique(chrom(params$TSS.windows))) {
+      ww = which(chrom(params$TSS.windows) == chr)
+      dat$Heights[ww] = max(dat$Cov[params$TSS.windows[ww]])
+    }
+  }
+  # Remove large data objects from the 'dat' object to save memory.
+  if( !is.null(dat$BED))  
+    dat$BED = NULL  # Remove BED data.
+  if( !is.null(dat$BW) )
+    dat$BW = NULL  # Remove BigWig data.
+  if( !is.null(dat$Cov))
+    dat$Cov = NULL  # Remove coverage data.
+  
+  # Compute the background model if it's requested and not already computed.
+  if( param$Background && is.null(dat$Background) ) {
+    if( param$Verbose ) catn(Name, ": Computing background model")
+    # Use the buildBackground function to compute the background model based on counts and TSS windows.
+    dat$Background = buildBackground(Y = dat$Counts, TWin = params$TSS.windows)
+    # Reset related fields as the background computation might affect their values.
+    dat$GeneBackground = NULL
+    dat$Counts.QQnorm = NULL
+    dat$GeneCounts.QQnorm = NULL
+    Change = TRUE  # Indicate that the data has changed.
+  }
+  
+  # Compute gene counts if it's requested and not already computed.
+  if( param$GeneCounts && is.null(dat$GeneCounts)) {
+    if( param$Verbose ) catn(Name, ": Computing gene counts")
+    # Compute gene counts using the ComputeGeneCounts function.
+    dat$GeneCounts = ComputeGeneCounts(dat$Counts[GeneWindows], params$Win2Gene)
+    # If the result is a matrix, extract the first column (assuming it's the relevant data).
+    if(is.matrix(dat$GeneCounts))
+      dat$GeneCounts = dat$GeneCounts[,1]
+    # Assign gene names to the gene counts.
+    names(dat$GeneCounts) = Genes
+    # Reset related fields as the gene counts computation might affect their values.
+    dat$GeneCounts.QQnorm = NULL
+    dat$GeneHeights = MaxGeneCounts(dat$Heights[GeneWindows], param$Win2Gene)
+    Change = TRUE
+  }
+  
+  # Compute gene background if it's requested and not already computed.
+  if( param$GeneBackground && is.null(dat$GeneBackground)) {
+    if( param$Verbose ) catn(Name, ": Computing gene background")
+    # Use the background model to estimate gene background.
+    mu = dat$Background
+    Z = getMultiBackgroundEstimate(mu, param$GeneWindows)
+    dat$GeneBackground = ComputeGeneCounts(Z, param$Win2Gene)
+    # If the result is a matrix, extract the first column.
+    if(is.matrix(dat$GeneBackground))
+      dat$GeneBackground = dat$GeneBackground[,1]
+    # Assign gene names to the gene background.
+    names(dat$GeneBackground) = Genes
+    # Compute gene copy number variation based on gene background and genome data.
+    dat$GeneCNV = dat$GeneBackground / (GeneLength * dat$Background$genome)
+    dat$GeneCounts.QQnorm = NULL
+    Change = TRUE
+  }
+  
+  
+  
+  # Return the processed data object.
+  return(dat)
+}
+
+# Normalize data if it's requested and not already normalized.
+if( param$Normalize && is.null(dat$GeneCounts.QQnorm)) {
+  if( param$Verbose ) catn(Name, ": Normalize")
+  # Compute the difference between gene counts and gene background, ensuring no negative values.
+  GeneDiff = pmax(dat$GeneCounts - dat$GeneBackground, 0)
+  # Prepare data for normalization.
+  A = cbind(GeneDiff, param$NormRef)
+  colnames(A) = c("Sample", "Ref")
+  # Normalize gene counts using the QQNormalizeGenes function.
+  Qs = QQNormalizeGenes(A, CommonG = param$CommonGenes)
+  dat$QQNorm = Qs[1] / Qs[2]
+  dat$GeneCounts.QQnorm = GeneDiff * dat$QQNorm
+  names(dat$GeneCounts.QQnorm) = Genes
+  dat$OverExpressedGenes = NULL
+  # Estimate background throughout the data.
+  dat$WinBackground = getMultiBackgroundEstimate(dat$Background, 1:length(param$TSS.windows))
+  dat$Counts.QQnorm = pmax(dat$Counts - dat$WinBackground, 0) * dat$QQNorm
+  Change = TRUE
+}
+
+# Compute overexpressed genes if it's requested and not already computed.
+if(param$OverExpressedGenes && is.null(dat$OverExpressedGenes)) {
+  if(param$Verbose) catn(Name, ": Computing overexpressed genes")
+  # Use the ComputeOverExpressed function to identify overexpressed genes.
+  dat$OverExpressedGenes = cfChIP.ComputeOverExpressed(dat$GeneCounts.QQnorm, 
+                                                       dat$GeneCounts, 
+                                                       dat$GeneBackground, 
+                                                       param$NormRef, 
+                                                       param$NormRef.var, 
+                                                       dat$QQNorm)
+  Change = TRUE
+}
+
+# Compute overexpressed windows if it's requested, not already computed, and window normalization reference is available.
+if(param$OverExpressedGenes && is.null(dat$OverExpressedWins) && !is.null(param$WinNormRef)) {
+  if(param$Verbose) catn(Name, ": Computing overexpressed windows")
+  # Use the ComputeOverExpressed function to identify overexpressed windows.
+  dat$OverExpressedWins = cfChIP.ComputeOverExpressed(dat$Counts.QQnorm, 
+                                                      dat$Counts, 
+                                                      dat$WinBackground, 
+                                                      param$WinNormRef, 
+                                                      param$WinNormRef.var, 
+                                                      dat$QQNorm)
+  rownames(dat$OverExpressedWins) = 1:nrow(dat$OverExpressedWins)
+  Change = TRUE
+}
+
+# Save the processed data if changes have been made and saving is enabled.
+if(Change && param$Save) {
+  if(param$Verbose) catn(Name, ": Saving data")
+  saveRDS(dat, fn)
 }

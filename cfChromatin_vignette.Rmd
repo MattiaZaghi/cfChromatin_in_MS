@@ -13,13 +13,13 @@ output: html_document
 library(plyranges)
 library(readr)
 library(stringr)
-library(TxDb.Hsapiens.UCSC.hg38.knownGene)
-library(EnsDb.Hsapiens.v86)
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+library(EnsDb.Hsapiens.v75)
 library(org.Hs.eg.db)
 library(parallel)
 library(rtracklayer)
 library(preprocessCore)
-library(BSgenome.Hsapiens.UCSC.hg38)
+library(BSgenome.Hsapiens.UCSC.hg19)
 
 sessionInfo()
 ```
@@ -30,13 +30,13 @@ sessionInfo()
 source(paste0("/home/mattia/cfChromatin_in_MS/cfChromatin_fun.R"))
 #working_path <- "/media/sf_ubuntu_music/cfChromatin/"
 working_path <- "/date/gcb/gcb_MZ/"
-annotation_dir_path <- paste0(working_path, "Chrom_HMM_hg38_annotation/")
+annotation_dir_path <- paste0(working_path, "Chrom_HMM_hg19/")
 glossary_path <- paste0(annotation_dir_path, "Glossary.txt")
 bed_dir_path <- "/date/gcb/gcb_MZ/Round1/bed/bedtools/normal/"
 
 core <- 6
-
-setwd(dir = "/date/gcb/gcb_MZ/Round1/R/")
+wd<-"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac-MZ"
+setwd(wd)
 
 ```
 ## 1.Constructing a TSS/Enhancers catalogue for cfChip-seq analysis 
@@ -50,7 +50,7 @@ As explained in the manual Page 5-6. The first step is creating a catalogue of r
 # Catalog part 1
 windows <- load_catalog(annotation_dir = annotation_dir_path,glossary = glossary_path, glossary_group = "ANATOMY", states = c("1_TssA", "2_TssAFlnk"))
 # Catalog part 2 & 3
-windows <- annotate_catalog(windows, feature_tag = "TSS", db = list('UCSC'=TxDb.Hsapiens.UCSC.hg38.knownGene, 'Ensembl'=EnsDb.Hsapiens.v86), db_gap = 2500, db_spe = TRUE, db_tag = "EXTRA_TSS", db_spe_center = 3000)
+windows <- annotate_catalog(windows, feature_tag = "TSS", db = list('UCSC'=TxDb.Hsapiens.UCSC.hg19.knownGene, 'Ensembl'=EnsDb.Hsapiens.v75), db_gap = 2500, db_spe = TRUE, db_tag = "EXTRA_TSS", db_spe_center = 3000)
 # Catalog part 4
 windows <- add_flank(windows, feature_tag = "FLANKING", flanking_size = 1000)
 windows <- add_background(windows, feature_tag = "BACKGROUND", bin_size = 5000)
@@ -59,7 +59,7 @@ windows <- add_background(windows, feature_tag = "BACKGROUND", bin_size = 5000)
 show_statistics(windows, db_tag = "EXTRA_TSS")
 
 # Save files
-saveRDS(windows,paste0(working_path,"TSS_windows.rds"))
+saveRDS(windows,paste0(wd,"Windows.rds"))
 
 df_windows <- data.frame(
   seqnames=seqnames(windows),
@@ -69,7 +69,7 @@ df_windows <- data.frame(
   feature=windows$feature,
   type=windows$type)
 
-write.table(df_windows, file=paste0(working_path,"TSS.bed"), quote=F, sep=",", row.names=F, col.names=F)
+write.table(df_windows, file=paste0(wd,"Windows.bed"), quote=F, sep=",", row.names=F, col.names=F)
 ```
 ## 2.Constructing a Count Matrix of each chip-seq based on the Windows set of regions
 

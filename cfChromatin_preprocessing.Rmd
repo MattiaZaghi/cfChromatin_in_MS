@@ -1,0 +1,110 @@
+---
+title: "cfChromatin analysis Sadeh et al. based"
+author: "Mattia Zaghi"
+date: "2024-04-04"
+output: html_document
+---
+
+
+```{r setup 1}
+.libPaths(c("/home/mattia/miniconda3/envs/cfChromatin/lib/R/library/"))
+```
+
+## Preprocessing of cfChromatin files ##
+
+First upload the functions files necessary to perform the preprocessing steps 
+```{r}
+source("/home/mattia/cfChromatin_in_MS/cfChromatin_fun.R")
+suppressMessages(library(rtracklayer))
+suppressMessages(library(tools))
+suppressMessages(library(ggplot2))
+suppressMessages(library(parallel))
+```
+First we need to establish all the necessary directory to be used to process the files that we want to process
+
+```{r}
+catn = function(...) { cat(...,"\n") }
+  setwd("/date/gcb/gcb_MZ/Analysis/cfChromatin_MS/")
+  Mod = "H3K4me3"
+  SourceDIR = "/date/gcb/gcb_MZ/Analysis/cfChIP-seq/"
+  SetupDIR = paste0(SourceDIR, "SetupFiles/", Mod,"/")
+  RootDir =  getwd()
+  DataDir = paste0(RootDir, "/Samples/", Mod, "/")
+  BedDir = paste0(RootDir, "/BED/", Mod, "/")
+  TracksDIR = paste0(RootDir, "/Tracks/", Mod, "/")
+  OutputDir = paste0(RootDir, "/Output/", Mod, "/")
+
+  # Read the TSS windows data from an RDS file located in the SetupDIR directory.
+  TSS.windows <- readRDS(file.path(SetupDIR, "Windows.rds"))
+
+  # Filter to keep only standard chromosomes
+  TSS.windows <- keepStandardChromosomes(TSS.windows)
+
+  # Now TSS.windows contains only the TSS windows on standard chromosomes
+
+
+  # Now TSS.windows contains only the TSS windows on standard chromosomes
+
+  # Retrieve sequence information from the TSS windows data.
+  genome.seqinfo = seqinfo(TSS.windows)
+  # Define a list of chromosome names typically found in human genome datasets.
+  ChrList = paste0("chr", c(1:22,"X","Y"))
+  Win2Gene.Matrix.filename = paste0(SetupDIR,"Win2Gene.rds")
+  print("Loading Window to Gene mapping")
+  L = readRDS(Win2Gene.Matrix.filename)
+  Win2Gene.matrix = L$Matrix
+  MultiPromoterGenes = L$Multi
+  rm(L)
+#  colnames(Win2Gene.matrix)[is.na(colnames(Win2Gene.matrix))] = ""
+  Genes = colnames(Win2Gene.matrix)
+  GeneWindows = as.integer(rownames(Win2Gene.matrix))
+  
+  W = width(TSS.windows[GeneWindows])/1000
+  GeneLength = ComputeGeneCounts(W)
+  names(GeneLength) = Genes
+  rm(W)
+  
+  Win2Gene.triplet = as(Win2Gene.matrix, "TsparseMatrix")
+  Win2Gene.rows = Win2Gene.triplet@i +1
+  Win2Gene.cols = Win2Gene.triplet@j +1
+  Win2Gene.lists = split(Win2Gene.rows, Win2Gene.cols)
+  names(Win2Gene.lists) = Genes
+  rm(Win2Gene.cols)
+  rm(Win2Gene.rows)
+  rm(Win2Gene.triplet)
+```
+
+1. Find and upload the cfChromatin file coverage data from BED file to be subsequently analized
+
+```{r}
+# List all BED files in the directory
+bed_files <- list.files(BedDir, pattern = "\\.bed$", full.names = TRUE)
+
+# Define the parameters for cfChIP analysis
+params <- cfChIP.Params()
+params$DataDir <- BedDir  # Set the data directory
+# ... set other parameters as needed ...
+
+# Determine the number of cores to use
+num_cores <- detectCores() - 1  # Leave one core free for other tasks
+
+# Use parLapply to process BED files in parallel
+# Iterate over the list of BED files and process each one
+for(bed_file in bed_files) {
+  # Print the current file being processed
+  message("Processing file: ", bed_file)
+  
+  # Process the BED file and store the result
+  processed_data <- cfChIP.ProcessFile(filename ="/date/gcb/gcb_MZ/Analysis/BED/H3K4me3/H001.1.tagAlign.gz", param = params)
+  
+  # Add the processed data to the list
+  processed_data_list[[bed_file]] <- processed_data
+}
+# If you want to use a specific number of cores, replace num_cores with your desired number
+# Now, 'processed_data_list' contains the processed data for each BED file
+```
+2. Normalize coverage from bed files using TSS catalogues 
+```{r}
+
+```
+
