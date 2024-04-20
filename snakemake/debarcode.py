@@ -20,7 +20,7 @@ class bcdCT:
         if self.single_cell:
             self.out_reads = ['R1','R2','R3']
         else:
-            self.out_reads = ['R1','R3']
+            self.out_reads = ['R1','R2']
 
         if args.name:
             self.name = args.name
@@ -40,7 +40,7 @@ class bcdCT:
         if len(input) == 1 and os.path.isdir(input[0]):     # Case input is single directory
             self.input_dir = input[0]
             self.input_files = []
-            self.input_files.extend(glob(self.input_dir + "/*.fastq.gz"))
+            self.input_files.extend(glob(self.input_dir + "/*.fastq"))
             self.input_files.extend(glob(self.input_dir + "/*.fq.gz"))
 
         elif len(input) > 1:                                  # Case input are multiple files
@@ -49,7 +49,7 @@ class bcdCT:
             if not len(self.input_dir) == 1:
                 sys.stderr.write(Error_message)
                 sys.exit(1)
-            if not sum([x.endswith('.fastq.gz') or x.endswith('.fq.gz') for x in self.input_files]) == len(self.input_files):
+            if not sum([x.endswith('.fastq') or x.endswith('.fq.gz') for x in self.input_files]) == len(self.input_files):
                 sys.exit(1)
                 sys.stderr.write(Error_message)
         else:
@@ -57,14 +57,14 @@ class bcdCT:
             sys.stderr.write(Error_message)
 
     def detect_reads(self):
-        Error_message="*** Error: Please specify exactly one _R1_ _R2_ and _R3_ file or folder with exactly one of each files ***\n" + \
+        Error_message="*** Error: Please specify exactly one _R1_ _R2_ and file or folder with exactly one of each files ***\n" + \
                       "e.g. /data/path_to_my_files/*L001*.fastq.gz or /data/path_to_my_files/\n"
         self.path_in = {}
         self.path_in['R1'] = [x for x in self.input_files if "_R1_" in x]
         self.path_in['R2'] = [x for x in self.input_files if "_R2_" in x]
-        self.path_in['R3'] = [x for x in self.input_files if "_R3_" in x]
 
-        if len(self.path_in['R1']) != 1 or len(self.path_in['R2']) != 1 or len(self.path_in['R3']) != 1:
+
+        if len(self.path_in['R1']) != 1 or len(self.path_in['R2']) != 1:
             sys.stderr.write(Error_message)
             sys.exit(1)
 
@@ -73,7 +73,7 @@ class bcdCT:
 
 
     def in_handles(self,stack):
-        in_stack = {x: stack.enter_context(FastxFile(self.path_in[x],'r')) for x in ['R1','R2','R3']}
+        in_stack = {x: stack.enter_context(FastxFile(self.path_in[x],'r')) for x in ['R1','R2']}
         return in_stack
 
     def prep_out_filenames(self):
@@ -89,7 +89,7 @@ class bcdCT:
                     self.path_out[barcode][read] = self.path_out[barcode][read].replace(sample_id,args.name)
 
     def autodetect_name(self):
-        Error_message = "*** Error: Prefix for R1 R2 R3 files not the same. Please use the same prefix for all the files or specify experiment name ***\n"
+        Error_message = "*** Error: Prefix for R1 R2 files not the same. Please use the same prefix for all the files or specify experiment name ***\n"
 
         self.name = [split("_R[0-9]_", str(x)) for x in self.path_in.values()]
         self.name = [x[0] for x in self.name]
@@ -107,14 +107,14 @@ class bcdCT:
 
 
     def __iter__(self):
-        with FastxFile(self.path_in['R1']) as f1, FastxFile(self.path_in['R2']) as f2, FastxFile(self.path_in['R3']) as f3:
-            for r1,r2,r3 in zip(f1,f2,f3):
-                yield r1, r2, r3
+        with FastxFile(self.path_in['R1']) as f1, FastxFile(self.path_in['R2']) as f2:
+            for r1,r2 in zip(f1,f2):
+                yield r1, r2
 
     def autodetect_barcodes(self,args):
         barcodes = {}
         n=0
-        for read1,read2,read3 in self:
+        for read1,read2 in self:
             hit = find_seq(args.pattern, read2.sequence, nmismatch=0)
             if not hit or hit == 'Multiple':
                 continue
@@ -141,12 +141,6 @@ class bcdCT:
 def get_read_barcode(string,index):
     read_barcode = revcompl(string.sequence[index - 8:index])  # Get the barcode sequence
     return read_barcode
-
-def extract_cell_barcode(read,index):
-    cell_bcd_start = index + len(args.pattern)
-    read.sequence = read.sequence[cell_bcd_start:cell_bcd_start + 16]  # Get the cell barcode
-    read.quality  = read.quality[cell_bcd_start:cell_bcd_start + 16]   # Get corresponding Quality score
-    return read
 
 def revcompl(seq):
     revcomp_table = {
@@ -191,11 +185,11 @@ def main(args):
         exp.create_out_handles(stack)
         n = 0
         sys.stderr.write("Starting demultiplexing \n")
-        for read1,read2,read3 in exp:
+        for read1,read2 in exp:
             n+=1
             if n % 5000000 == 0:
                 sys.stderr.write("{} reads processed\n".format(n))
-            assert (read1.name == read2.name == read3.name)                                                 # Make sure the fastq files are ok
+            assert (read1.name == read2.name)                                                 # Make sure the fastq files are ok
 
             spacer_hit = find_seq(pattern=args.pattern,DNA_string=read2.sequence,nmismatch=2)
             if not spacer_hit:

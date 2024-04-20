@@ -68,17 +68,19 @@ rule all:
 
 rule merge_fastq:
     input:
-        fq_1=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][0],
-        fq_2=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][1]
+        fq_1_L001=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][0],
+        fq_1_L002=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][2],
+        fq_2_L001=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][1],
+        fq_2_L002=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][3]
     output:
         R1=temp("{myrun}/cat/{sample}_R1.fastq"),
         R2=temp("{myrun}/cat/{sample}_R2.fastq")
     threads: config['THREADS']
     shell:
         """
-        gunzip -c {input.fq_1} > {output.R1}
+        gunzip -c {input.fq_1_L001} {input.fq_1_L002} > {output.R1}
 
-        gunzip -c {input.fq_2} > {output.R2}
+        gunzip -c {input.fq_2_L001} {input.fq_2_L002} > {output.R2}
 
         """
 
@@ -132,7 +134,7 @@ rule aligning_bowtie2:
         """
         mkdir -p {params.dir}
         
-        bowtie2 --very-sensitive-local -x {params.index} -1 {input.Paired1} -2 {input.Paired2} -S {output.sam} -p {threads} --no-mixed --no-discordant
+        bowtie2 -x {params.index} -1 {input.Paired1} -2 {input.Paired2} -S {output.sam} -p {threads} --no-mixed --no-discordant
 
         """
 

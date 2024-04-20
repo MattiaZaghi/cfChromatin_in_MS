@@ -32,6 +32,14 @@
                 "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1016/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1016_S12_L002_R1_001.fastq.gz",
                 "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1016/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1016_S12_L002_R2_001.fastq.gz"
             ]
+        },
+        "H3K27ac+27me3": {
+            "nanoCT": [
+                "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1012/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1012_S1_L001_R1_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1012/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1012_S1_L001_R2_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1012/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1012_S1_L002_R1_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1012/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1012_S1_L002_R2_001.fastq.gz"
+            ]
         }
     },
     "H2-P": {
@@ -66,6 +74,14 @@
                 "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1017/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1017_S13_L002_R1_001.fastq.gz",
                 "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1017/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1017_S13_L002_R2_001.fastq.gz"
             ]
+        },
+        "H3K27ac+27me3": {
+            "nanoCT": [
+                "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1013/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1013_S2_L001_R1_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1013/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1013_S2_L002_R2_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1013/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1013_S2_L002_R1_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1013/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1013_S2_L002_R2_001.fastq.gz"
+            ]
         }
     },
     "H3-P": {
@@ -91,6 +107,14 @@
                 "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1009/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1009_S9_L001_R2_001.fastq.gz",
                 "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1009/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1009_S9_L001_R1_001.fastq.gz",
                 "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1009/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1009_S9_L001_R2_001.fastq.gz"
+            ]
+        },
+        "H3K27ac+27me3": {
+            "nanoCT": [
+                "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1014/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1014_S3_L002_R1_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1014/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1014_S3_L002_R2_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1014/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1014_S3_L002_R1_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1014/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1014_S3_L002_R2_001.fastq.gz"
             ]
         }
     },
@@ -118,6 +142,14 @@
                 "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1018/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1018_S14_L001_R2_001.fastq.gz",
                 "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1018/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1018_S14_L002_R1_001.fastq.gz",
                 "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1018/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1018_S14_L002_R2_001.fastq.gz"
+            ]
+        },
+        "H3K27ac+27me3": {
+            "nanoCT": [
+                "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1015/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1015_S4_L002_R1_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1015/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1015_S4_L002_R2_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1015/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1015_S4_L002_R1_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1015/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1015_S4_L002_R2_001.fastq.gz"
             ]
         }
     }

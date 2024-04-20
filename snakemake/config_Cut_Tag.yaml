@@ -1,5 +1,5 @@
 # proj parameters
-RUN_ID: "Round1_hg19" # "RUN_id"
+RUN_ID: "Round2_fresh_hg19" # "RUN_id"
 THREADS: 5
 # trimming
 adapters: "/home/mattia/Trimmomatic/adapters/NexteraPE-PE.fa"
@@ -11,7 +11,7 @@ binsize: "10"
 norm_method: "RPKM"
 smooth_length: "300"
 #Cut&Tag or ChIP
-c_t: 'Cut-Tag'
+c_t: 'nanoCT'
 chip: 'ChIP'
 Acetylation: 'H3K27ac'
 Methylation: 'H3K36me3'

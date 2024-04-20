@@ -81,7 +81,20 @@ rule merge_fastq:
         gunzip -c {input.fq_2} > {output.R2}
 
         """
-
+rule demultiplex:
+    input:
+        script=workflow.basedir + '/scripts/debarcode.py',
+        R1=temp("{myrun}/cat/{sample}_R1.fastq"),
+        R2=temp("{myrun}/cat/{sample}_R2.fastq")
+    output:
+        '{sample}/{modality}_{barcode}/fastq/barcode_{barcode}/{sample}_{number}_{lane}_R1_{suffix}',
+        '{sample}/{modality}_{barcode}/fastq/barcode_{barcode}/{sample}_{number}_{lane}_R2_{suffix}'
+    params:
+        nbarcodes=lambda wildcards: len(config['samples'][wildcards.sample]['barcodes']),
+        out_folder=lambda wildcards: '{sample}/{modality}_{barcode}/fastq/'.format(sample=wildcards.sample,modality=wildcards.modality,barcode=wildcards.barcode),
+    conda: '/home/mattia/nanoscope/envs/nanoscope_debarcode.yaml'
+    shell:
+        "python3 {input.script} -i {input.fastq} -o {params.out_folder} --barcode {wildcards.barcode} --name {wildcards.sample} 2>&1"
 
 rule trimming_trimmomatic:  
     input:
