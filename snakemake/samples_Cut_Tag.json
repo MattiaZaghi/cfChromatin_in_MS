@@ -1,15 +1,5 @@
 {
     "H1-P": {
-        "H3K27ac": {
-            "ChIP": [
-                "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1001/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1001_S1_L001_R1_001.fastq.gz",
-                "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1001/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1001_S1_L001_R2_001.fastq.gz",
-                "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1001/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1001_S1_L002_R1_001.fastq.gz",
-                "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1001/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1001_S1_L002_R2_001.fastq.gz"
-                
-            ]
-        },
-
         "H3K27ac+27me3": {
             "nanoCT": [
                 "/date/gcb/gcb_MZ/P31260/files/P31260/P31260_1012/02-FASTQ/240418_A00621_0973_AH5CTKDRX5/P31260_1012_S1_L001_R1_001.fastq.gz",
