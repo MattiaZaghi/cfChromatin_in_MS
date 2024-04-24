@@ -1,0 +1,21 @@
+name: homer
+channels:
+  - bioconda
+  - defaults
+dependencies:
+  - _libgcc_mutex=0.1=main
+  - _openmp_mutex=5.1=1_gnu
+  - ca-certificates=2023.08.22=h06a4308_0
+  - homer=4.11=pl5321h9f5acd7_7
+  - libgcc-ng=11.2.0=h1234567_1
+  - libgomp=11.2.0=h1234567_1
+  - libidn2=2.3.4=h5eee18b_0
+  - libnsl=2.0.0=h5eee18b_0
+  - libstdcxx-ng=11.2.0=h1234567_1
+  - libunistring=0.9.10=h27cfd23_0
+  - openssl=3.0.12=h7f8727e_0
+  - perl=5.32.1=0_h5eee18b_perl5
+  - unzip=6.0=h611a1e1_0
+  - wget=1.21.4=h251f7ec_1
+  - zlib=1.2.13=h5eee18b_0
+prefix: /home/mattia/miniconda3/envs/homer

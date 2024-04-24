@@ -141,7 +141,6 @@ rule bam__dedup:
         markdup = "{myrun}/sorted/samtools/{sample}.bam"
     output:
         dedup = "{myrun}/dedup/picard/{sample}.bam",
-        bai   = "{myrun}/dedup/picard/{sample}.bam.bai",
         metrics = "{myrun}/dedup/picard/{sample}.bam_metrics.txt"
     params:
         dir="{myrun}/dedup/picard/",
