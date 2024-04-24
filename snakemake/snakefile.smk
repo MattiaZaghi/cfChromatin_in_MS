@@ -28,7 +28,7 @@ ALL_SAMPLES =  CHIPS + CUT_TAGS
 
 BAM=expand("{myrun}/dedup/picard/{sample}.bam", sample=ALL_SAMPLES, myrun=RUNID)
 ALL_FLAGSTAT = expand("{myrun}/dedup/picard/{sample}.flagstat", sample = ALL_SAMPLES,myrun=RUNID)
-#ALL_DOWNSAMPLE_BAM = expand("{myrun}/downsample/sambamba/{sample}.bam", sample = ALL_SAMPLES,myrun=RUNID)
+FILTER expand("{myrun}/filter/samtools/{sample}.bam", sample = ALL_SAMPLES,myrun=RUNID)
 ALL_BIGWIG_DEDUP = expand("{myrun}/coverage/deeptools/{sample}_RPKM.bw", sample = ALL_SAMPLES,myrun=RUNID)
 BED=expand("{myrun}/bed/bedtools/{sample}.bed", sample = ALL_SAMPLES,myrun=RUNID)
 #ALL_BIGWIG= expand("{myrun}/coverage/deeptools/CPM/{sample}_CPM.bw", sample = ALL_SAMPLES,myrun=RUNID)
@@ -42,7 +42,7 @@ SIZE=expand("{myrun}/dedup/picard/insert/{sample}_insert.pdf", sample = ALL_SAMP
 
 TARGETS = []
 TARGETS.extend(BAM)
-#TARGETS.extend(ALL_DOWNSAMPLE_BAM)
+TARGETS.extend(FILTER)
 #TARGETS.extend(GOPEAKS)
 #TARGETS.extend(GOPEAKS_BROAD)
 TARGETS.extend(ALL_BIGWIG_DEDUP)
@@ -212,6 +212,20 @@ rule filter_chr_samtools:
         samtools index {output.filter} -@ {threads}
         
         """
+rule filter_stat:
+    input:
+        filter = "{myrun}/filter/samtools/{sample}.bam",
+    output:
+        downsample_filter= "{myrun}/filter/samtools/{sample}.flagstat"
+    resources: mem_mb=64000
+    threads: config['THREADS']
+    conda:
+        "/home/mattia/miniconda3/envs/samtools.yml"
+    shell:
+        """        
+        samtools flagstat -@ {threads} {input.downsample_bam} > {output.downsample_flagstat} 
+        
+        """
 rule stat_samtools:
     input:
         dedup  = "{myrun}/dedup/picard/{sample}.bam"
@@ -292,7 +306,27 @@ rule coverage_deeptools:
         bamCoverage -b {input.dedup} --outFileName {output.bw} --normalizeUsing {params.norm} --binSize {params.mapping_qual_bw} --smoothLength {params.smooth} --numberOfProcessors {threads} --exactScaling  
 
         """
+rule coverage_deeptools_filter:
+    input: 
+        dedup  = "{myrun}/dedup/picard/{sample}.bam"
+    output:
+        bw="{myrun}/coverage/deeptools/{sample}_RPKM.bw"
+    params:
+        genome_size_bp  = config['genome_size_bp'],
+        mapping_qual_bw = config['binsize'],
+        norm= config['norm_method'],
+        smooth= config['smooth_length']
+    resources:
+        mem_mb=64000
+    threads: config['THREADS']
+    log: "{myrun}/coverage/deeptools/{sample}.log"
+    conda:
+        "/home/mattia/miniconda3/envs/deeptools.yml"
+    shell:
+        """
+        bamCoverage -b {input.dedup} --outFileName {output.bw} --normalizeUsing {params.norm} --binSize {params.mapping_qual_bw} --smoothLength {params.smooth} --numberOfProcessors {threads} --exactScaling  
 
+        """
         
 rule insertsize_picard:
     input:
