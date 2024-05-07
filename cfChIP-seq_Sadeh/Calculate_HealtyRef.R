@@ -2,18 +2,18 @@ suppressMessages(library(rtracklayer))
 suppressMessages(library(tools))
 suppressMessages(library(ggplot2))
 
-# Create a vector of file paths
-file_paths <- c("/date/gcb/gcb_MZ/Analysis/Samples/H3K27ac/H1-P_H3K27ac_ChIP.rdata",
-                "/date/gcb/gcb_MZ/Analysis/Samples/H3K27ac/H2-P_H3K27ac_ChIP.rdata",
-                "/date/gcb/gcb_MZ/Analysis/Samples/H3K27ac/H3-P_H3K27ac_ChIP.rdata",
-                "/date/gcb/gcb_MZ/Analysis/Samples/H3K27ac/H4-P_H3K27ac_ChIP.rdata",
-                "/date/gcb/gcb_MZ/Analysis/Samples/H3K27ac/19019-P_H3K27ac_ChIP.rdata")
+file_paths <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K27ac_ref"
+files <- list.files(path = file_paths, pattern = "^Human.*rdata$", full.names = TRUE)
+
 
 # Use lapply to load all files
-data_list <- lapply(file_paths, readRDS)
+data_list <- lapply(files, readRDS)
 
-# Create a vector of object names
-object_names <- c("H1", "H2", "H3", "H4","19019")
+# Extract the base names from the file paths
+base_names <- basename(files)
+
+# Remove the pattern "__H3K27ac_ChIP-SE.rdata" from the base names
+names <- sub("_H3K27ac_ChIP-SE.rdata$", "", base_names)
 
 # Assign names to the list elements
 names(data_list) <- object_names
@@ -33,4 +33,4 @@ average_gene_counts <- rowMeans(gene_counts_df, na.rm = TRUE)
 # Print the result
 print(average_gene_counts)
 
-saveRDS(average_gene_counts,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac/HealthyRef.rds")
+saveRDS(average_gene_counts,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_ref/HealthyRef.rds")

@@ -370,4 +370,46 @@ rule bam_to_bed:
         bedtools bamtobed -i {input.filter}  > {output.bed}
 
         """
+rule R_script:
+    input: 
+        bed  = "{myrun}/dedup/picard/{sample}.bam",
+        rdata  = "Analysis/Samples/H3K27ac_ref/file.RData"  # Add your RData file here
+    output:
+        bw="{myrun}/coverage/deeptools/R/{sample}.bw"
+    params:
+        Output="Analysis/Output/H3K27ac_ref"
+    resources:
+        mem_mb=64000
+    threads: config['THREADS']
+    log: "{myrun}/coverage/deeptools/{sample}.log"
+    conda:
+        "/home/mattia/miniconda3/envs/deeptools.yml"
+    shell:
+        """
+        Rscript --vanilla Analysis/cfChIP-seq/ProcessBEDFiles.R -r Analysis -m ${m} -BCN ${sample}
+        """
 
+rule coverage_deeptools_R:
+    input: 
+        dedup  = "{myrun}/dedup/picard/{sample}.bam",
+        rdata  = "Analysis/Samples/H3K27ac_ref/file.RData"  # Add your RData file here
+    output:
+        bw="{myrun}/coverage/deeptools/R/{sample}.bw"
+    params:
+        genome_size_bp  = config['genome_size_bp'],
+        mapping_qual_bw = config['binsize'],
+        smooth= config['smooth_length']
+    resources:
+        mem_mb=64000
+    threads: config['THREADS']
+    log: "{myrun}/coverage/deeptools/{sample}.log"
+    conda:
+        "/home/mattia/miniconda3/envs/deeptools.yml"
+    shell:
+        """
+        # Use Rscript to extract the QQnorm value from the RData file
+        QQnorm=$(Rscript -e "load('{input.rdata}'); print(QQnorm)")
+
+        # Use the extracted QQnorm value as the --scaleFactor
+        bamCoverage -b {input.dedup} --outFileName {output.bw} --scaleFactor $QQnorm --binSize {params.mapping_qual_bw} --smoothLength {params.smooth} --numberOfProcessors {threads} --exactScaling
+        """

@@ -17,6 +17,7 @@ chip-se: 'ChIP-SE'
 Acetylation: 'H3K27ac'
 Methylation: 'H3K36me3'
 Polycomb: 'H3K27me3'
+Ref_Acetylation: 'H3K27ac_ref'
 #index Bowtie2
 index_bt2_hg: "/home/mattia/Genomes/hg19/fa/hg19"
 #downsample target
