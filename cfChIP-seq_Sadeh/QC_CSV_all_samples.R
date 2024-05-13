@@ -1,8 +1,18 @@
-# Define the directory
-directory <- "/date/gcb/gcb_MZ/Analysis/Output/H3K27ac"
+suppressMessages(library(rtracklayer))
+suppressMessages(library(tools))
+suppressMessages(library(ggplot2))
+suppressMessages(library(tidyverse))
+suppressMessages(library(dplyr))
 
-# Get a list of all CSV files in the directory that end with "_ChIP.csv"
-file_paths <- list.files(directory, pattern = "_ChIP\\.csv$", full.names = TRUE)
+# Define the directory
+directory <- "/date/gcb/gcb_MZ/Analysis/Output/H3K4me3"
+
+# Get a list of all CSV files in the directory
+all_files <- list.files(directory, pattern = "\\.csv$", full.names = TRUE)
+
+# Remove the files that contain "_H3K4me3_ChIP"
+file_paths <- all_files[!grepl("_H3K4me3_ChIP", all_files)]
+
 
 # Initialize an empty data frame
 merged_data <- data.frame()
@@ -20,35 +30,40 @@ for (file_path in file_paths) {
 # Rename the first column as "sample"
 colnames(merged_data)[1] <- "sample"
 # Rename the first column as "sample"
-colnames(merged_data)[7] <- "Total Signal"
+colnames(merged_data)[6] <- "Total Signal"
 # Rename the first column as "sample"
-colnames(merged_data)[8] <- "Background Signal"
+colnames(merged_data)[7] <- "Background Signal"
 
 # Save the merged data to a new CSV file
-write.csv(merged_data, "/date/gcb/gcb_MZ/Analysis/Output/H3K27ac/QC_all_samples.csv", row.names = FALSE)
+write.csv(merged_data, "/date/gcb/gcb_MZ/Analysis/Output/H3K4me3/QC_all_Sadeh_samples.csv", row.names = FALSE)
 
-# Print a success message
-print("Merged data has been saved to '/path/to/merged_file.csv'")
 
 
 #plot Yield
 
+# Assuming the two columns you want to plot are `Total Signal` and `Another Column`
+to_plot <-merged_data %>% 
+  dplyr::select(`Total Signal`,`Background Signal`) %>% 
+  gather(key=Group, value=value, "Total Signal","Background Signal")
 
+# Define the order
+levels_order <- c("Total Signal","Background Signal")  # replace with your actual labels
 
-ggplot(merged_data) +
-  aes(x = sample, y = Frip, fill = sample, color = sample) +
-  geom_violin(trim = TRUE, color = "#000000") +
-  geom_boxplot(width = 0.1, color = "#000000", fill = "#ffffff", outlier.shape = NA) +
-  scale_fill_manual(values = c("#FF0000", "#FF0000","#3399FF", "#3399FF", "#3399FF","#00CC33", "#00CC33","#00CC33")) +
-  scale_color_manual(values = c("#FF0000", "#FF0000","#3399FF","#3399FF","#3399FF",  "#00CC33", "#00CC33","#00CC33")) +
+# Convert the column to a factor and specify the order of levels
+to_plot$Category <- factor(to_plot$Group, levels = levels_order)
+
+ggplot(to_plot, aes(x=Group, y=value, fill=Group)) +
+  geom_boxplot(width = 0.1, color = "#000000", outlier.shape = NA) +
+  geom_jitter(width = 0.1, size = 1, color = "#000000") +
   ggthemes::theme_base() +
   xlab("") +
-  ylab("Fraction of reads into peaks") +
-  scale_x_discrete(labels = c("nanoCT_ATAC","nanoCTAR_ATAC", "Droplet_Pair-Tag_H3K27ac","nanoCT_H3K27ac","nanoCTAR_H3K27ac","Droplet_Pair-Tag_H3K27me3","nanoCT_H3K27me3", "nanoCTAR_H3K27me3"))+
-  #scale_y_continuous(breaks = seq(0, 25000, by = 5000)) +
+  ylab("% of Signal") +
+  scale_x_discrete(labels = c("H3K4me3 CfChromatin Background","H3K4me3 CfChromatin in TSS")) +
   theme(panel.border = element_rect()) +
   theme_classic() + theme(legend.position = "none") +
-  theme(axis.text.x = element_text(size = 18, family = "Arial", angle = 45, hjust = 1),
-        axis.text.y = element_text(size = 18, family = "Arial"),
-        axis.title.y = element_text(size = 18, family = "Arial"),
+  theme(axis.text.x = element_text(size = 7, family = "Arial", angle = 45, hjust = 1),
+        axis.text.y = element_text(size = 10, family = "Arial"),
+        axis.title.y = element_text(size = 10, family = "Arial"),
         axis.line = element_line(size = 1))
+
+

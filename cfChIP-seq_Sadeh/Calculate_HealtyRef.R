@@ -2,9 +2,11 @@ suppressMessages(library(rtracklayer))
 suppressMessages(library(tools))
 suppressMessages(library(ggplot2))
 
-file_paths <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K27ac_ref"
-files <- list.files(path = file_paths, pattern = "^Human.*rdata$", full.names = TRUE)
+# Set the file path
+file_paths <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K4me3"
 
+# List all files in the directory that match the pattern
+files <- list.files(path = file_paths, pattern = ".*H3K4me3.*_ChIP.rdata$", full.names = TRUE)
 
 # Use lapply to load all files
 data_list <- lapply(files, readRDS)
@@ -12,11 +14,11 @@ data_list <- lapply(files, readRDS)
 # Extract the base names from the file paths
 base_names <- basename(files)
 
-# Remove the pattern "__H3K27ac_ChIP-SE.rdata" from the base names
-names <- sub("_H3K27ac_ChIP-SE.rdata$", "", base_names)
+# Remove the pattern "_H3K4me3_ChIP.rdata" from the base names
+names <- sub("_H3K4me3_ChIP.rdata$", "", base_names)
 
 # Assign names to the list elements
-names(data_list) <- object_names
+names(data_list) <- names
 
 
 
@@ -30,7 +32,15 @@ gene_counts_df <- do.call(cbind, gene_counts_list)
 # Calculate row means (average gene counts)
 average_gene_counts <- rowMeans(gene_counts_df, na.rm = TRUE)
 
-# Print the result
-print(average_gene_counts)
+#load common Genes (HouseKeeping based on H3K4me3 calculation Sadeh et al.)
 
-saveRDS(average_gene_counts,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_ref/HealthyRef.rds")
+Common_genes<-readRDS("/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K4me3/CommonGenes.rds")
+
+#filter the gene counts matrix keeping only the housekeeping genes
+filtered_data <- average_gene_counts[names(average_gene_counts) %in% Common_genes]
+
+# Print the result
+print(filtered_gene_counts_df)
+
+saveRDS(filtered_data,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K4me3/HealthyRef.rds")
+

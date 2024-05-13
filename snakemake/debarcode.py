@@ -18,7 +18,7 @@ class bcdCT:
         self.single_cell=args.single_cell
         self.out_prefix=args.out_prefix
         if self.single_cell:
-            self.out_reads = ['R1','R2','R3']
+            self.out_reads = ['R1','R2']
         else:
             self.out_reads = ['R1','R2']
 
@@ -32,7 +32,7 @@ class bcdCT:
         self.prep_out_filenames()
 
     def detect_input(self,input):
-        Error_message="*** Error: Wrong input files specified. The input must be either folder with _R1_*.fastq.gz _R2_*.fastq.gz _R3_*.fastq.gz files or paths to the files themselves ***\n" +\
+        Error_message="*** Error: Wrong input files specified. The input must be either folder with _R1_*.fastq.gz _R2_*.fastq.gz  files or paths to the files themselves ***\n" +\
         "The files should be placed in the same folder\n" +\
         "e.g. /data/path_to_my_files/*L001*.fastq.gz or /data/path_to_my_files/\n"
 
@@ -40,7 +40,7 @@ class bcdCT:
         if len(input) == 1 and os.path.isdir(input[0]):     # Case input is single directory
             self.input_dir = input[0]
             self.input_files = []
-            self.input_files.extend(glob(self.input_dir + "/*.fastq"))
+            self.input_files.extend(glob(self.input_dir + "/*.fastq.gz"))
             self.input_files.extend(glob(self.input_dir + "/*.fq.gz"))
 
         elif len(input) > 1:                                  # Case input are multiple files
@@ -49,7 +49,7 @@ class bcdCT:
             if not len(self.input_dir) == 1:
                 sys.stderr.write(Error_message)
                 sys.exit(1)
-            if not sum([x.endswith('.fastq') or x.endswith('.fq.gz') for x in self.input_files]) == len(self.input_files):
+            if not sum([x.endswith('.fastq.gz') or x.endswith('.fq.gz') for x in self.input_files]) == len(self.input_files):
                 sys.exit(1)
                 sys.stderr.write(Error_message)
         else:
@@ -62,7 +62,6 @@ class bcdCT:
         self.path_in = {}
         self.path_in['R1'] = [x for x in self.input_files if "_R1_" in x]
         self.path_in['R2'] = [x for x in self.input_files if "_R2_" in x]
-
 
         if len(self.path_in['R1']) != 1 or len(self.path_in['R2']) != 1:
             sys.stderr.write(Error_message)
@@ -138,9 +137,10 @@ class bcdCT:
 
         self.picked_barcodes = picked_barcodes
 
-def get_read_barcode(string,index):
+def get_read_barcode(string, index):
     read_barcode = revcompl(string.sequence[index - 8:index])  # Get the barcode sequence
     return read_barcode
+
 
 def revcompl(seq):
     revcomp_table = {
@@ -157,16 +157,12 @@ def rev(seq):
     return seq[::-1]
 
 def find_seq(pattern, DNA_string, nmismatch=2):
-    for n in range(0,nmismatch + 1):
+    for n in range(0, nmismatch + 1):
         r = regex.compile('({0}){{e<={1}}}'.format(pattern, n))
         res = r.finditer(DNA_string)
-        hit = [x.start() for x in res]
-        if len(hit) == 0:
-            continue
-        if len(hit) > 1:
-            return None
-        if len(hit) == 1:
-            return int(hit[0])
+        for match in res:
+            if match.start() >= 8:  # Look for matches after the first 8 nucleotides
+                return match.start()
     return None
 
 def main(args):
@@ -216,7 +212,6 @@ def main(args):
 
                 # Write the outputs
                 exp.out_stack[hit_barcode]['R1'].write('{}\n'.format(str(read1)))
-                exp.out_stack[hit_barcode]['R3'].write('{}\n'.format(str(read3)))
 
 
                 statistics["barcode_found"] += 1
@@ -234,7 +229,7 @@ if __name__ == '__main__':
                         required=True,
                         type=str,
                         nargs='+',
-                        help='path to input R1,R2,R3 .fastq.gz files [3 files required]')
+                        help='path to input R1,R2 .fastq.gz files [ files required]')
 
     parser.add_argument('-o', '--out_prefix',
                         type=str,

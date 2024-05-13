@@ -99,9 +99,14 @@ cfChIP.GetCoverage  = function(filename) {
 
 
 # Create a vector of file paths
-file_paths_ref <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K27ac_ref"
-files_ref <- list.files(path = file_paths_ref, pattern = "^Human.*rdata$", full.names = TRUE)
-file_paths_samples <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K27ac"
+file_paths_ref <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K4me3"
+files_ref <- list.files(path = file_paths_ref, pattern = "*rdata$", full.names = TRUE)
+# Remove the files that contain "_H3K4me3_ChIP"
+files_ref  <- files_ref [!grepl("_H3K4me3_ChIP", files_ref)]
+# Use grep to get the indices of files that start with 'H'
+files_ref  <- files_ref[137:151]
+file_paths_samples <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K4me3"
+
 files_samples <- list.files(path = file_paths_samples, pattern = "*_ChIP.rdata$", full.names = TRUE)
 # Merge the lists
 merged_list <- c(files_ref,files_samples)
@@ -114,8 +119,8 @@ data_list <- lapply(merged_list ,readRDS)
 base_names <- basename(merged_list)
 
 # Remove the pattern "__H3K27ac_ChIP-SE.rdata" from the base names
-names <- sub("_H3K27ac_ChIP-SE.rdata$", "", base_names)
-names<- sub("_H3K27ac_ChIP.rdata$", "", names)
+#names <- sub("_H3K27ac_ChIP-SE.rdata$", "", base_names)
+names<- sub(".rdata$", "", base_names)
 
 # Assign names to the list elements
 names(data_list) <- names
