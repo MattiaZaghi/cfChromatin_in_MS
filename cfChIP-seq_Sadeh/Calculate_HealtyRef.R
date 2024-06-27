@@ -3,10 +3,10 @@ suppressMessages(library(tools))
 suppressMessages(library(ggplot2))
 
 # Set the file path
-file_paths <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K4me3"
+file_paths <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K27ac"
 
 # List all files in the directory that match the pattern
-files <- list.files(path = file_paths, pattern = ".*H3K4me3.*_ChIP.rdata$", full.names = TRUE)
+files <- list.files(path = file_paths, pattern = ".*H3K27ac.*_ChIP.rdata$", full.names = TRUE)
 
 # Use lapply to load all files
 data_list <- lapply(files, readRDS)
@@ -15,7 +15,7 @@ data_list <- lapply(files, readRDS)
 base_names <- basename(files)
 
 # Remove the pattern "_H3K4me3_ChIP.rdata" from the base names
-names <- sub("_H3K4me3_ChIP.rdata$", "", base_names)
+names <- sub("_H3K27ac_ChIP.rdata$", "", base_names)
 
 # Assign names to the list elements
 names(data_list) <- names
@@ -31,6 +31,11 @@ gene_counts_df <- do.call(cbind, gene_counts_list)
 
 # Calculate row means (average gene counts)
 average_gene_counts <- rowMeans(gene_counts_df, na.rm = TRUE)
+
+gene_counts_df <- as.data.frame(gene_counts_df)
+
+# Calculate variance for each gene
+gene_variance <- apply(gene_counts_df, 1, var)
 
 #load common Genes (HouseKeeping based on H3K4me3 calculation Sadeh et al.)
 

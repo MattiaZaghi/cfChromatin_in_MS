@@ -1,0 +1,189 @@
+samples:
+  M1_donor3_rep1_Multiome_H3K27ac:                         
+    fastq_path:
+      /date/gcb/gcb_MZ/multiNanoCT/samples/Human_Brain_doplet_paired_Tag/Human_Brain_doplet_paired_Tag_rep1/H3K27ac_CCTATCCT/fastq/barcode_CCTATCCT
+    fastq_path_RNA:
+      /date/gcb/gcb_MZ/multiNanoCT/Human_Brain_paired_Tag/M1_donor3_rep1_Multiome_H3K27ac/  
+    barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      H3K27ac: CCTATCCT
+      #H3K27me3: ATAGAGGC
+      #RNA_AAAAGGGG_H3K27ac: AAAAGGGG
+  
+  M1_donor3_rep2_Multiome_H3K27ac:                         
+    fastq_path:
+      /date/gcb/gcb_MZ/multiNanoCT/samples/Human_Brain_doplet_paired_Tag/Human_Brain_doplet_paired_Tag_rep2/H3K27ac_CCTATCCT/fastq/barcode_CCTATCCT
+    fastq_path_RNA:
+      /date/gcb/gcb_MZ/multiNanoCT/Human_Brain_paired_Tag/M1_donor3_rep2_Multiome_H3K27ac
+    barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      H3K27ac: CCTATCCT
+      #H3K27me3: ATAGAGGC
+      #RNA_AAAAGGGG_H3K27ac: AAAAGGGG
+  #E1_seq:                                                                         # Change the name of your sample here
+    #fastq_path:
+      #/date/gcb/gcb_MZ/P29857/P29857_1001/
+    #fastq_path_RNA:
+      #/date/gcb/gcb_Neemat_Mattia/P30156/P30156_1003/
+    #barcodes:
+      #ATAC: TATAGCCT                                                                         # Define your different antibody barcodes here
+      #H3K27ac: CCTATCCT
+      #H3K27me3: ATAGAGGC
+      #RNA: AAAAGGGG
+  #E2_seq:                                                                         # Change the name of your sample here
+    #fastq_path:
+      #/date/gcb/gcb_MZ/P29857/P29857_1002/
+    #fastq_path_RNA:
+      #/date/gcb/gcb_Neemat_Mattia/P30156/P30156_1004/
+    #barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: CCTATCCT
+      #H3K27me3: ATAGAGGC
+      #RNA: AAAAGGGG
+  #E3_seq:                                                                         # Change the name of your sample here
+    #fastq_path:
+      #/date/gcb/gcb_MZ/P29857/P29857_1003/
+    #fastq_path_RNA:
+      #/date/gcb/gcb_Neemat_Mattia/P30156/P30156_1005/
+    #barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: CCTATCCT
+      #H3K27me3: ATAGAGGC
+      #RNA: AAAAGGGG
+  #E4_seq:                                                                         # Change the name of your sample here
+    #fastq_path:
+      #/date/gcb/gcb_MZ/P29857/P29857_1004/
+    #fastq_path_RNA:
+      #/date/gcb/gcb_Neemat_Mattia/P30156/P30156_1006/
+    #barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: CCTATCCT
+      #H3K27me3: ATAGAGGC
+      #RNA: AAAAGGGG
+  #E1_amb:                                                                         # Change the name of your sample here
+    #fastq_path:
+      #/date/gcb/gcb_MZ/multiNanoCT/Embryo_fastq_Epi/E1_amb/
+    #fastq_path_RNA:
+      #/date/gcb/gcb_Neemat_Mattia/P30156/P30156_1007/  
+    #barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: CCTATCCT
+      #H3K27me3: ATAGAGGC
+      #RNA: AAAAGGGG        
+  #E2_amb:                         
+    #fastq_path:
+      #/date/gcb/gcb_MZ/multiNanoCT/Embryo_fastq_Epi/E2_amb/
+    #fastq_path_RNA:
+      #/date/gcb/gcb_Neemat_Mattia/P30156/P30156_1008/  
+    #barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: CCTATCCT
+      #H3K27me3: ATAGAGGC
+      #RNA: AAAAGGGG
+  #E3_amb:                         
+    #fastq_path:
+      #/date/gcb/gcb_MZ/multiNanoCT/Embryo_fastq_Epi/E3_amb/
+    #fastq_path_RNA:
+      #/date/gcb/gcb_Neemat_Mattia/P30156/P30156_1009/  
+    #barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: CCTATCCT
+      #H3K27me3: ATAGAGGC
+      #RNA: AAAAGGGG
+  #E4_amb:                         
+    #fastq_path:
+      #/date/gcb/gcb_MZ/multiNanoCT/Embryo_fastq_Epi/E4_amb
+    #fastq_path_RNA:
+      #/date/gcb/gcb_Neemat_Mattia/P30156/P30156_1010/  
+    #barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: CCTATCCT
+      #H3K27me3: ATAGAGGC
+      #RNA: AAAAGGGG     
+  #E5_seq:                         
+    #fastq_path:
+      #/date/gcb/gcb_MZ/P30208/files/P30208/P30208_1005/
+    #fastq_path_RNA:
+      #/date/gcb/gcb_Neemat_Mattia/P30156/P30156_1011/  
+    #barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: CCTATCCT
+      #H3K27me3: ATAGAGGC
+      #RNA: AAAAGGGG      
+  
+  
+  #FC_Droplet_Paired-Tag_H3K27ac_rep2:                         
+    #fastq_path:
+      #/date/gcb/gcb_MZ/multiNanoCT/samples/FC_Droplet_Paired-Tag_H3K27ac_rep2/H3K27ac_CCTATCCT/fastq/
+    #fastq_path_RNA:
+      #/date/gcb/gcb_MZ/multiNanoCT/Droplet_Pair_Tag/fastq/FC_Droplet_Paired-Tag_H3K27ac_rep2/  
+    #barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: CCTATCCT
+      #H3K27me3: ATAGAGGC
+      #RNA: AAAAGGGG
+  
+  #FC_Droplet_Paired-Tag_H3K27ac_rep3:                         
+    #fastq_path:
+      #/date/gcb/gcb_MZ/multiNanoCT/samples/FC_Droplet_Paired-Tag_H3K27ac_rep3/H3K27ac_CCTATCCT/fastq/
+    #fastq_path_RNA:
+      #/date/gcb/gcb_MZ/multiNanoCT/Droplet_Pair_Tag/fastq/FC_Droplet_Paired-Tag_H3K27ac_rep3/  
+    #barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: CCTATCCT
+      #H3K27me3: ATAGAGGC
+      #RNA: AAAAGGGG
+
+  #FC_Droplet_Paired-Tag_rep1:                         
+    #fastq_path:
+      #/date/gcb/gcb_MZ/multiNanoCT/samples/FC_Droplet_Paired-Tag/FC_Droplet_Paired-Tag_rep1/
+    #fastq_path_RNA:
+      #/date/gcb/gcb_MZ/multiNanoCT/Droplet_Pair_Tag/fastq/FC_Droplet_Paired-Tag_H3K27me3_rep1/   
+    #barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: CCTATCCT
+      #H3K27me3: ATAGAGGC
+      #RNA_AAAAGGGG_H3K27ac: AAAAGGGG
+  
+  #FC_Droplet_Paired-Tag_rep2:                         
+    #fastq_path:
+      #/date/gcb/gcb_MZ/multiNanoCT/samples/FC_Droplet_Paired-Tag/FC_Droplet_Paired-Tag_rep2/
+    #fastq_path_RNA:
+      #/date/gcb/gcb_MZ/multiNanoCT/Droplet_Pair_Tag/fastq/FC_Droplet_Paired-Tag_H3K27me3_rep2/   
+    #barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: CCTATCCT
+      #H3K27me3: ATAGAGGC
+      #RNA_AAAAGGGG_H3K27ac: AAAAGGGG
+  
+  #FC_Droplet_Paired-Tag_rep3:                         
+    #fastq_path:
+      #/date/gcb/gcb_MZ/multiNanoCT/samples/FC_Droplet_Paired-Tag/FC_Droplet_Paired-Tag_rep3/
+    #fastq_path_RNA:
+      #/date/gcb/gcb_MZ/multiNanoCT/Droplet_Pair_Tag/fastq/FC_Droplet_Paired-Tag_H3K27me3_rep3/   
+    #barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: CCTATCCT
+      #H3K27me3: ATAGAGGC
+      #RNA_AAAAGGGG_H3K27ac: AAAAGGGG
+  
+
+general:
+  tempdir: /date/gcb/gcb_MZ/multiNanoCT/samples/Human_Brain_doplet_paired_Tag/                                                   # Modify path to a tmp folder already created here
+  cellranger_software: /data/bin/cellranger-atac2                                        # Modify the path to cellranger binaries here
+  cellranger_software_RNA: /data/bin/cellranger7
+  cellranger_software_arc: /data/bin/cellranger-arc2
+  cellranger_ref:  /home/mattia/refdata-cellranger-arc-GRCh38-2020-A-2.0.0/ # Modify the path to cellranger reference here
+  cellranger_ref_RNA: /home/mattia/refdata-gex-GRCh38-2020-A/ # Modify the path to cellranger reference here
+  macs_genome: hs
+  workflow_dir: /home/mattia/Multi_nanoCTRNA/                                                                      # Modify genome for macs2 callpeak
+  norm: none # normalization for cellragner arc
+  chrom_sizes: /home/mattia/refdata-cellranger-arc-GRCh38-2020-A-2.0.0/star/chrNameLength.txt
+
+
+consensous:
+  merge:
+    barcodes:                                                                            # Define your different antibody barcodes here
+      ATAC: TATAGCCT
+      H3K27ac: CCTATCCT
+      H3K27me3: ATAGAGGC

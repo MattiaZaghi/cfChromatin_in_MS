@@ -1,0 +1,593 @@
+---
+title: "Human_Single_cell_H3K27ac_integration"
+author: "Mattia Zaghi"
+date: "2024-05-29"
+output: html_document
+---
+
+```{r setup 2}
+library(Signac)
+library(Seurat)
+library(GenomicRanges)
+library(future)
+library(stringr)
+library(ggplot2)
+library(gghalves)
+library(ggpubr)
+library(dplyr)
+library(tidyverse)
+library(EnsDb.Hsapiens.v86)
+library(BSgenome.Hsapiens.UCSC.hg38)
+library(ComplexUpset)
+library(regioneR)
+library(scales)
+library(ggvenn)
+library(readxl)
+library(ggthemes)
+library(dplyr)
+library(tidyverse)
+```
+
+
+First We need to load all the datasets that we need to use for the bridge integration
+
+
+```{r}
+Human_pairTag_Cortex<-readRDS("/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/combined.obj_Human_Droplet_PairTag_all_mod.rds")
+
+Human_pairTag_Cortex[["RNA_AAAAGGGG_H3K27ac"]]@meta.data$barcode<-paste(Human_pairTag_Cortex[["RNA_AAAAGGGG_H3K27ac"]]@meta.data$sample,Human_pairTag_Cortex[["RNA_AAAAGGGG_H3K27ac"]]@meta.data$barcode_RNA,sep = "_")
+Human_pairTag_Cortex[["RNA_AAAAGGGG_H3K27ac"]]@meta.data$barcode <- sub("H3K27ac_", "", Human_pairTag_Cortex[["RNA_AAAAGGGG_H3K27ac"]]@meta.data$barcode)
+
+
+
+Human_pairTag_Cortex_multiome<- CreateSeuratObject(
+  counts = Human_pairTag_Cortex[["RNA_AAAAGGGG_H3K27ac"]]@assays[["RNA"]]$counts,
+  assay = "RNA"
+)
+Human_pairTag_Cortex_multiome[["SCT"]]<-Human_pairTag_Cortex[["RNA_AAAAGGGG_H3K27ac"]]@assays[["SCT"]]
+Human_pairTag_Cortex_multiome[["RNA"]]<- Human_pairTag_Cortex[["RNA_AAAAGGGG_H3K27ac"]]@assays[["RNA"]]
+Human_pairTag_Cortex_multiome[["H3K27ac_bins"]]<-Human_pairTag_Cortex[["H3K27ac_CCTATCCT"]]@assays[["H3K27ac_bins"]]
+
+metadata_RNA<-as.data.frame(Human_pairTag_Cortex[["RNA_AAAAGGGG_H3K27ac"]]@meta.data) %>% unique()
+metadata_RNA$barcode<-paste(metadata_RNA$sample,metadata_RNA$barcode_RNA,sep = "_")
+# Assuming df is your data frame and 'column_name' is the name of your column
+metadata_RNA$barcode <- sub("H3K27ac_", "", metadata_RNA$barcode)
+
+Human_pairTag_Cortex_multiome@meta.data$barcode<-colnames(Human_pairTag_Cortex_multiome)
+barcode<-as.data.frame(Human_pairTag_Cortex_multiome@meta.data$barcode) %>% dplyr::rename(barcode=1)
+metadata_RNA<-inner_join(barcode,metadata_RNA)
+metadata_RNA<-metadata_RNA[1:36]
+metadata_RNA<-unique(metadata_RNA) %>% dplyr::rename(predicted.id=15)
+rownames(metadata_RNA)<-metadata_RNA$barcode
+Human_pairTag_Cortex_multiome@meta.data<-metadata_RNA
+
+metadata_H3K27ac<-as.data.frame(Human_pairTag_Cortex[["H3K27ac_CCTATCCT"]]@meta.data)
+metadata_H3K27ac<-metadata_H3K27ac[1:43]
+metadata_H3K27ac$barcode<-paste(metadata_H3K27ac$sample,metadata_H3K27ac$barcode_RNA,sep = "_")
+metadata_H3K27ac<-inner_join(barcode,metadata_H3K27ac) %>% unique()
+metadata<-inner_join(metadata_H3K27ac,metadata_RNA,by="barcode")
+rownames(metadata)<-metadata$barcode
+
+Human_pairTag_Cortex_multiome@meta.data<-metadata
+
+barcode<-as.character(Human_pairTag_Cortex_multiome@meta.data[["barcode"]])
+colnames(Human_pairTag_Cortex_multiome)<-barcode
+Human_pairTag_Cortex_multiome_n<-RenameCells(
+Human_pairTag_Cortex_multiome,
+new.names = barcode)
+
+DefaultAssay(Human_pairTag_Cortex_multiome) <- "RNA"
+Human_pairTag_Cortex_multiome <- NormalizeData(Human_pairTag_Cortex_multiome, normalization.method = "LogNormalize", scale.factor = 10000)
+Human_pairTag_Cortex_multiome<- FindVariableFeatures(Human_pairTag_Cortex_multiome, selection.method = "vst", nfeatures = 2000)
+all.genes <- rownames(
+Human_pairTag_Cortex_multiome)
+
+Human_pairTag_Cortex_multiome  <- ScaleData(
+Human_pairTag_Cortex_multiome , features = all.genes)
+
+# store mitochondrial percentage in object meta data
+Human_pairTag_Cortex_multiome <- PercentageFeatureSet(Human_pairTag_Cortex_multiome , pattern = "^MT-", col.name = "percent.mt")
+
+DefaultAssay(Human_pairTag_Cortex_multiome) <- "SCT"
+
+Human_pairTag_Cortex_multiome<- RunPCA(Human_pairTag_Cortex_multiome, features = VariableFeatures(object = Human_pairTag_Cortex_multiome),reduction.name = "pca_SCT")
+
+Human_pairTag_Cortex_multiome<- FindNeighbors(Human_pairTag_Cortex_multiome, dims = 1:15,reduction = "pca_SCT")
+Human_pairTag_Cortex_multiome <- FindClusters(Human_pairTag_Cortex_multiome, resolution = 0.5,
+                                                                  cluster.name="Seurat_clusters_SCT")
+Human_pairTag_Cortex_multiome <- RunUMAP(Human_pairTag_Cortex_multiome, dims = 1:15, reduction = "pca_SCT",reduction.name = "umap_SCT")
+
+DefaultAssay(Human_pairTag_Cortex_multiome) <- "RNA"
+
+Human_pairTag_Cortex_multiome <- RunPCA(Human_pairTag_Cortex_multiome , features = VariableFeatures(object = Human_pairTag_Cortex_multiome))
+Human_pairTag_Cortex_multiome <- FindNeighbors(Human_pairTag_Cortex_multiome, dims = 1:15)
+Human_pairTag_Cortex_multiome<- FindClusters(Human_pairTag_Cortex_multiome, resolution = 0.5)
+
+Human_pairTag_Cortex_multiome<- RunUMAP(Human_pairTag_Cortex_multiome, dims = 1:15)
+
+pc <- 10
+
+#Human_pairTag_Cortex_multiome<-readRDS("/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/Human_pairTag_Cortex_multiome_object.rds")
+DefaultAssay(Human_pairTag_Cortex_multiome) <- "H3K27ac_bins"
+Human_pairTag_Cortex_multiome <- FindTopFeatures(Human_pairTag_Cortex_multiome, min.cutoff = 10)
+Human_pairTag_Cortex_multiome <- RunTFIDF(Human_pairTag_Cortex_multiome)
+Human_pairTag_Cortex_multiome<- RunSVD(Human_pairTag_Cortex_multiome)
+Human_pairTag_Cortex_multiome <- RunUMAP(Human_pairTag_Cortex_multiome, reduction= 'lsi', dims = 2:pc)
+Human_pairTag_Cortex_multiome<- FindNeighbors(Human_pairTag_Cortex_multiome,reduction = 'lsi', dims = 2:pc)
+Human_pairTag_Cortex_multiome<- FindClusters(Human_pairTag_Cortex_multiome, verbose = FALSE, algorithm = 3,resolution = 0.5)
+
+
+# Get the column names that start with "prediction.score"
+cols <- grep("^prediction.score", colnames(Human_pairTag_Cortex_multiome@meta.data), value = TRUE)
+
+# Remove these columns from the metadata
+Human_pairTag_Cortex_multiome@meta.data <- Human_pairTag_Cortex_multiome@meta.data[, !colnames(Human_pairTag_Cortex_multiome@meta.data) %in% cols]
+
+
+```
+Before proceeding we need to map our Human pair Tag dataset onto our qeury dataset
+
+```{r}
+# load developing embryonic brain reference atlas
+Human_CTX_atlas<- readRDS("/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/ref/Siletti_CX_EA_seurat_ENS.rds")
+
+# Assuming 'seurat_object' is your Seurat object
+cell_counts <- table(Human_CTX_atlas@meta.data[["supercluster_term"]])
+
+# Print the cell counts
+print(cell_counts)
+
+
+# Assuming 'seurat_object' is your Seurat object and 'cell_population' is your metadata column
+set.seed(123) # for reproducibility
+
+# Get the unique cell populations
+cell_populations <- unique(Human_CTX_atlas@meta.data[["supercluster_term"]])
+
+# Initialize an empty vector to store the downsampled cell names
+downsampled_cells <- c()
+
+# Loop over each cell population
+for (pop in cell_populations) {
+  # Get the cells in the current population
+  cells_in_pop <- which(Human_CTX_atlas@meta.data[["supercluster_term"]] == pop)
+  
+  # If the population has more than 1000 cells, downsample it
+  if (length(cells_in_pop) > 1000) {
+    cells_in_pop <- sample(cells_in_pop, size = 1000)
+  }
+  
+  # Add the cells to the downsampled cells vector
+  downsampled_cells <- c(downsampled_cells, cells_in_pop)
+}
+
+# Subset the Seurat object to only include the downsampled cells
+Human_CTX_atlas_downsampled <- subset(Human_CTX_atlas, cells = downsampled_cells)
+
+# Assuming 'seurat_object' is your Seurat object
+cell_counts <- table(Human_CTX_atlas_downsampled@meta.data[["supercluster_term"]])
+
+# Print the cell counts
+print(cell_counts)
+rm(Human_CTX_atlas)
+
+gc()
+
+# transfer cell type labels from reference to query
+transfer_anchors <- FindTransferAnchors(reference =Human_CTX_atlas_downsampled , query = Human_pairTag_Cortex_multiome,
+                                            reference.assay = "RNA",
+                                        reduction = "cca",
+                                        npcs = 50,
+                                        dims = 1:50,
+  query.assay = "RNA",
+  features = VariableFeatures(Human_pairTag_Cortex_multiome@assays[["RNA"]]))
+  
+
+supercluster <- TransferData(
+  anchorset = transfer_anchors, 
+  refdata =  Human_CTX_atlas_downsampled@meta.data[["supercluster_term"]],
+  weight.reduction = Human_pairTag_Cortex_multiome@reductions[["pca"]],
+  dims = 1:50
+)
+
+cell_type <- TransferData(
+  anchorset = transfer_anchors, 
+  refdata =  Human_CTX_atlas_downsampled@meta.data[["cell_type"]],
+  weight.reduction = Human_pairTag_Cortex_multiome@reductions[["pca"]],
+  dims = 1:50,
+)
+
+supercluster_obj<-Human_pairTag_Cortex_multiome
+cell_type_obj<-Human_pairTag_Cortex_multiome
+
+supercluster_obj<- AddMetaData(
+  object = Human_pairTag_Cortex_multiome,
+  metadata = supercluster
+)
+
+cell_type_obj <- AddMetaData(
+  object = Human_pairTag_Cortex_multiome,
+  metadata = cell_type
+)
+
+
+# If the dimensions are correct, assign them to the metadata
+
+  Human_pairTag_Cortex_multiome@meta.data[["supercluster"]] <- supercluster_obj@meta.data[["predicted.id"]]
+  
+  # Get the column names that start with "prediction.score"
+  cols <- grep("^prediction.score", colnames(supercluster_obj@meta.data), value = TRUE)
+  
+  # Loop over these column names
+for (col in cols) {
+  # Create new column name by replacing "prediction.score" with "supercluster.score"
+  new_col <- gsub("prediction.score", "supercluster.score", col)
+  
+  # Add new column to Human_pairTag_Cortex_multiome@meta.data
+  Human_pairTag_Cortex_multiome@meta.data[[new_col]] <- supercluster_obj@meta.data[[col]]
+}
+
+  Human_pairTag_Cortex_multiome@meta.data[["cell_type"]] <- cell_type_obj@meta.data[["predicted.id"]]
+  
+    # Get the column names that start with "prediction.score"
+  cols <- grep("^prediction.score", colnames(cell_type_obj@meta.data), value = TRUE)
+  
+  # Loop over these column names
+for (col in cols) {
+  # Create new column name by replacing "prediction.score" with "supercluster.score"
+  new_col <- gsub("prediction.score", "cell_type.score", col)
+  
+  # Add new column to Human_pairTag_Cortex_multiome@meta.data
+  Human_pairTag_Cortex_multiome@meta.data[[new_col]] <- cell_type_obj@meta.data[[col]]
+}
+  
+saveRDS(Human_pairTag_Cortex_multiome,"/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/Human_pairTag_Cortex_multiome_object.rds")
+```
+
+Map scH3K27ac dataset using bridge integration
+Now that we have the reference, query, and bridge datasets set up, we can begin integration. The bridge dataset enables translation between the scRNA-seq reference and the scATAC-seq query, effectively augmenting the reference so that it can map a new data type. We call this an extended reference, and first set it up. Note that you can save the results of this function and map multiple scATAC-seq datasets without having to rerun.
+
+First, we drop the first dimension of the ATAC reduction
+
+```{r}
+dims.atac <- 2:50
+dims.rna <- 1:50
+
+
+
+Human_pairTag_Cortex_multiome<-readRDS("/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/Human_pairTag_Cortex_multiome_object.rds")
+
+
+Human_CTX_atlas<- readRDS("/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/ref/Siletti_CX_EA_seurat_ENS.rds")
+
+# Assuming 'seurat_object' is your Seurat object
+cell_counts <- table(Human_CTX_atlas@meta.data[["supercluster_term"]])
+
+# Print the cell counts
+print(cell_counts)
+
+
+# Assuming 'seurat_object' is your Seurat object and 'cell_population' is your metadata column
+set.seed(123) # for reproducibility
+
+# Get the unique cell populations
+cell_populations <- unique(Human_CTX_atlas@meta.data[["supercluster_term"]])
+
+# Initialize an empty vector to store the downsampled cell names
+downsampled_cells <- c()
+
+# Loop over each cell population
+for (pop in cell_populations) {
+  # Get the cells in the current population
+  cells_in_pop <- which(Human_CTX_atlas@meta.data[["supercluster_term"]] == pop)
+  
+  # If the population has more than 1000 cells, downsample it
+  if (length(cells_in_pop) > 1000) {
+    cells_in_pop <- sample(cells_in_pop, size = 1000)
+  }
+  
+  # Add the cells to the downsampled cells vector
+  downsampled_cells <- c(downsampled_cells, cells_in_pop)
+}
+
+# Subset the Seurat object to only include the downsampled cells
+Human_CTX_atlas_downsampled <- subset(Human_CTX_atlas, cells = downsampled_cells)
+
+# Assuming 'seurat_object' is your Seurat object
+cell_counts <- table(Human_CTX_atlas_downsampled@meta.data[["supercluster_term"]])
+
+# Print the cell counts
+print(cell_counts)
+rm(Human_CTX_atlas)
+
+gc()
+
+DefaultAssay(Human_pairTag_Cortex_multiome) <-  "SCT"
+DefaultAssay(Human_CTX_atlas_downsampled) <- "SCT"
+obj.rna.ext <- PrepareBridgeReference(
+  reference = Human_CTX_atlas_downsampled , bridge = Human_pairTag_Cortex_multiome,
+  reference.reduction = "pca", reference.dims = dims.rna,bridge.query.assay = "H3K27ac_bins",
+  normalization.method = "SCT")
+#saveRDS(obj.rna.ext,"/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/bridge_integration_human_CTX_H3K27ac.rds")
+rm(Human_CTX_atlas_downsampled)
+
+gc()
+```
+Now, we can directly find anchors between the extended reference and query objects. We use the FindBridgeTransferAnchors function, which translates the query dataset using the same dictionary as was used to translate the reference, and then identifies anchors in this space. The function is meant to mimic our FindTransferAnchors function, but to identify correspondences across modalities.
+
+
+```{r}
+rm(Human_pairTag_Cortex_multiome_n)
+
+gc()
+pc <- 10
+
+Human_CZI_Cortex_SC<-readRDS("/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/combined.obj_Human_CZI_nanoCT.rds")
+#Human_CZI_Cortex_SC<-Human_CZI_Cortex_SC[["H3K27ac_TATAGCCT"]]
+#Human_CZI_Cortex_SC <- RunUMAP(Human_CZI_Cortex_SC,reduction = 'lsi', dims = 2:pc)
+#Human_CZI_Cortex_SC<- FindNeighbors(Human_CZI_Cortex_SC,reduction = 'lsi', dims = 2:pc)
+#Human_CZI_Cortex_SC<- FindClusters(Human_CZI_Cortex_SC, verbose = FALSE, algorithm = 3,resolution = 0.5)
+
+bridge.anchor <- FindBridgeTransferAnchors(
+  extended.reference = obj.rna.ext, query = Human_CZI_Cortex_SC,
+  reduction = "lsiproject", dims = dims.atac, bridge.reduction = "cca")
+
+
+```
+Once we have identified anchors, we can map the query dataset onto the reference. The MapQuery function is the same as we have previously introduced for reference mapping . It transfers cell annotations from the reference dataset, and also visualizes the query dataset on a previously computed UMAP embedding. Since our reference dataset contains cell type annotations at three levels of resolution (l1 - l3), we can transfer each level to the query dataset.
+
+
+```{r}
+# Map the 'supercluster_term' metadata
+supercluster_mapped <- MapQuery(
+  anchorset = bridge.anchor, 
+  reference = obj.rna.ext,
+  query =  Human_CZI_Cortex_SC,
+  refdata = "supercluster_term")
+
+# Map the 'cell_type' metadata
+cell_type_mapped <- MapQuery(
+  anchorset = bridge.anchor, 
+  reference = obj.rna.ext,
+  query =  Human_CZI_Cortex_SC,
+  refdata = "cell_type")
+
+  Human_CZI_Cortex_SC@meta.data[["supercluster"]] <- supercluster_mapped@meta.data[["predicted.id"]]
+
+  Human_CZI_Cortex_SC@meta.data[["supercluster.score.max"]] <- supercluster_mapped@meta.data[["predicted.id.score"]]
+
+saveRDS(Human_CZI_Cortex_SC,"/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/combined.obj_Human_CZI_nanoCT.rds")
+
+rm(supercluster_mapped)
+rm(cell_type_mapped)
+
+gc()
+```
+
+Now we can visualize the results, plotting the scATAC-seq cells based on their predicted annotations, on the reference UMAP embedding. You can see that each scATAC-seq cell has been assigned a cell name based on the scRNA-seq defined cell ontology.
+
+
+```{r fig.width = 10, fig.height = 10}
+p1<-DimPlot(
+  Human_CZI_Cortex_SC, group.by = "supercluster",
+  reduction = "umap", label = TRUE
+) + ggtitle("H3K27ac") +NoLegend()
+
+p2<-DimPlot(
+  Human_CZI_Cortex_SC, group.by = "cell_type",
+  reduction = "umap", label = TRUE
+) + ggtitle("Predictions") +NoLegend()
+
+p1+p2
+```
+
+Now let's try to do data integration using gene activity and then label transfer in the classical using siletti Et al. cortex dataset
+
+
+```{r}
+# Assuming `multiomic_data` is your multiomic Seurat object and `h3k27ac_data` is your H3K27ac-only Seurat object
+DefaultAssay(Human_pairTag_Cortex_multiome)<-"H3K27ac_bins"
+DefaultAssay(Human_CZI_Cortex_SC)<-"H3K27ac_bins"
+# Step 1: Data Integration
+anchors <- FindIntegrationAnchors(object.list = list(Human_pairTag_Cortex_multiome,Human_CZI_Cortex_SC), dims = 1:30)
+integrated_data <- IntegrateData(anchorset = anchors, dims = 1:30)
+
+# Step 2: Cell Similarity
+integrated_data <- ScaleData(integrated_data)
+integrated_data <- RunPCA(integrated_data)
+integrated_data <- FindNeighbors(integrated_data, dims = 1:30)
+integrated_data <- FindClusters(integrated_data, resolution = 0.5)
+
+# Step 3: Infer Gene Expression
+# This is a simplified example. In practice, you might want to use a more sophisticated method.
+for (cluster in unique(Idents(integrated_data))) {
+  cells_in_cluster <- WhichCells(integrated_data, idents = cluster)
+  average_expression <- AverageExpression(Human_pairTag_Cortex_multiome[["RNA"]], cells = cells_in_cluster)
+  # Add the average expression to the Human_CZI_Cortex_SC dataset
+  Human_CZI_Cortex_SC[["RNA"]][, WhichCells(Human_CZI_Cortex_SC, idents = cluster)] <- average_expression
+}
+
+
+saveRDS(Human_CZI_Cortex_SC,"/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/combined.obj_Human_CZI_nanoCT.rds")
+
+```
+
+
+Now let´s try do a data integration between Paired-Tag and the CZI nanoCT
+
+```{r}
+
+Human_CZI_Cortex_SC@meta.data[["barcode"]]<-paste0(Human_CZI_Cortex_SC@meta.data[["sample"]],"_",Human_CZI_Cortex_SC@meta.data[["barcode"]])
+# first add dataset-identifying metadata
+Human_pairTag_Cortex_multiome$dataset <- "PairTag"
+Human_CZI_Cortex_SC$dataset <- "nanoCT"
+
+
+# merge
+Brain.combined <- merge(Human_pairTag_Cortex_multiome, Human_CZI_Cortex_SC)
+
+# process the combined dataset
+DefaultAssay(Brain.combined) <- "H3K27ac_bins"
+Brain.combined <- FindTopFeatures(Brain.combined, min.cutoff = 10)
+Brain.combined <- RunTFIDF(Brain.combined)
+Brain.combined <- RunSVD(Brain.combined)
+
+saveRDS(Brain.combined,"/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/combined_human_CNS_H3K27ac.rds")
+
+```
+
+Now let´s perform the data integration between the two single cell H3K27ac
+
+```{r}
+#Brain.combined<-readRDS("/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/combined_human_CNS_H3K27ac.rds")
+# find integration anchors
+DefaultAssay(Human_pairTag_Cortex_multiome) <- "H3K27ac_bins"
+DefaultAssay(Human_CZI_Cortex_SC) <- "H3K27ac_bins"
+integration.anchors <- FindIntegrationAnchors(
+  object.list = list(Human_pairTag_Cortex_multiome,Human_CZI_Cortex_SC),
+  anchor.features = rownames(Human_pairTag_Cortex_multiome),
+  reduction = "rlsi",
+  dims = 2:30
+)
+
+# integrate LSI embeddings
+integrated <- IntegrateEmbeddings(
+  anchorset = integration.anchors,
+  reductions =Brain.combined@reductions[["lsi"]],
+  new.reduction.name = "integrated_lsi",
+  dims.to.integrate = 1:30
+)
+
+# Identify anchors between the RNA-seq and ATAC-seq datasets
+anchors <- FindTransferAnchors(reference = Human_pairTag_Cortex_multiome, query = Human_CZI_Cortex_SC, features = VariableFeatures(Human_pairTag_Cortex_multiome@assays[["H3K27ac_bins"]]))
+
+# Transfer the data
+predictions <- TransferData(anchorset = anchors, refdata = multiome_seurat_obj@assays$RNA@counts, weight.reduction = atac_seurat_obj[["H3K27ac"]], dims = 2:30)
+
+# create a new UMAP using the integrated embeddings
+integrated <- RunUMAP(integrated, reduction = "integrated_lsi", dims = 2:30)
+saveRDS(integrated,"/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/integrated_human_CNS_H3K27ac.rds")
+
+integrated@meta.data[["sample.x"]]<-NULL
+integrated@meta.data[["sample.x"]]<-NULL
+
+sample<- data.frame(sample=colnames(integrated))
+
+rownames(sample)<-sample$sample
+
+sample$sample<- sub("_[A-Z]*-[0-9]*$", "", sample$sample)
+sample$barcode<- rownames(sample)
+pairtagbarcodes <- sample$barcode[grepl("^M1", sample$barcode)]
+nanoCTbarcodes <- sample$barcode[grepl("NanoCT", sample$barcode)]
+
+integrated@meta.data[["sample.x"]]<-NULL
+integrated@meta.data[["sample.x"]]<-NULL
+integrated@meta.data[["sample"]]<-sample$sample
+
+integrated  <- subset(integrated, subset = cell_type != "central nervous system macrophage")
+integrated  <- subset(integrated, subset = cell_type != "endothelial cell")
+integrated<- subset(integrated, subset = cell_type != "fibroblast")
+integrated<- subset(integrated, subset = cell_type != "pericyte")
+
+integrated_subset_pairtag = subset(integrated, cells=pairtagbarcodes)
+
+integrated_subset_nanoCT = subset(integrated, cells=nanoCTbarcodes)
+
+p1<-DimPlot(integrated_subset_pairtag,group.by="supercluster")
+p2<-DimPlot(integrated,group.by="cell_type")
+
+integrated_subset_supercluster = subset(integrated, subset = supercluster.score.max  > 0.7)
+# Assuming 'seurat_obj' is your Seurat object, 'column_name' is the name of the column,
+# and 'entry' is the specific entry you want to exclude
+integrated_subset_supercluster  <- subset(integrated_subset_supercluster, subset = cell_type != "central nervous system macrophage")
+integrated_subset_supercluster  <- subset(integrated_subset_supercluster, subset = cell_type != "endothelial cell")
+integrated_subset_supercluster  <- subset(integrated_subset_supercluster, subset = cell_type != "fibroblast")
+
+integrated_subset_celltype = subset(integrated, subset = cell_type.score.max > 0.9)
+saveRDS(integrated_subset,"/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/integrated_human_CNS_H3K27ac_subset.rds")
+p1 <- DimPlot(integrated_subset_supercluster, group.by = "cell_type")
+p2 <- DimPlot(integrated_subset_celltype, group.by = "cell_type")
+p1
+p2
+```
+Let´s plot some marker genes to check that the cellular Identity that have been obtained are the expected ones. 
+
+
+
+```{r,fig.height=10, fig.width=20}
+DefaultAssay(integrated) <- "RNA"
+FeaturePlot(integrated, features = c("OLIG2", "SOX10", "SOX9","RBFOX3","MBP","MAG","PDGFRA","OPALIN","GFAP","ALDH1L1",
+                  "PLP1","AQP4","TUBB3","MAP2","TMEM119","CX3CR1"))
+```
+
+Let´s perform a dotplot to evaluate the expression of the "marker genes" inside each transferred cell population.
+
+
+```{r}
+#now I will check all the markers by subetting x dataset
+
+
+
+DefaultAssay(integrated_subset_supercluster) <- "RNA"
+# Assuming `seurat_object` is your Seurat object and `gene_markers` is a vector of gene markers
+gene_markers <- c("OLIG2", "SOX10", "SOX9","RBFOX3","MBP","MAG","PDGFRA","OPALIN","GFAP","ALDH1L1",
+                  "PLP1","AQP4","TUBB3","MAP2","TMEM119","CX3CR1") # replace with your actual gene markers
+
+# Create a dot plot
+DotPlot(integrated, features = gene_markers,group.by = "cell_type") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+
+# Create a violin plot
+VlnPlot(integrated_subset_supercluster, features = "CXCR3", group.by = "supercluster")
+
+```
+
+
+The final step is call peaks in the single cell dataset, resize them to 400bp and then try to understand which one of them is enrich in which cell type. Basically a peakset relative to each cell type our annotated object. 
+
+
+```{r}
+library(Signac)
+library(Seurat)
+library(GenomicRanges)
+
+# Load your Seurat object
+# pbmc <- readRDS("path_to_your_data.rds")
+DefaultAssay(integrated_subset)<-"H3K27ac_bins"
+# Call peaks
+peaks <- CallPeaks(
+  object =integrated_subset,
+  group.by = "cell_type",macs2.path = "/home/mattia/miniconda3/envs/macs2/bin/macs2"
+)
+
+# Resize the peaks
+resized_peaks <- resize(peaks, width = 400, fix = "center")
+
+
+# Create a binary peak-by-cell matrix
+peak_matrix <- FeatureMatrix(
+  fragments = integrated_subset@assays[["H3K27ac_bins"]]@fragments,
+  features = resized_peaks,
+  cells = colnames(integrated_subset)
+)
+
+# Assuming 'peak_matrix' is your matrix with the called peaks
+chrom_assay <- CreateChromatinAssay(counts = peak_matrix, sep = c(":", "-"))
+
+# Add the ChromatinAssay to your existing Seurat object
+integrated_subset[["peaks"]] <- chrom_assay
+
+saveRDS(integrated_subset,"/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/integrated_human_CNS_H3K27ac_subset.rds")
+
+DefaultAssay(integrated_subset) <- "peaks"
+marker_peaks <- FindAllMarkers(
+  object = integrated_subset,
+  only.pos = TRUE,
+  min.pct = 0.25,
+  logfc.threshold = 0.25,
+  group.by = "predicted.id"
+)
+
+
+```
+

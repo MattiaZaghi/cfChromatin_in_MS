@@ -1,0 +1,654 @@
+---
+title: "Human_Droplet_Pair_Tag_Reanalysis"
+author: "Mattia Zaghi"
+date: "2024-05-21"
+output: html_document
+---
+
+
+## MultiNanoCT bins 
+
+## 1. Data loading (metadata and fragments)
+In this section we are going to load the input files for each modality and sample, create a fragment object for each experiment, generate a bins x cell matrix for each experiment and finally generate one Seurat object for experiment. Plus the RNA preprocessing steps will be performed for each analyzed samples
+
+* Inputs of this section are the ```fragments.tsv.gz``` and ```metadata.csv``` files.\
+* Output of his section is a Seurat object for each experiment (ATAC,nanoCT + RNA).\
+
+First, load all the required libraries.
+
+```{r setup 1}
+.libPaths(c("/home/mattia/R/x86_64-redhat-linux-gnu-library/4.3/"))
+```
+
+```{r setup 2}
+library(Signac)
+library(Seurat)
+library(GenomicRanges)
+library(future)
+library(stringr)
+library(ggplot2)
+library(gghalves)
+library(ggpubr)
+library(dplyr)
+library(tidyverse)
+library(EnsDb.Hsapiens.v86)
+library(BSgenome.Hsapiens.UCSC.hg38)
+library(ComplexUpset)
+library(regioneR)
+library(scales)
+library(ggvenn)
+library(readxl)
+library(ggthemes)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+### 1.1 Setting some initial variables
+First, load functions  that will be used across the entire vignette. Modify them according to your data.\
+
+**Extremely important:**
+
+1. set as ```repodir``` the directory where the [nanoscope Github repo](https://github.com/bartosovic-lab/nanoscope/blob/main/README.md#clone-github-repository) is. This is required in order to upload all the custom functions needed to run this vignette\
+
+
+```{r init_var1 }
+# directory where the pipeline is
+repodir <- "/home/mattia/cfChromatin_in_MS/single_cell_data_processing/" # change accordingly
+source(paste0(repodir,"scripts/functions_scCT.R"))
+```
+
+2. set the output root containing the epigenomic output, since the script derive from the nanoscope version to analyze nanoCT. To process RNA we will then use absolut paths.In the case of Rstudio markdown do not use setwd but instead use knit
+
+**Please note that nothing but the directories containing the input data for each samples must be stored in ```wd```**
+
+```{r setup, include=FALSE, echo=FALSE}
+require("knitr")
+opts_knit$set(root.dir = "/date/gcb/gcb_MZ/multiNanoCT/samples/Human_Brain_SC_CZI/")# change accordingly
+
+#wd <- "~/NatProt/nanoscope/results" # change accordingly
+#setwd(wd)
+```
+
+
+3. set other variables (genome version, assay type, etc)
+```{r init_var3 }
+# Set the used genome version
+genome <- "hg38"
+# Genome annotations
+genome_ann <- EnsDb.Hsapiens.v86
+# BSgenome
+bs_genome <- BSgenome.Hsapiens.UCSC.hg38
+# Assay (peaks or bins)
+assay <- "bins"
+# Samples
+samples <- dir()
+samples[1:4]
+# Modalities
+modalities <- dir(samples[1]) # this assumes sample1, sample2, sampleN share the same modalities and barcodes!
+modalities<-modalities[1]
+# Minimum number of cells a feature must be detected in to be included in the Seurat obj
+min_cell <- 1
+# Minium number of features a cell must have to be included in the Seurat obj
+min_feat <- 1
+
+```
+
+### 1.2 Creating bin x cell matrix from a fragment file (for ATAC and nanoCT)
+In order to create one Seurat object for each sample contaning a bin per cell count matrix we need to combine all the input files together. To this end we will need to: i) select the cells that passed internal filtering, ii) get the fragments file reporting the genomic coordinates of each fragment and the reads supporting each fragment and iii) construct a bin x cell matrix from a fragments file.\
+
+#### Load metadata files
+First, we parse the metadata file in order to get the cells that passed the filtering and are actually identified as cells.
+
+```{r load_metadata}
+##### Metadata
+# Load metadata for each experiment iterating across the sample list
+modalities_epi <-modalities[1]
+metadata.ls <- list()
+for (smpl in samples) {
+  cat("Loading metadata for sample",smpl,"\n")
+  for (mod in modalities_epi) {
+    cat("\t",mod,"\n")
+
+    # Load metadata
+    metadata.ls[[paste0(mod,"_",smpl)]] <- read.csv(paste0(smpl,"/",mod,"/cell_picking/metadata.csv"),
+                                                  stringsAsFactors = FALSE)
+    rownames(metadata.ls[[paste0(mod,"_",smpl)]]) <- metadata.ls[[paste0(mod,"_",smpl)]]$barcode
+    
+    metadata.ls[[paste0(mod,"_",smpl)]] <-  metadata.ls[[paste0(mod,"_",smpl)]] %>% dplyr::mutate(passedMZ=logUMI>2 & peak_ratio_MB>0.1)
+ }
+}
+
+
+```
+
+### Filtering-out low-quality cells
+Here we are going to exclude the cells which have not passed the internal filtering (flagged as ```passedMB```). This internal filtering takes into consideration the log10UMI and the percentage of reads in peaks for each cell and clusterizes the cells based on these values (by building a Gaussian finite mixture mode fitted via EM algorithm via ```Mclust```). This will cluster the cells in *n* clusters, but only the cells belonging to the top1 cluster with the highest log10UMI will be classified as ```passedMB=TRUE```.\
+
+Before doing this, however, we would like to know how many cells we are filtering out:
+
+```{r, fig.height=4.5, fig.width=4.5}
+plotPassed(metadata.ls,xaxis_text = 9,angle_x=60)
+```
+
+And which cells we are filtering out:
+```{r, fig.height=7.5, fig.width=10}
+plotPassedCells(metadata.ls,samples,modalities)
+```
+
+
+```{r filter_out_cells}
+metadata.ls <- lapply(metadata.ls, function(x){x[x$passedMB,]})
+```
+#### Load fragments files and creation of fragment objects
+Then, we create a fragment object for each experiment (*i.e.*, an object holding all the information related to a single fragment file). To this end we will use the Signac function ```CreateFragmentObject```.\
+
+As explained in the [Signac vignette](https://stuartlab.org/signac/articles/merging.html), the ```CreateFragmentObject``` function checks that the file is present on disk, it is compressed and indexed, computes the MD5 sum for the file and the tabix index so that we can tell if the file is modified at any point, and checks that the expected cells (```metadata.csv```) are present in the file.
+
+```{r }
+##### Fragments
+# Create one fragment object per each experiment iterating across the sample list
+fragment.ls <- list()
+for (smpl in samples) {
+  cat("Loading fragments for sample",smpl,"\n")
+  for (mod in modalities_epi) {
+    cat("\t",mod,"\n")
+
+    # Load fragments
+    fragment.ls[[paste0(mod,"_",smpl)]] <- CreateFragmentObject(
+                                              path = paste0(smpl,"/",mod,"/cellranger/outs/fragments.tsv.gz"),
+                                              cells = metadata.ls[[paste0(mod,"_",smpl)]]$barcode)
+
+  }
+}
+```
+Check modalities and number of cell loaded
+
+```{r}
+head(fragment.ls[[paste0("ATAC_TATAGCCT_",samples[1])]])
+```
+Creating a list of fragment object using cell ranger fragment object
+
+
+#### Construct a bin x cell matrix from a fragments file
+Now that each experiment has been associated to a fragment object containing fragments and metadata, we can create a bins x cell matrix for each experiment. This will be done by using the Signac function ```GenomeBinMatrix```.
+```GenomeBinMatrix``` subdivides the genome in non-overlapping windows of length X (X=2kb here) and counts for each bin, for each cell, the number of overlapping fragments.
+
+To speed-up the process, we launch ```FeatureMatrix``` with ```process_n = 20000```. This runs OK on our 64GB MacBook Pro, but could go out-of-memory on other systems. If this happens, please, decrease the ```process_n``` value (2000 should be fine for every system).
+
+```{r bin_x_cell}
+
+# As usual, append the object to a list
+counts_bins.ls <- list()
+# Iterate among the experiment names in order to retrieve fragments and cell barcodes from the same experiment
+for (experim in names(fragment.ls)) {
+  
+  cat("Analysing experiment: ",experim,"\n")
+  
+  # modality name
+  modal <- paste0(str_split_fixed(experim,"_",4)[,1],"_",str_split_fixed(experim,"_",4)[,2])
+  cat("\tBins from modality: ",modal,"\n")
+
+  # Create FeatureMatrix
+  counts_bins.ls[[experim]] <- GenomeBinMatrix(fragments = fragment.ls[[experim]],         # fragments
+                                        cells = metadata.ls[[experim]]$barcode,       # metadata
+                                        binsize = 5000,                               # bin size
+                                        genome = seqlengths(bs_genome),               # chom sizes
+                                        process_n = 1000000) # the higher, the faster, the more memory is used
+
+}
+
+
+counts_bins.ls[[names(fragment.ls)[1]]][3990:4000,1:50]
+```
+
+```{r}
+saveRDS(counts_bins.ls,"/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/counts_Human_CZI_nanoCT_amb.ls")
+```
+
+### 1.4 Create one Seurat object for each experiment
+Now that we have generated a bins x cell matrix for each experiment, we can store it in a Seurat object along with the fragment object and the metadata.
+
+This is done for each experiment separately, objects will be merged in the next step. The reason for this is that we would like to first perform QC on each experiment individually and then merge all the experiments in a single Seurat object.
+```{r create_obj}
+
+obj_bins.ls <- list()
+# Iterate among the experiment names in order to retrieve fragments and cell barcodes from the same experiment
+for (experim in names(counts_bins.ls)) {
+
+  # Get sample and modality name from the experiment variable
+  smpl <- str_split_fixed(experim,"_",3)[,3]
+  modality <- str_split_fixed(experim,"_",2)[,1]
+
+  # Create the chromatin assay with bins counts
+  chrom_bins.assay <- CreateChromatinAssay(counts = counts_bins.ls[[experim]],
+                                      fragments = fragment.ls[[experim]],
+                                      genome = genome,
+                                      min.cells = min_cell,
+                                      min.features = min_feat)
+  # Create the object using the chromatin assay from the bins 
+  obj_bins.ls[[experim]] <- CreateSeuratObject(counts = chrom_bins.assay,
+                                          assay = paste0(modality,"_bins"),
+                                          meta.data=metadata.ls[[experim]],
+                                          project = smpl)
+  
+
+  # Add some metadata of origin
+  obj_bins.ls[[experim]]$dataset <- experim
+  obj_bins.ls[[experim]]$modality <- modality
+  obj_bins.ls[[experim]]$sample <- smpl
+}
+
+
+```
+## 2. Quality controls (QC) **OPTIONAL**
+Before merging the objects, we are going to do some QC on the individual experiments. In particular, we are going to drop cells with abnormal number of UMIs. To define what is "abnormal" and what is not, we will use quantiles. Everything greater than the 95th or less than the 5th quantiles will be here considered as "abnormal" and therefore discarded.
+
+**Please, consider how applying these filters is optional and the thresholds used should be specifically set for each dataset as they usually are highly sample-specific. The thresholds we are applying here are quite harsh and, if applied to other datasets, might lead to removal of important biological information.**
+
+* Input of this section is a Seurat object for each experiment (6 in this case [2 samples * 3 modalities]).\
+* Output of this section is a Seurat object for each experiment (6 in this case [2 samples * 3 modalities]) containing cells which have passed QCs.
+
+```{r qc_filtering}
+obj.ls.qc <- list()
+quant_high <- 0.99
+quant_low <- 0.01
+for (experiment in names(obj_bins.ls)) {
+
+  # Calculate 5th and 95th quantiles for logUMI
+  logUMI_cutoff_high <- quantile(obj_bins.ls[[experiment]]$logUMI, quant_high)
+  logUMI_cutoff_low  <- quantile(obj_bins.ls[[experiment]]$logUMI, quant_low)
+
+  # Filter out cells outside these thresholds
+  obj.ls.qc[[experiment]] <- subset(obj_bins.ls[[experiment]],
+                                    logUMI > logUMI_cutoff_low &
+                                      logUMI < logUMI_cutoff_high)
+
+  # print number of discarded cells
+  old_n_cell <- nrow(obj_bins.ls[[experiment]][[]])
+  new_n_cell <- nrow(obj.ls.qc[[experiment]][[]])
+  discarded <- old_n_cell - new_n_cell
+  cat(experiment,"\n")
+  cat("\tdiscarded",discarded,"cells (",round(discarded/old_n_cell*100,2),"%)\n")
+}
+```
+
+
+```{r}
+plotCounts(obj = obj_bins.ls, quantiles = c(quant_low,quant_high), feature = "logUMI")
+rm(obj_bins.ls)
+```
+
+#ad Hoc for epigenomics based on the different origin of the data
+
+```{r}
+for (experiment in names(obj.ls.qc)) {
+  
+# extract gene annotations from EnsDb
+annotations <- GetGRangesFromEnsDb(ensdb = EnsDb.Hsapiens.v86)
+
+# change to UCSC style since the data was mapped to hg19
+seqlevels(annotations) <- paste0('chr', seqlevels(annotations))
+genome(annotations) <- "hg38"
+
+# add the gene information to the object
+Annotation(obj.ls.qc[[experiment]]) <- annotations
+
+obj.ls.qc[[experiment]] <- TSSEnrichment(obj.ls.qc[[experiment]], fast = FALSE)
+
+obj.ls.qc[[experiment]]  <- NucleosomeSignal(object = obj.ls.qc[[experiment]])
+
+}
+```
+
+```{r,echo=TRUE}
+#plot QC metric for various modalities and set threshold to select which cells to pick 
+
+VlnPlot_results<-list()
+
+for (experiment in names(obj.ls.qc)) {
+  features_to_plot <- c(paste0('nCount_',sub("^(.*?)_.*$", "\\1", experiment),'_bins'),
+               'TSS.enrichment','nucleosome_signal','peak_ratio_MB')
+
+
+
+VlnPlot(
+    object = obj.ls.qc[[experiment]],
+    features =  features_to_plot ,
+    ncol = 4,
+    pt.size = 0.5,
+  )
+
+TSSPlot(obj.ls.qc[[experiment]])
+
+   }
+
+```
+
+
+
+
+### Number of cells for each sample and modality
+Now we can plot, for each sample, the number of cells being simultaneously profiled by all the three modalities. Since we will annotate the cells based on their H3K27ac signal (see **6.  Annotation**), all the cells lacking the H3K27ac profiling will result as not annotated at the end of the processing of the data. So it is important that the majority of the cells have H3K27ac profiling and that, in general, there is a good overlap among the different modalities.
+
+
+```{r number_cells, fig.height=5, fig.width=7}
+
+
+saveRDS(obj.ls.qc,"/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/obj.ls.qc_Human_nanoCT_CZI_amb")
+
+# Plot number of cells for each modality for each sample
+# Create a list to store the results for each sample
+venn_results <- list()
+
+# Iterate through each sample
+for (sample_name in samples) {
+  venn_result <- commonCellHistonMarks(
+    mod1 = obj.ls.qc_all[[paste0(modalities[2], "_", sample_name)]],
+    name_mod1 = gsub("H3", "", strsplit(modalities[2], "_")[[1]][1]),
+    mod2 = obj.ls.qc_all[[paste0(modalities[4], "_", sample_name)]],
+    name_mod2 = strsplit(modalities[4], "_")[[1]][1],
+    sample = sample_name
+  )
+  
+  # Store the result in the list
+  venn_results[[sample_name]] <- venn_result
+  
+  # Plot the result using ggarrange
+  print(ggarrange(venn_result, ncol = 2))
+}
+
+```
+
+
+
+## 3. Merge Seurat objects
+Now that we have one object for experiment containing only QC-passed cells, we can merge all the objects from different samples obtaining one Seurat object for modality. Before doing that we need to create a unique list containing RNA and Epigenomics single objects
+
+### Merge Seurat objects across different samples
+
+```{r}
+# Merge list
+combined.obj.ls <- list()
+
+    for (mod in modalities) {
+
+  # merge objects among the different samples
+  combined.obj.ls[[mod]] <- merge(obj.ls.qc[[paste0(mod,"_",samples[1])]],
+                                  y = c(obj.ls.qc[[paste0(mod,"_",samples[2])]],obj.ls.qc[[paste0(mod,"_",samples[3])]],
+                                        obj.ls.qc[[paste0(mod,"_",samples[4])]],obj.ls.qc[[paste0(mod,"_",samples[5])]],
+                                        obj.ls.qc[[paste0(mod,"_",samples[6])]]),
+                                  add.cell.ids = c(samples[1], samples[2],samples[3], samples[4],
+                                                   samples[5], samples[6]))
+
+}
+
+
+```
+
+```{r}
+saveRDS(combined.obj.ls,"/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/combined.obj_Human_Droplet_PairTag_amb.ls")
+```
+
+### Number of cells for each sample and modality
+Now we can plot, for each sample, the number of cells being simultaneously profiled by all the three modalities. Since we will annotate the cells based on their H3K27ac signal (see **6.  Annotation**), all the cells lacking the H3K27ac profiling will result as not annotated at the end of the processing of the data. So it is important that the majority of the cells have H3K27ac profiling and that, in general, there is a good overlap among the different modalities.
+At this step it is also essential to merge togheter the cells that are coming from the epigenomic modalitiy and the RNA modality
+
+
+```{r number_cells, fig.height=5, fig.width=7}
+
+# Plot number of cells for each modality for each sample
+venn1 <- commonCellHistonMarks_all(
+                               mod1 = combined.obj.ls[[paste0(modalities[1])]], 
+                               name_mod1 = gsub("H3","",strsplit(modalities[1],"_")[[1]][1]),
+                               mod2 = combined.obj.ls[[paste0(modalities[2])]], 
+                               name_mod2 =  strsplit(modalities[2],"_")[[1]][1])
+
+
+```
+
+```{r, fig.height=5, fig.width=7}
+ggarrange(venn1,ncol=1)
+```
+
+### Generating a unique object encompassing cells across epigenomics only
+```{r}
+# First step we have to extract all the barcodes that common across 4 modalities
+
+    x <- list(name_mod1=colnames(combined.obj.ls[["ATAC_TATAGCCT"]]),
+              name_mod2=colnames(combined.obj.ls[["H3K27ac_CCTATCCT"]]),
+              name_mod3=colnames(combined.obj.ls[["H3K27me3_ATAGAGGC"]]))
+barcode_list<-Reduce(intersect, x)
+# Identify the cell barcodes that you want to keep
+combined.obj.ls_epi_mod<-list()
+barcodes_to_keep <- barcode_list
+for (mod in modalities){
+# Use the subset function to filter the Seurat object
+combined.obj.ls_epi_mod[[mod]] <- subset(combined.obj.ls[[paste0(mod)]], cells = barcodes_to_keep)
+
+# Print or further analyze your filtered Seurat object
+
+}
+
+combined.obj.ls_all_mod<-list()
+for (mod in modalities_epi){
+# Use the subset function to filter the Seurat object
+combined.obj.ls_all_mod[[mod]] <- subset(combined.obj.ls[[paste0(mod)]],
+                                       subset = passedMB==TRUE)
+
+# Print or further analyze your filtered Seurat object
+
+}
+saveRDS(combined.obj.ls_all_mod,"/home/mattia/Multi_nanoCTRNA/Mouse_embryo_all_mod.rds")
+```
+Before moving on with the last portion of the analysis we will plot some final QCs Metrics of the final cells that we have selected 
+```{r}
+combined.obj.ls_all_mod <-readRDS("/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/combined.obj_Human_Droplet_PairTag_amb.ls")
+```
+
+
+
+## 5. Normalisation and dimensional reduction (Epigenomics)
+After having filter out low quality cells and having generated one Seurat object per each modality, we can proceed with normalisation and dimensionality reduction. Once again, we will follow [Signac vignette](https://stuartlab.org/signac/articles/pbmc_vignette.html#normalization-and-linear-dimensional-reduction).
+
+* First, we perform data normalisation. To this end, ```RunTFIDF``` will be used
+* Second, we select variable features (bins)
+* Third, dimension reduction by running singular value decomposition (SVD)
+```{r normalisation_variable_feat}
+
+# Normalisation
+combined.obj.ls_all_mod[["H3K27ac_TATAGCCT"]]<- RunTFIDF(combined.obj.ls_all_mod[["H3K27ac_TATAGCCT"]])
+# a warning (Some features contain 0 total counts) might rise. This is due to the cell filtering performed in the QC step. Should be safe to proceed
+
+# Variable features
+combined.obj.ls_all_mod[["H3K27ac_TATAGCCT"]]<-FindTopFeatures(combined.obj.ls_all_mod[["H3K27ac_TATAGCCT"]])
+
+# Dim reduction
+combined.obj.ls_all_mod[["H3K27ac_TATAGCCT"]]<- RunSVD(combined.obj.ls_all_mod[["H3K27ac_TATAGCCT"]] )
+
+saveRDS(combined.obj.ls_all_mod,"/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/combined.obj_Human_CZI_nanoCT.rds")
+```
+
+
+
+It usually happens that the first LSI (you can think it as a principal component, if you are more familiar with scrna-seq) is mostly associated to the sequencing depth, rather than biological variation. We will test this by running a modified version of the ```DepthCor``` function. The modifications simply consists in plotting the modality name as plot title.
+
+```{r fig.width = 10, fig.height = 4}
+DepthCorMulMod(combined.obj.ls_all_mod[["H3K27ac_CCTATCCT"]])
+
+```
+
+Here, the correlation between the first LSI and sequencing depth is quite strong. We will discard it from further analyses.\
+
+
+Then, the dimensionality of the dataset should be determined. Although more sophisticated (and time consuming) methods have been implemented (like the JackStraw procedure), we think that the ‘Elbow plot’ could be informative enough. In the ‘Elbow plot’ the standard deviation explained by each LSI is plotted. When the the plateau is reached, it means that adding more LSI to our analysis does not actually increase the variability explained.
+
+```{r fig.width = 10, fig.height = 4}
+ElbowPlot(combined.obj.ls_all_mod[["H3K27ac_CCTATCCT"]],reduction = "lsi",ndims = 50)
+
+pc <- 10
+```
+
+In this case, we believe that considering the first 10 LSI should be definitely more than enough for all the three modalities (probably even less than 35 should be fine).
+\
+##  Non-linear dimension reduction and clustering
+Now that we have normalised and found variable features in the data, we can perform graph-based clustering and non-linear dimension reduction for visualization. This is done individually for each modality as different modalities might require different parameters (*e.g.*, number of PCs, clustering resolution, ..).\
+
+To find the most appropriate parameter we have used, and suggest using, [clustertree](https://cran.r-project.org/web/packages/clustree/vignettes/clustree.html).\
+
+As you will notice, the resolution value for the ATAC modality is quite low (.2), but this is necessary in order to avoid over-clustering of the cluster 0. With any value of resolution greater than 0.2, the cluster 0 is subclustered in two or more clusters, but we do not think there is enough variability here to define the cells in cluster 0 as belonging to more than one cluster.
+
+```{r umap}
+
+
+# H3K27ac
+combined.obj.ls_all_mod[["H3K27ac_CCTATCCT"]] <- RunUMAP(combined.obj.ls_all_mod[["H3K27ac_CCTATCCT"]],reduction = 'lsi', dims = 2:pc)
+combined.obj.ls_all_mod[["H3K27ac_CCTATCCT"]]<- FindNeighbors(combined.obj.ls_all_mod[["H3K27ac_CCTATCCT"]],reduction = 'lsi', dims = 2:pc)
+combined.obj.ls_all_mod[["H3K27ac_CCTATCCT"]]<- FindClusters(combined.obj.ls_all_mod[["H3K27ac_CCTATCCT"]], verbose = FALSE, algorithm = 3,resolution = 1)
+
+```
+
+```{r fig.width = 10, fig.height = 4}
+# Plot each modality separately
+p1=DimPlot(combined.obj.ls_all_Epi$ATAC_TATAGCCT, label = TRUE) + NoLegend() +
+  ggtitle("ATAC") +
+  theme(plot.title = element_text(size=15,hjust=0.5,face='bold'))
+
+p2=DimPlot(combined.obj.ls_all_Epi$H3K27ac_CCTATCCT, label = TRUE) + NoLegend() +
+  ggtitle("H3K27ac") +
+  theme(plot.title = element_text(size=15,hjust=0.5,face='bold'))
+
+p3=DimPlot(combined.obj.ls_all_Epi$H3K27me3_ATAGAGGC, label = TRUE) + NoLegend() +
+  ggtitle("H3K27me3") +
+  theme(plot.title = element_text(size=15,hjust=0.5,face='bold'))
+
+ggarrange(p1,p2,p3,ncol=3)
+```
+Save the list of objects containing the cells selected for all the three modalities
+
+```{r}
+saveRDS(combined.obj.ls_all_mod,"Embryo_cells_all_modalities")
+```
+
+```{r}
+combined.obj.ls_all_mod<-readRDS("Analysis/Embryo_cells_all_modalities")
+```
+
+Extract BigWig files from clusters 
+
+
+
+```{r}
+
+for (mod in modalities){
+df_barcode<-data.frame(barcode=combined.obj.ls_all_mod[[mod]]@meta.data[["barcode_epi"]],sample=combined.obj.ls_all_mod[[mod]]@meta.data[["sample"]]) %>% 
+  dplyr::mutate(number= case_when(
+    sample == "E1_amb" ~ 1,
+    sample == "E2_amb" ~ 2,
+    sample == "E3_amb" ~ 3,
+    sample == "E4_amb" ~ 4,
+    TRUE ~ NA_integer_
+  ))
+
+df_barcode$barcode_only <-str_extract(df_barcode$barcode, "[A-Za-z]+")
+
+
+df_barcode$barcode_merge<-paste(df_barcode$barcode_only,df_barcode$number,sep="-")
+
+combined.obj.ls_all_mod[[mod]]@meta.data$barcode_merge<-df_barcode$barcode_merge
+}
+
+fragment_merge.ls <- list()
+
+for (mod in modalities) {
+  
+  cat("Loading fragments for",mod,"\n")
+
+    # Load fragments
+    fragment_merge.ls[[paste0(mod)]] <- CreateFragmentObject(
+                                              path = paste0("/date/gcb/gcb_MZ/multiNanoCT/merge/",mod,"/cellranger/outs/fragments.tsv.gz"),
+                                              cells =  paste0(combined.obj.ls_all_mod[[mod]]@meta.data[["barcode_merge"]]))
+
+  }
+
+for (mod in modalities){
+  cat("Rename cell barcodes for ",mod,"\n")
+ combined.obj.ls_all_mod[[mod]]<-RenameCells(
+  combined.obj.ls_all_mod[[mod]],
+  new.names = combined.obj.ls_all_mod[[mod]]@meta.data[["barcode_merge"]]) # get list of fragment objects
+Fragments(combined.obj.ls_all_mod[[mod]]) <- NULL  # remove fragment information from assay
+Fragments(combined.obj.ls_all_mod[[mod]]) <-fragment_merge.ls[[mod]]  # assign update list of fragment objects back to the assay
+
+
+ExportGroupBW(
+  object = combined.obj.ls_all_mod[[mod]], #The seurat object
+  assay =  paste0(sub("^(.*?)_.*$", "\\1", mod),'_bins'), #The assay of the fragment file
+  group.by = "manual_clusters", #The metadata used to split the fragment file
+  idents = NULL, #The idents from the group.by to be exported
+  normMethod = "RC",#Normalization method for the biwig files. It can be the name of any quantitative column in the @meta.data or ncells as the number of cells. Can also be set to none
+  tileSize = 100, #The size of the tiles in the bigwig file
+  minCells = 5, #The minimum of cells in a group to be exported
+  cutoff = 4, #The maximum number of fragment in a given tile
+  #chromosome = combined.obj.ls_all_mod[[mod]], #The chromosomes to be exported. Primary or all
+  outdir =  paste0("/date/gcb/gcb_MZ/multiNanoCT/Analysis/",mod,"_bigwig_rc"), #The output directory for bigwig files. Also used as output directory for SlitFragment function
+  verbose=TRUE #Display messages
+)
+}
+
+```
+```{r}
+#modalities<-modalities[-4]
+
+```
+
+## 7. Gene regulation analysis 
+
+#Coverage plot
+
+
+```{r}
+cov_plot <- CoveragePlot(
+  object = combined.obj.ls_all_mod[["H3K27ac_CCTATCCT"]],
+  region = "chr1-56651705-57123476",
+  annotation = TRUE,
+  peaks = FALSE,
+  group.by = "manual_clusters",
+  idents = c("Radial_Glia","Intermediate_Prog","CTX_Neu","Immune")
+)
+cov_plot
+```
+#feature plot Neuro lineage
+
+```{r}
+object_copy <- combined.obj.ls_all_mod[["RNA_AAAAGGGG"]]
+my_levels <- c("Radial_Glia","Intermediate_Prog","CTX_Neu","Neu","Glia_prog", "Hippo_Neu","Vascular","Immune",
+               "Choroid_Plexus")
+Idents(object_copy) <- factor(Idents(object_copy), levels= my_levels)
+cols=c("#00BA38","#93AA00","#F8766D","#00C19F")
+VlnPlot(object_copy, features = c("Tbr1","Satb2"),cols=cols,idents = c("Radial_Glia","Intermediate_Prog","CTX_Neu","Neu"))+xlab(c('',''))
+```
+```{r}
+object_copy <- combined.obj.ls_all_mod[["RNA_AAAAGGGG"]]
+my_levels <- c("Radial_Glia","Intermediate_Prog","CTX_Neu","Neu","Glia_prog", "Hippo_Neu","Vascular","Immune",
+               "Choroid_Plexus")
+Idents(object_copy) <- factor(Idents(object_copy), levels= my_levels)
+cols=c("#00BA38","#D39200")
+VlnPlot(object_copy, features = c("Pdgfra"),cols=cols,idents = c("Radial_Glia","Glia_prog"))+xlab(c('',''))
+
+```
+
+
+```{r}
+
+
+my_color_palette <- hue_pal()(length(my_levels))
+"#F8766D" "#D39200" "#93AA00" "#00BA38" "#00C19F" "#00B9E3" "#619CFF" "#DB72FB" "#FF61C3"
+```
+
+## 8. Pseudotime with Monocole3
+
+Now let's try to oder cells based on pseudotime trajectory using monocle3
+
+```{r}
+
+```
+

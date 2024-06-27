@@ -137,7 +137,7 @@ class bcdCT:
 
         self.picked_barcodes = picked_barcodes
 
-def get_read_barcode(string, index):
+def get_read_barcode(string,index):
     read_barcode = revcompl(string.sequence[index - 8:index])  # Get the barcode sequence
     return read_barcode
 
@@ -157,12 +157,16 @@ def rev(seq):
     return seq[::-1]
 
 def find_seq(pattern, DNA_string, nmismatch=2):
-    for n in range(0, nmismatch + 1):
+    for n in range(0,nmismatch + 1):
         r = regex.compile('({0}){{e<={1}}}'.format(pattern, n))
         res = r.finditer(DNA_string)
-        for match in res:
-            if match.start() >= 8:  # Look for matches after the first 8 nucleotides
-                return match.start()
+        hit = [x.start() for x in res]
+        if len(hit) == 0:
+            continue
+        if len(hit) > 1:
+            return None
+        if len(hit) == 1:
+            return int(hit[0])
     return None
 
 def main(args):
@@ -229,7 +233,7 @@ if __name__ == '__main__':
                         required=True,
                         type=str,
                         nargs='+',
-                        help='path to input R1,R2 .fastq.gz files [ files required]')
+                        help='path to input R1,R2 .fastq.gz files [2 files required]')
 
     parser.add_argument('-o', '--out_prefix',
                         type=str,
@@ -238,7 +242,7 @@ if __name__ == '__main__':
 
     parser.add_argument('-p', '--pattern',
                         type=str,
-                        default="GCGTGGAGACGCTGCCGACGA",
+                        default="GTGTAGATCTCGGTGGTCGCC",
                         help='Pattern that follows the antibody barcode \n \
                                   (Default: %(default)s)')
 

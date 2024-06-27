@@ -1,0 +1,129 @@
+samples:
+  #NanoCT_Spinal_Cord_F40_1:                         
+    #fastq_path:
+      #/date/gcb/gcb_MZ/multiNanoCT/CZI_Human_Brain_SC_nanoCT/P27505/P27505_1001
+    #barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: TATAGCCT
+      #H3K27me3: CCTATCCT
+      #RNA_AAAAGGGG_H3K27ac: AAAAGGGG
+  
+  #NanoCT_Spinal_Cord_F40_2:                         
+    #fastq_path:
+      #/date/gcb/gcb_MZ/multiNanoCT/CZI_Human_Brain_SC_nanoCT/P27505/P27505_1002
+    #barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: TATAGCCT
+      #H3K27me3: CCTATCCT
+      #RNA_AAAAGGGG_H3K27ac: AAAAGGGG
+
+  #NanoCT_Spinal_Cord_M76:                         
+    #fastq_path:
+      #/date/gcb/gcb_MZ/multiNanoCT/CZI_Human_Brain_SC_nanoCT/P27505/P27505_1003
+    #barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: TATAGCCT
+      #H3K27me3:  ATAGAGGC
+      #RNA_AAAAGGGG_H3K27ac: AAAAGGGG
+
+  #NanoCT_Primary_Motor_Cortex_M34:                         
+    #fastq_path:
+      #/date/gcb/gcb_MZ/multiNanoCT/CZI_Human_Brain_SC_nanoCT/P27505/P27505_1004
+    #barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: TATAGCCT
+      #H3K27me3:  ATAGAGGC
+      #RNA_AAAAGGGG_H3K27ac: AAAAGGGG
+
+  #NanoCT_Primary_Motor_Cortex_M63_1:                         
+    #fastq_path:
+      #/date/gcb/gcb_MZ/multiNanoCT/CZI_Human_Brain_SC_nanoCT/P29054/P29054_1001
+    #barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: TATAGCCT
+      #H3K27me3:  CCTATCCT
+      #RNA_AAAAGGGG_H3K27ac: AAAAGGGG
+
+  #NanoCT_Primary_Motor_Cortex_M63_2:                         
+    #fastq_path:
+      #/date/gcb/gcb_MZ/multiNanoCT/CZI_Human_Brain_SC_nanoCT/P29054/P29054_1002
+    #barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: TATAGCCT
+      #H3K27me3:  CCTATCCT
+      #RNA_AAAAGGGG_H3K27ac: AAAAGGGG
+
+  PBMCs_H3K27ac_rep1:                         
+    fastq_path:
+      /date/gcb/gcb_MZ/multiNanoCT/samples/Human_PBMCs/PBMCs_H3K27ac_rep1/fastq/barcode_CCTATCCT
+    barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      H3K27ac: CCTATCCT
+      #H3K27me3:  CCTATCCT
+      #RNA_AAAAGGGG_H3K27ac: AAAAGGGG
+
+  PBMCs_H3K4me1_rep1:                         
+    fastq_path:
+      /date/gcb/gcb_MZ/multiNanoCT/samples/Human_PBMCs/PBMCs_H3K4me1_rep1/fastq/barcode_CTCGGTCA
+    barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: CCTATCCT
+      #H3K27me3:  CCTATCCT
+      H3K4me1: CTCGGTCA
+
+  PBMCs_H3K4me1_rep2:                         
+    fastq_path:
+      /date/gcb/gcb_MZ/multiNanoCT/samples/Human_PBMCs/PBMCs_H3K4me1_rep2/fastq/barcode_CTCGGTCA
+    barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: CCTATCCT
+      #H3K27me3:  CCTATCCT
+      H3K4me1: CTCGGTCA
+
+  PBMCs_H3K27ac_rep2:                         
+    fastq_path:
+      /date/gcb/gcb_MZ/multiNanoCT/samples/Human_PBMCs/PBMCs_H3K27ac_rep2/fastq/barcode_CCTATCCT
+    barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      H3K27ac: CCTATCCT
+      #H3K27me3:  CCTATCCT
+      #RNA_AAAAGGGG_H3K27ac: AAAAGGGG
+
+  PBMCs_H3K27me3:                         
+    fastq_path:
+      /date/gcb/gcb_MZ/multiNanoCT/samples/Human_PBMCs/PBMCs_H3K27me3/fastq/barcode_TATAGCCT
+    barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: CCTATCCT
+      H3K27me3:  TATAGCCT
+      #RNA_AAAAGGGG_H3K27ac: AAAAGGGG
+
+  PBMCs_H3K4me3:                         
+    fastq_path:
+      /date/gcb/gcb_MZ/multiNanoCT/samples/Human_PBMCs/PBMCs_H3K4me3/fastq/barcode_ATAGAGGC
+    barcodes:                                                                            # Define your different antibody barcodes here
+      #ATAC: TATAGCCT
+      #H3K27ac: CCTATCCT
+      H3K4me3:  ATAGAGGC
+      #RNA_AAAAGGGG_H3K27ac: AAAAGGGG
+
+
+general:
+  tempdir: /date/gcb/gcb_MZ/multiNanoCT/samples/Human_Brain_doplet_paired_Tag/                                                   # Modify path to a tmp folder already created here
+  cellranger_software: /data/bin/cellranger-atac2                                     # Modify the path to cellranger binaries here
+  cellranger_software_RNA: /data/bin/cellranger7
+  cellranger_software_arc: /data/bin/cellranger-arc2
+  cellranger_ref:  /home/mattia/refdata-cellranger-arc-GRCh38-2020-A-2.0.0/ # Modify the path to cellranger reference here
+  cellranger_ref_RNA: /home/mattia/refdata-gex-GRCh38-2020-A/ # Modify the path to cellranger reference here
+  macs_genome: hs
+  workflow_dir: /home/mattia/cfChromatin_in_MS/single_cell_data_processing/                                                                   # Modify genome for macs2 callpeak
+  norm: none # normalization for cellragner arc
+  chrom_sizes: /home/mattia/refdata-cellranger-arc-GRCh38-2020-A-2.0.0/star/chrNameLength.txt
+
+
+consensous:
+  merge:
+    barcodes:                                                                            # Define your different antibody barcodes here
+      ATAC: TATAGCCT
+      H3K27ac: CCTATCCT
+      H3K27me3: ATAGAGGC
