@@ -26,6 +26,8 @@ library(readxl)
 library(ggthemes)
 library(dplyr)
 library(tidyverse)
+library(plyranges)
+library(pbapply)
 ```
 
 
@@ -563,31 +565,65 @@ peaks <- CallPeaks(
 # Resize the peaks
 resized_peaks <- resize(peaks, width = 400, fix = "center")
 
+# Assuming 'peaks' is your GRanges object
+filtered_peaks <- subset(resized_peaks, seqnames(resized_peaks) %in% c(paste0("chr", 1:22), "chrX", "chrY"))
+
+# Drop unused levels
+seqlevels(filtered_peaks) <- droplevels(seqlevels(filtered_peaks))
+
+
+write_bed(peaks,"/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/integrated_human_CNS_H3K27ac.peaks.bed")
 
 # Create a binary peak-by-cell matrix
 peak_matrix <- FeatureMatrix(
   fragments = integrated_subset@assays[["H3K27ac_bins"]]@fragments,
-  features = resized_peaks,
+  features = filtered_peaks,
   cells = colnames(integrated_subset)
 )
+annotations <- GetGRangesFromEnsDb(ensdb = EnsDb.Hsapiens.v86)
 
 # Assuming 'peak_matrix' is your matrix with the called peaks
-chrom_assay <- CreateChromatinAssay(counts = peak_matrix, sep = c(":", "-"))
+chrom_assay <- CreateChromatinAssay(counts = peak_matrix,sep = c(":", "-"),annotation = annotations)
+
 
 # Add the ChromatinAssay to your existing Seurat object
-integrated_subset[["peaks"]] <- chrom_assay
+integrated_subset[["peaks"]] <-chrom_assay
 
 saveRDS(integrated_subset,"/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/integrated_human_CNS_H3K27ac_subset.rds")
 
 DefaultAssay(integrated_subset) <- "peaks"
+
+Idents(integrated_subset) <- "cell_type"
+
 marker_peaks <- FindAllMarkers(
   object = integrated_subset,
   only.pos = TRUE,
-  min.pct = 0.25,
+  min.pct = 0.1,
   logfc.threshold = 0.25,
-  group.by = "predicted.id"
+  group.by = "cell_type"
 )
 
 
 ```
 
+Extract BigWig files from clusters to check if the peaks calls make sense 
+
+
+
+```{r}
+
+ExportGroupBW(
+  object = integrated_subset, #The seurat object
+  assay =  "H3K27ac_bins", #The assay of the fragment file
+  group.by = "cell_type", #The metadata used to split the fragment file
+  idents = NULL, #The idents from the group.by to be exported
+  normMethod = "RC",#Normalization method for the biwig files. It can be the name of any quantitative column in the @meta.data or ncells as the number of cells. Can also be set to none
+  tileSize = 100, #The size of the tiles in the bigwig file
+  minCells = 5, #The minimum of cells in a group to be exported
+  cutoff = 4, #The maximum number of fragment in a given tile
+  outdir =  "/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/Tracks", #The output directory for bigwig files. Also used as output directory for SlitFragment function
+  verbose=TRUE #Display messages
+)
+
+
+```

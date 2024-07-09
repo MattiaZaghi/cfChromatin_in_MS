@@ -25,34 +25,86 @@ core <- 40
 setwd(dir = working_path)
 source("/home/mattia/cfChromatin_in_MS/cfChromatin_fun.R")
 
+# Load the hg38 genome
+
 #############################################################################################################################
 ###                                                    CATALOGUES CREATION                                                ###
 #############################################################################################################################
 
 ###### TSS
 # Catalog part 1
-windows <- load_catalog(annotation_dir = annotation_dir_path,glossary = glossary_path, glossary_group = "ANATOMY", states = c("1_TssA", "2_TssAFlnk"))
+windows_TSS <- load_catalog(annotation_dir = annotation_dir_path,glossary = glossary_path, glossary_group = "ANATOMY", states = c("1_TssA", "2_TssAFlnk"))
+windows_Enh <- load_catalog(annotation_dir = annotation_dir_path,glossary = glossary_path, glossary_group = "ANATOMY", states = c("6_EnhG", "7_Enh"))
 # Catalog part 2 & 3
-windows <- annotate_catalog(windows, feature_tag = "TSS", db = list('UCSC'=TxDb.Hsapiens.UCSC.hg38.knownGene, 'Ensembl'=EnsDb.Hsapiens.v86), db_gap = 2500, db_spe = TRUE, db_tag = "EXTRA_TSS", db_spe_center = 3000)
+windows_TSS <- annotate_catalog(windows_TSS, feature_tag = "TSS annotate", db = list('UCSC'=TxDb.Hsapiens.UCSC.hg38.knownGene, 'Ensembl'=EnsDb.Hsapiens.v86), db_gap = 2500, 
+                                db_spe = TRUE, db_tag = "TSS", db_spe_center = 3000)
+
+
+windows_Enh$name <- "."
+windows_Enh$type <- "Enhancer"
+
+# Assuming gr1 and gr2 are your GRanges objects
+overlaps <- findOverlaps(windows_Enh, windows_TSS)
+
+# Get the indices of the ranges in gr1 that overlap with gr2
+indices <- queryHits(overlaps)
+
+# Get the ranges in gr1 that do not overlap with gr2
+windows_Enh <-windows_Enh[-indices]
+
+
+
+
+windows<-c(windows_TSS,windows_Enh)
+#windows<-c(windows_TSS,windows_Enh)
+windows<-sort(windows)
 # Catalog part 4
-windows <- add_flank(windows, feature_tag = "FLANKING", flanking_size = 1000)
-windows <- add_background(windows, feature_tag = "BACKGROUND", bin_size = 5000)
+windows <- add_flank(windows, feature_tag = "flaking", flanking_size = 1000)
+windows <- add_background(windows, feature_tag = "background", bin_size = 5000)
+# Set the seqinfo to hg38
+seqinfo(windows) <- Seqinfo(genome = "hg38")
+
+
+library(GenomicRanges)
+
+# Assuming 'gr' is your GRanges object
+gr_list <- split(windows, seqnames(windows))
+
+# Function to remove the first and last range
+remove_first_last <- function(x) {
+  if(length(x) <= 2) {
+    return(GRanges())
+  } else {
+    return(x[-c(1, length(x))])
+  }
+}
+
+# Apply the function to each chromosome
+gr_list <- lapply(gr_list, remove_first_last)
+
+# Combine the list back into a GRanges object
+windows <- bind_ranges(gr_list)
 
 # Statistics
-show_statistics(windows, db_tag = "EXTRA_TSS")
+show_statistics(windows, db_tag = "TSS")
+
 
 # Save files
-saveRDS(windows,paste0(working_path,"TSS_windows.rds"))
+saveRDS(windows,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Windows_TSS_enh_bastien.rds")
+write_bed(windows,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Windows_TSS_enh_bastien.bed")
 
 df_windows <- data.frame(
   seqnames=seqnames(windows),
-  starts=start(windows)-1,
+  starts=start(windows),
   ends=end(windows),
+  type=windows$type,
   name=windows$name,
-  tissue=windows$tissue,
-  type=windows$type)
+  tissue=windows$tissue
+)
 
-write.table(df_windows, file=paste0(working_path,"TSS.bed"), quote=F, sep=",", row.names=F, col.names=F)
+# Create a new data frame with a comma as the first column and rownumber as the second column
+
+write.csv(df_windows,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Windows_TSS_enh_bastien.csv",row.names = TRUE)
 
 #############################################################################################################################
 ###                                                 PROCESSING SEQUENCING FILES                                           ###
@@ -173,3 +225,4 @@ createBigWig <- function(gr, filename) {
 # Apply the createBigWig function to each GRanges object in the list
 filenames <- paste0("/date/gcb/gcb_MZ/Round1/R_bigiwig/", seq_along(normalizedSignal_counts), ".bw")  # replace with your actual filenames
 mapply(createBigWig, normalizedSignal_counts, filenames)
+

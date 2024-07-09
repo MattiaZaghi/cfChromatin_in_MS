@@ -11,16 +11,15 @@ load_catalog <- function(
     states				= NULL,
     verbose				= TRUE
 ){
-  #############################################################################################################################
-  ###                                          1.LOAD THE 111 FILES FROM CHROMHMM                                           ###
-  #############################################################################################################################
+  # Required library
+  library(parallel)
   
   # Get all files from annotation directory
   if (verbose){print("Load ChromHMM files...")}
   files <- list.files(annotation_dir, pattern = "\\.bed", full.names = T)
   
   # Load each file in granges and name them
-  encode <- lapply(files, read_bed)
+  encode <- mclapply(files, read_bed, mc.cores = detectCores())
   encode <- lapply(encode, function(gr) {
     gr[seqnames(gr) != "chrM"]})
   names(encode) <- sapply(files, function(x) {strsplit(basename(x), "_")[[1]][1]})
@@ -30,31 +29,35 @@ load_catalog <- function(
   # Remove cell line files
   glossary <- glossary[glossary$GROUP != "ENCODE2012",]
   
-  #############################################################################################################################
-  ###                                    2.MERGE ADJACENT RANGES BY TISSUE AND ANNOTATE                                     ###
-  #############################################################################################################################
-  
   # Create a grange for each tissue and reduce it
   if (verbose){print("Reducing ChromHMM windows per group...")}
-  windows_list <- list()
-  for (tissue in unique(glossary[,glossary_group])){
+  windows_list <- mclapply(unique(glossary[,glossary_group]), function(tissue) {
     eid_tissue <- glossary[glossary[,glossary_group] == tissue,]$EID
     tmp <- bind_ranges(encode[eid_tissue])
     tmp <- tmp[tmp$name %in% states, ]
-    windows_list[[tissue]] <- reduce(tmp, ignore.strand=TRUE)
-    windows_list[[tissue]]$tissue <- tissue
-  }
+    tmp <- reduce(tmp, ignore.strand=TRUE)
+    tmp$tissue <- tissue
+    return(tmp)
+  }, mc.cores = detectCores())
+  
   
   # Aggregate the granges
   if (verbose){print("Aggregate ChromHMM windows...")}
   windows_aggr <- sort(sortSeqlevels(bind_ranges(windows_list)), ignore.strand=TRUE)
+  # Split windows_aggr into chunks
+  chunks <- split(windows_aggr, ceiling(seq_along(windows_aggr) / length(windows_aggr) * detectCores()))
   
-  # Disjoin to get windows overlapping multiple tissues (can take a while)
-  windows <- disjoin(windows_aggr, with.revmap=TRUE, ignore.strand=TRUE)
-  windows$tissue <- unlist(lapply(windows$revmap,function(i){paste(collapse=';',windows_aggr$tissue[i])}))
-  windows$revmap <- NULL
+  # Apply disjoin to each chunk in parallel
+  result_list <- mclapply(chunks, function(chunk) {
+    windows <- disjoin(chunk, with.revmap=TRUE, ignore.strand=TRUE)
+    windows$tissue <- unlist(lapply(windows$revmap,function(i){paste(collapse=';',chunk$tissue[i])}))
+    windows$revmap <- NULL
+    return(windows)
+  }, mc.cores = detectCores())
   
-  return(windows)
+  # Combine the results
+  windows_list <- do.call(c, result_list)
+  windows <- bind_ranges(windows_list)
 }
 
 

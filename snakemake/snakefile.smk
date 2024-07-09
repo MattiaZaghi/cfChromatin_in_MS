@@ -28,10 +28,12 @@ ALL_SAMPLES =  CHIPS + CUT_TAGS
 
 BAM=expand("{myrun}/dedup/picard/{sample}.bam", sample=ALL_SAMPLES, myrun=RUNID)
 ALL_FLAGSTAT = expand("{myrun}/dedup/picard/{sample}.flagstat", sample = ALL_SAMPLES,myrun=RUNID)
-FILTER expand("{myrun}/filter/samtools/{sample}.bam", sample = ALL_SAMPLES,myrun=RUNID)
-ALL_BIGWIG_DEDUP = expand("{myrun}/coverage/deeptools/{sample}_RPKM.bw", sample = ALL_SAMPLES,myrun=RUNID)
+FILTER_FLAGSTAT = expand("{myrun}/filter/samtools/{sample}.flagstat", sample = ALL_SAMPLES,myrun=RUNID)
+FILTER = expand("{myrun}/filter/samtools/{sample}.bam", sample = ALL_SAMPLES,myrun=RUNID)
+#ALL_BIGWIG_DEDUP = expand("{myrun}/coverage/deeptools/{sample}_RPKM.bw", sample = ALL_SAMPLES,myrun=RUNID)
 BED=expand("{myrun}/bed/bedtools/{sample}.bed", sample = ALL_SAMPLES,myrun=RUNID)
-#ALL_BIGWIG= expand("{myrun}/coverage/deeptools/CPM/{sample}_CPM.bw", sample = ALL_SAMPLES,myrun=RUNID)
+BED_DEDUP=expand("{myrun}/bed/bedtools/dedup/{sample}.bed", sample = ALL_SAMPLES,myrun=RUNID)
+ALL_BIGWIG= expand("{myrun}/coverage/deeptools/{sample}_RPKM.bw", sample = ALL_SAMPLES,myrun=RUNID)
 #GOPEAKS = expand("{myrun}/peaks/gopeaks/{sample}_peaks.bed", sample = CUT_TAGS,myrun=RUNID)
 #GOPEAKS_BROAD = expand("{myrun}/peaks/gopeaks/{sample}_broad_peaks.bed", sample = CUT_TAGS,myrun=RUNID)
 #MACS2 = expand("{myrun}/peaks/macs2/{sample}_peaks.narrowPeak", sample = ALL_SAMPLES,myrun=RUNID)
@@ -45,20 +47,21 @@ TARGETS.extend(BAM)
 TARGETS.extend(FILTER)
 #TARGETS.extend(GOPEAKS)
 #TARGETS.extend(GOPEAKS_BROAD)
-TARGETS.extend(ALL_BIGWIG_DEDUP)
-#TARGETS.extend(ALL_BIGWIG)
+#TARGETS.extend(ALL_BIGWIG_DEDUP)
+TARGETS.extend(ALL_BIGWIG)
 #TARGETS.extend(MACS2)
 #TARGETS.extend(MACS2_BROAD)
 TARGETS.extend(ALL_FLAGSTAT)
 TARGETS.extend(SIZE)
 TARGETS.extend(BED)
+TARGETS.extend(BED_DEDUP)
 
 
 
 
 
 
-ruleorder: merge_fastq >  trimming_trimmomatic >  aligning_bowtie2 >  sorted_samtools > dedup_picard > coverage_deeptools > insertsize_picard > bam_to_bed
+ruleorder: merge_fastq_4 >  merge_fastq_2 > merge_fastq >  trimming_trimmomatic >  aligning_bowtie2 >  sorted_samtools > dedup_picard > coverage_deeptools > insertsize_picard > bam_to_bed > bam_to_bed_dedup
 
 
 
@@ -66,7 +69,14 @@ ruleorder: merge_fastq >  trimming_trimmomatic >  aligning_bowtie2 >  sorted_sam
 rule all:
     input: TARGETS
 
-rule merge_fastq:
+def get_fastq_files(wildcards):
+    files = FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]]
+    if len(files) == 4:
+        return "merge_fastq_4"
+    elif len(files) == 2:
+        return "merge_fastq_2"
+
+rule merge_fastq_4:
     input:
         fq_1_L001=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][0],
         fq_1_L002=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][2],
@@ -79,10 +89,26 @@ rule merge_fastq:
     shell:
         """
         gunzip -c {input.fq_1_L001} {input.fq_1_L002} > {output.R1}
-
         gunzip -c {input.fq_2_L001} {input.fq_2_L002} > {output.R2}
-
         """
+
+rule merge_fastq_2:
+    input:
+        fq_1=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][0],
+        fq_2=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][1]
+    output:
+        R1=temp("{myrun}/cat/{sample}_R1.fastq"),
+        R2=temp("{myrun}/cat/{sample}_R2.fastq")
+    threads: config['THREADS']
+    shell:
+        """
+        gunzip -c {input.fq_1} > {output.R1}
+        gunzip -c {input.fq_2} > {output.R2}
+        """
+
+rule merge_fastq:
+    input: rules=get_fastq_files
+
 
 
 rule trimming_trimmomatic:  
@@ -207,7 +233,7 @@ rule filter_chr_samtools:
         """
         mkdir -p {params.dir}
 
-        samtools view  -@ {threads} -b {input.dedup} chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX chrY chrM > {output.filter} 
+        samtools view  -@ {threads} -b {input.dedup} chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX chrY > {output.filter} 
         
         samtools index {output.filter} -@ {threads}
         
@@ -287,28 +313,7 @@ rule downsample_stat_samtools:
 
 rule coverage_deeptools:
     input: 
-        dedup  = "{myrun}/dedup/picard/{sample}.bam"
-    output:
-        bw="{myrun}/coverage/deeptools/{sample}_RPKM.bw"
-    params:
-        genome_size_bp  = config['genome_size_bp'],
-        mapping_qual_bw = config['binsize'],
-        norm= config['norm_method'],
-        smooth= config['smooth_length']
-    resources:
-        mem_mb=64000
-    threads: config['THREADS']
-    log: "{myrun}/coverage/deeptools/{sample}.log"
-    conda:
-        "/home/mattia/miniconda3/envs/deeptools.yml"
-    shell:
-        """
-        bamCoverage -b {input.dedup} --outFileName {output.bw} --normalizeUsing {params.norm} --binSize {params.mapping_qual_bw} --smoothLength {params.smooth} --numberOfProcessors {threads} --exactScaling  
-
-        """
-rule coverage_deeptools_filter:
-    input: 
-        dedup  = "{myrun}/dedup/picard/{sample}.bam"
+        dedup  = "{myrun}/filter/samtools/{sample}.bam"
     output:
         bw="{myrun}/coverage/deeptools/{sample}_RPKM.bw"
     params:
@@ -330,7 +335,7 @@ rule coverage_deeptools_filter:
         
 rule insertsize_picard:
     input:
-        dedup = "{myrun}/dedup/picard/{sample}.bam"
+        dedup = "{myrun}/filter/samtools/{sample}.bam"
     output:
         metrics="{myrun}/dedup/picard/insert/{sample}_insert.txt",
         pdf="{myrun}/dedup/picard/insert/{sample}_insert.pdf"
@@ -352,7 +357,7 @@ rule insertsize_picard:
 
 rule bam_to_bed:
     input: 
-        filter = "{myrun}/dedup/picard/{sample}.bam"
+        filter = "{myrun}/filter/samtools/{sample}.bam"
     output:
         bed="{myrun}/bed/bedtools/{sample}.bed"
     params:
@@ -370,46 +375,67 @@ rule bam_to_bed:
         bedtools bamtobed -i {input.filter}  > {output.bed}
 
         """
-rule R_script:
+
+rule bam_to_bed_dedup:
     input: 
-        bed  = "{myrun}/dedup/picard/{sample}.bam",
-        rdata  = "Analysis/Samples/H3K27ac_ref/file.RData"  # Add your RData file here
+        filter = "{myrun}/dedup/picard/{sample}.bam"
     output:
-        bw="{myrun}/coverage/deeptools/R/{sample}.bw"
+        bed="{myrun}/bed/bedtools/dedup/{sample}.bed"
     params:
-        Output="Analysis/Output/H3K27ac_ref"
+        dir  = "{myrun}/bed/bedtools/"
     resources:
         mem_mb=64000
     threads: config['THREADS']
-    log: "{myrun}/coverage/deeptools/{sample}.log"
     conda:
-        "/home/mattia/miniconda3/envs/deeptools.yml"
+        "/home/mattia/miniconda3/envs/bedtools.yml"
     shell:
-        """
-        Rscript --vanilla Analysis/cfChIP-seq/ProcessBEDFiles.R -r Analysis -m ${m} -BCN ${sample}
         """
 
-rule coverage_deeptools_R:
-    input: 
-        dedup  = "{myrun}/dedup/picard/{sample}.bam",
-        rdata  = "Analysis/Samples/H3K27ac_ref/file.RData"  # Add your RData file here
-    output:
-        bw="{myrun}/coverage/deeptools/R/{sample}.bw"
-    params:
-        genome_size_bp  = config['genome_size_bp'],
-        mapping_qual_bw = config['binsize'],
-        smooth= config['smooth_length']
-    resources:
-        mem_mb=64000
-    threads: config['THREADS']
-    log: "{myrun}/coverage/deeptools/{sample}.log"
-    conda:
-        "/home/mattia/miniconda3/envs/deeptools.yml"
-    shell:
+        mkdir -p {params.dir}
+
+        bedtools bamtobed -i {input.filter}  > {output.bed}
+
         """
+#rule R_script:
+    #input: 
+        #bed  = "{myrun}/dedup/picard/{sample}.bam",
+        #rdata  = "Analysis/Samples/H3K27ac_ref/file.RData"  # Add your RData file here
+    #output:
+        #bw="{myrun}/coverage/deeptools/R/{sample}.bw"
+    #params:
+        #Output="Analysis/Output/H3K27ac_ref"
+    #resources:
+        #mem_mb=64000
+    #threads: config['THREADS']
+    #log: "{myrun}/coverage/deeptools/{sample}.log"
+    #conda:
+        #"/home/mattia/miniconda3/envs/deeptools.yml"
+    #shell:
+        #"""
+        #Rscript --vanilla Analysis/cfChIP-seq/ProcessBEDFiles.R -r Analysis -m ${m} -BCN ${sample}
+        #"""
+
+#rule coverage_deeptools_R:
+   # input: 
+        #dedup  = "{myrun}/dedup/picard/{sample}.bam",
+        #rdata  = "Analysis/Samples/H3K27ac_ref/file.RData"  # Add your RData file here
+    #output:
+        #bw="{myrun}/coverage/deeptools/R/{sample}.bw"
+    #params:
+        #genome_size_bp  = config['genome_size_bp'],
+        #mapping_qual_bw = config['binsize'],
+        #smooth= config['smooth_length']
+    #resources:
+       # mem_mb=64000
+    #threads: config['THREADS']
+    #log: "{myrun}/coverage/deeptools/{sample}.log"
+    #conda:
+        #"/home/mattia/miniconda3/envs/deeptools.yml"
+    #shell:
+        #"""
         # Use Rscript to extract the QQnorm value from the RData file
-        QQnorm=$(Rscript -e "load('{input.rdata}'); print(QQnorm)")
+        #QQnorm=$(Rscript -e "load('{input.rdata}'); print(QQnorm)")
 
         # Use the extracted QQnorm value as the --scaleFactor
-        bamCoverage -b {input.dedup} --outFileName {output.bw} --scaleFactor $QQnorm --binSize {params.mapping_qual_bw} --smoothLength {params.smooth} --numberOfProcessors {threads} --exactScaling
-        """
+       # bamCoverage -b {input.dedup} --outFileName {output.bw} --scaleFactor $QQnorm --binSize {params.mapping_qual_bw} --smoothLength {params.smooth} --numberOfProcessors {threads} --exactScaling
+        #"""
