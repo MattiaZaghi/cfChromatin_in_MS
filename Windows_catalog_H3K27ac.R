@@ -90,8 +90,8 @@ show_statistics(windows, db_tag = "TSS")
 
 
 # Save files
-saveRDS(windows,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Windows_TSS_enh_bastien.rds")
-write_bed(windows,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Windows_TSS_enh_bastien.bed")
+saveRDS(windows,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Windows.rds")
+write_bed(windows,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Windows.bed")
 
 df_windows <- data.frame(
   seqnames=seqnames(windows),
@@ -104,7 +104,7 @@ df_windows <- data.frame(
 
 # Create a new data frame with a comma as the first column and rownumber as the second column
 
-write.csv(df_windows,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Windows_TSS_enh_bastien.csv",row.names = TRUE)
+write.csv(df_windows,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Windows.csv",row.names = TRUE)
 
 #############################################################################################################################
 ###                                                 PROCESSING SEQUENCING FILES                                           ###
