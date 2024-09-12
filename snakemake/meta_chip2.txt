@@ -1,0 +1,12 @@
+sample_name	fastq_name	factor	assay	type	reference
+H7-P	P32456_2001	H3K27ac	ChIP	narrow	human
+H8-P	P32456_2002	H3K27ac	ChIP	narrow	human
+H6-P-1D	P32456_2003	H3K27ac	ChIP	narrow	human
+H8-P-1D	P32456_2004	H3K36me3	ChIP	narrow	human
+18070-P-SP	P32456_2005	H3K27ac	ChIP	narrow	human
+H5-P	P32456_2006	H3K27ac	ChIP	narrow	human
+H8-P-1D	P32456_2007	H3K27ac	ChIP	narrow	human
+H6-P	P32456_2008	H3K27ac	ChIP	narrow	human
+H6-P-1D	P32456_2009	H3K36me3	ChIP	narrow	human
+
+

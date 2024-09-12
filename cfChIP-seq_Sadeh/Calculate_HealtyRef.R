@@ -19,7 +19,8 @@ for (rdata_file in rdata_files) {
   data_list[[var_name]] <- loaded_data
 }
 # Your vector
-Healthy <- c("H1-P_H3K27ac_ChIP","H2-P_H3K27ac_ChIP","H3-P_H3K27ac_ChIP","H4-P_H3K27ac_ChIP", "19019-P_H3K27ac_ChIP")
+Healthy <- c("H1-P_H3K27ac_ChIP","H2-P_H3K27ac_ChIP","H3-P_H3K27ac_ChIP","H4-P_H3K27ac_ChIP", "19019-P_H3K27ac_ChIP",
+             "H5-P_H3K27ac_ChIP","H6-P_H3K27ac_ChIP","H7-P_H3K27ac_ChIP","H8-P_H3K27ac_ChIP")
 
 # Get the names of the tissues that are in your datasets vector
 data_list <- data_list[names(data_list) %in% Healthy]
@@ -88,3 +89,4 @@ consensus = list(Win.avg = win.est$avg, Win.var = win.est$var, Gene.avg = gene.e
 saveRDS(consensus,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/HealthyRef.rds")
 
 print("All tasks completed.")
+

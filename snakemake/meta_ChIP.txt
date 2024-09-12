@@ -1,16 +1,21 @@
 sample_name	fastq_name	factor	assay	type	reference
-H1-P	P31260_1001	H3K27ac	ChIP	narrow	human
-H2-P	P31260_1004	H3K27ac	ChIP	narrow	human
-H3-P	P31260_1007	H3K27ac	ChIP	narrow	human
-H4-P	P31260_1010	H3K27ac	ChIP	narrow	human
-H1-P	P31260_1002	H3K4me3	ChIP	narrow	human
-H2-P	P31260_1005	H3K4me3	ChIP	narrow	human
-H3-P	P31260_1008	H3K4me3.1	ChIP	narrow	human
-H3-P	P31260_1009	H3K4me3.2	ChIP	narrow	human
-H4-P	P31260_1011	H3K4me3	ChIP	narrow	human
-H1-P	P31260_1003	H3K36me3	ChIP	narrow	human
-H2-P	P31260_1006	H3K36me3	ChIP	narrow	human
-H1-P	P31260_1016	cfDNA	ChIP	narrow	human
-H2-P	P31260_1017	cfDNA	ChIP	narrow	human
-H4-P	P31260_1018	cfDNA	ChIP	narrow	human
+P1-P-SP	P32456_1009	H3K27ac	ChIP	narrow	human
+12-179-P-RR	P32456_1010	H3K27ac	ChIP	narrow	human
+14-229-P-RR	P32456_1011	H3K27ac	ChIP	narrow	human
+14-131-P-RR	P32456_1012	H3K27ac	ChIP	narrow	human
+20-053-C-RR	P32456_1013	H3K27ac	ChIP	narrow	human
+20-056-C-RR	P32456_1014	H3K27ac	ChIP	narrow	human
+20-030-C-RR	P32456_1015	H3K27ac	ChIP	narrow	human
+20-031-C-RR	P32456_1016	H3K27ac	ChIP	narrow	human
+20-027-C-RR	P32456_1017	H3K27ac	ChIP	narrow	human
+20-040-C-RR	P32456_1018	H3K27ac	ChIP	narrow	human
+20-014-C-RR	P32456_1019	H3K27ac	ChIP	narrow	human
+20-034-C-RR	P32456_1020	H3K27ac	ChIP	narrow	human
+20-042-C-RR	P32456_1021	H3K27ac	ChIP	narrow	human
+20-033-C-RR	P32456_1022	H3K27ac	ChIP	narrow	human
+20-015-C-RR	P32456_1023	H3K27ac	ChIP	narrow	human
+19-020-C-RR	P32456_1024	H3K27ac	ChIP	narrow	human
+14-223-C-RR	P32456_1025	H3K27ac	ChIP	narrow	human
+14-031-C-RR	P32456_1026	H3K27ac	ChIP	narrow	human
+
 
