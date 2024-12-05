@@ -68,7 +68,7 @@ cfChIP.GetRawData = function(filename) {
   return(dat)  # Return the 'dat' list
 }
 # Read the TSS windows data from an RDS file located in the SetupDIR directory.
-TSS.windows = readRDS("/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac/Windows.rds")
+TSS.windows = readRDS("/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Windows.rds")
 # Retrieve sequence information from the TSS windows data.
 genome.seqinfo = seqinfo(TSS.windows)
 # Define a list of chromosome names typically found in human genome datasets.
@@ -99,15 +99,16 @@ cfChIP.GetCoverage  = function(filename) {
 
 
 # Create a vector of file paths
-file_paths_ref <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K4me3"
+file_paths_ref <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K27ac_roadmap_hg38"
 files_ref <- list.files(path = file_paths_ref, pattern = "*rdata$", full.names = TRUE)
 # Remove the files that contain "_H3K4me3_ChIP"
 files_ref  <- files_ref [!grepl("_H3K4me3_ChIP", files_ref)]
 # Use grep to get the indices of files that start with 'H'
-files_ref  <- files_ref[137:151]
-file_paths_samples <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K4me3"
+files_ref  <- files_ref[c(4:25,36)]
+file_paths_samples <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K27ac_hg38"
 
 files_samples <- list.files(path = file_paths_samples, pattern = "*_ChIP.rdata$", full.names = TRUE)
+files_samples <-files_samples[c(2,4:6,8,10,22:26,31)]
 # Merge the lists
 merged_list <- c(files_ref,files_samples)
 # Use lapply to load all files
@@ -119,11 +120,12 @@ data_list <- lapply(merged_list ,readRDS)
 base_names <- basename(merged_list)
 
 # Remove the pattern "__H3K27ac_ChIP-SE.rdata" from the base names
-#names <- sub("_H3K27ac_ChIP-SE.rdata$", "", base_names)
-names<- sub(".rdata$", "", base_names)
+names <- sub("_H3K27ac_ChIP.rdata$", "", base_names)
+# Extract the first part of each name
+shortened_names <- sub("([^-_+]+).*", "\\1", names)
 
 # Assign names to the list elements
-names(data_list) <- names
+names(data_list) <- shortened_names
 # Create a vector of bed file paths
 file_paths <- c("/date/gcb/gcb_MZ/Analysis/BED/H3K27ac/H1-P_H3K27ac_ChIP.bed",
                 "/date/gcb/gcb_MZ/Analysis/BED/H3K27ac/H2-P_H3K27ac_ChIP.bed",
@@ -167,11 +169,29 @@ gene_counts_df <- do.call(cbind, gene_counts_list)
 
 norm_counts <- as.matrix(gene_counts_df)
 
+gene_counts_df<-gene_counts_df[rownames(gene_counts_df) != "UNKNOWN", ]
 # Assuming norm_counts is your matrix of normalized counts
 correlation_matrix <- cor(norm_counts)
 
 # Create the correlation plot with squares and positive values in red
-corrplot(correlation_matrix, method = "color", col = colorRampPalette(c("blue", "white", "red"))(200))
+corrplot(correlation_matrix, method = "color", col = colorRampPalette(c("blue", "white", "red"))(200), tl.cex = 0.8)
+
+
+# Assuming H1, H2, H3, and H4 are your objects with gene counts
+gene_counts_list <- lapply(data_list, function(x) x$Counts.QQnorm)
+
+# Combine them into a data frame
+gene_counts_df <- do.call(cbind, gene_counts_list)
+
+#Create a matrix from the normalized counts
+
+norm_counts <- as.matrix(gene_counts_df)
+
+# Assuming norm_counts is your matrix of normalized counts
+correlation_matrix <- cor(norm_counts)
+
+# Create the correlation plot with squares and positive values in red
+corrplot(correlation_matrix, method = "color", col = colorRampPalette(c("blue", "white", "red"))(200), tl.cex = 0.8)
 
 library(S4Vectors)
 

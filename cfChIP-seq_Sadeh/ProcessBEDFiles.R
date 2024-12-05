@@ -1,6 +1,14 @@
 #!/usr/local/bin/Rscript --vanilla
 #if executing in development 
-setwd("/date/gcb/gcb_MZ/Analysis/")
+# Check if the workspace file exists and load it if it does
+if (file.exists("cfChIP.RData")) {
+  load("cfChIP.RData")
+} else {
+  message("No existing workspace found. Starting with a clean environment.")
+}
+
+
+#setwd("/date/gcb/gcb_MZ/Analysis/")
 # Define a custom function 'catn' that behaves like 'cat' but appends a newline at the end of the output.
 catn = function(...) { cat(...,"\n") }
 
@@ -22,7 +30,7 @@ if( !any(grepl("--interactive", initial.options)) ) {
 } else {
   # In development mode (e.g., running inside RStudio), set directories and options manually.
   DevelopmentMode = TRUE
-  Mod = "H3K27ac/"
+  Mod = "H3K27ac_hg38/"
   SourceDIR = "/date/gcb/gcb_MZ/Analysis/cfChIP-seq/"
   ANNOTDIR = paste0(SourceDIR, "SetupFiles/", Mod)
   # Simulate command-line arguments for development mode.
@@ -79,7 +87,7 @@ option_list = list(
   make_option(c("-a", "--annotationdir"), type="character", default=NULL, help="location of annotation files"),
   make_option(c("-t", "--trackdir"), type="character", default=NULL, help="location of genome browser track files"),
   make_option(c("-o", "--outputdir"), type="character", default=NULL, help="location of output files"),
-  make_option(c("-m", "--mod"), type="character", default="H3K27ac", help="name of modification, used in combination with -r"),
+  make_option(c("-m", "--mod"), type="character", default="H3K27ac_hg38", help="name of modification, used in combination with -r"),
   make_option(c("-r", "--root"), type="character", default=NULL, help="name of root directory, input is assumed to be in Root/XXX/mod"),
   make_option(c("-p", "--project"), type="character", default=NULL, help="name of project root directory, output is assumed to be in Project/XXX/mod"),
   
@@ -1033,3 +1041,5 @@ ProcessBEDFile = function(BFile) {
       cfChIP.plotEnrichments(LL, outputPlotEnrichments, params)
   }
     
+  # Save the workspace at the end
+  save.image(file = "my_workspace.RData")

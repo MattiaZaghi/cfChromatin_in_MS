@@ -1,51 +1,51 @@
 #  Definitions
 
-
 fitNoise = function(X, thresh = 0.95, MinNumber = 50, Prior = NA, PriorStrength = 100) {
-  X = X[!is.na(X)]
+  X = X[!is.na(X)]  # Remove NA values from X
   if(length(X) < MinNumber) 
-    return(NA)
-  t = quantile(X,thresh)
-  X = X[X <= t]
-  T = table(X)
-  N = as.integer(names(T))
-  M = sum(T)
+    return(NA)  # Return NA if the number of elements is less than MinNumber
+  t = quantile(X, thresh)  # Calculate the threshold quantile
+  X = X[X <= t]  # Keep values below the threshold
+  T = table(X)  # Create a frequency table of X
+  N = as.integer(names(T))  # Get the unique values
+  M = sum(T)  # Sum of frequencies
   
   alpha = 1
   beta = 0
   if( !is.na(Prior) ) {
     beta = PriorStrength
-    alpha = Prior*PriorStrength
+    alpha = Prior * PriorStrength
   }
   
   LL = function(l)  {
-    sum( T*dpois(N,l,log = TRUE)) - M*ppois(max(N),l,log.p = TRUE) + (alpha-1)*log(l) - beta*l
+    sum(T * dpois(N, l, log = TRUE)) - M * ppois(max(N), l, log.p = TRUE) + (alpha - 1) * log(l) - beta * l
   }
-  m = mean(X)
-  up = max(0.1,m*10)
-  down = max(0.0001,m/10)
-  op = optimize(LL, c(up,down),maximum = TRUE)
-  op$maximum
+  m = mean(X)  # Calculate the mean of X
+  up = max(0.1, m * 10)  # Upper bound for optimization
+  down = max(0.0001, m / 10)  # Lower bound for optimization
+  op = optimize(LL, c(up, down), maximum = TRUE)  # Optimize the log-likelihood function
+  op$maximum  # Return the optimized value
 }
 
-fitNoise.nbin = function(X,thresh = 0.95) {
-  t = quantile(X,thresh,na.rm=TRUE)
-  X = X[X <= t]
-  fit = fitdist(X,"nbinom")
-  coef(fit)
+fitNoise.nbin = function(X, thresh = 0.95) {
+  t = quantile(X, thresh, na.rm = TRUE)  # Calculate the threshold quantile
+  X = X[X <= t]  # Keep values below the threshold
+  fit = fitdist(X, "nbinom")  # Fit a negative binomial distribution
+  coef(fit)  # Return the coefficients of the fit
 }
 
-fitNoise.mean = function(X,thresh = 0.95) {
-  t = quantile(X,thresh)
-  X = X[X <= t]
-  mean(X)
+fitNoise.mean = function(X, thresh = 0.95) {
+  t = quantile(X, thresh)  # Calculate the threshold quantile
+  X = X[X <= t]  # Keep values below the threshold
+  mean(X)  # Return the mean of the filtered values
 }
+
 
 
 if( !exists("Background.Regions")) {
   print("Loading Background model")
-  BackgroundModel.filename = paste0(SetupDIR,"BackgroundModel.rds")
-  L = readRDS(BackgroundModel.filename)
+  BackgroundModel.filename = paste0(SetupDIR, "BackgroundModel.rds")
+  L = readRDS(BackgroundModel.filename)  # Load the background model from a file
   Background.Regions.width = L$Background.Regions.width 
   Background.Regions = L$Background.Regions
   Background.Regions.num = L$Background.Regions.num
@@ -61,37 +61,38 @@ if( !exists("Background.Regions")) {
   WinChr = L$WinChr
   Background.RegionWindows = L$Background.RegionWindows
   Background.IndWindows = L$Background.IndWindows
-  rm(L)
+  rm(L)  # Remove the loaded object to free up memory
 }
+
 
 
 Background.Ind.Strech = 
-Background.windows = TSS.windows$type == "background" & width(TSS.windows) > 4000
+  Background.windows = TSS.windows$type == "background" & width(TSS.windows) > 4000  # Select background windows with width > 4000
 
-Background.windows.width = 5
+Background.windows.width = 5  # Set default background window width
 
-if (TargetMod == "H3K4me3-scer") { # TODO: set a cutoff for human/yeast in params
-  Background.windows = TSS.windows$type == "background" & width(TSS.windows) > 400
-  Background.windows.width = 2
+if (TargetMod == "H3K4me3-scer") {  # Check for specific target modification
+  Background.windows = TSS.windows$type == "background" & width(TSS.windows) > 400  # Adjust selection criteria
+  Background.windows.width = 2  # Adjust background window width
 }
 
-Edge.Penalty = 0
+Edge.Penalty = 0  # Initialize edge penalty
 
 
 
-getBackground = function( mu, w ) {
-  mu.genome = mu$genome
-  W = TSS.windows[w]
-  chr = as.character(chrom(W))
-  mu.chr = mu$chr[chr]
+getBackground = function(mu, w) {
+  mu.genome = mu$genome  # Extract genome-wide background signal
+  W = TSS.windows[w]  # Retrieve the windows specified by 'w'
+  chr = as.character(chrom(W))  # Get the chromosome names for the specified windows
+  mu.chr = mu$chr[chr]  # Extract the chromosome-specific background signal
   
-  mu.region = mu$region.uniq[as.numeric(Background.WindowRegion[w])]
-    
-  mu.ind = mu$ind.uniq[as.numeric(Background.WindowInd[w])]
+  mu.region = mu$region.uniq[as.numeric(Background.WindowRegion[w])]  # Extract the region-specific background signal
   
-  len = (width(W)+Edge.Penalty)/1000
-  c( ind = mu.ind*len, region = mu.region*len, chr = mu.chr*len, genome = mu.genome*len)
-} 
+  mu.ind = mu$ind.uniq[as.numeric(Background.WindowInd[w])]  # Extract the individual-specific background signal
+  
+  len = (width(W) + Edge.Penalty) / 1000  # Calculate the length of the windows, adjusted by an edge penalty, in kilobases
+  c(ind = mu.ind * len, region = mu.region * len, chr = mu.chr * len, genome = mu.genome * len)  # Combine and scale the background signals
+}
 
 
 

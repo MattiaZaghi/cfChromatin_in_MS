@@ -1,10 +1,11 @@
-# Define the directories
-dir1 <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K27ac_roadmap_hg38"
+library(dplyr)
+library(tidyverse)
 
+# Define the directories
+dir1 <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K27ac_roadmap_hg38/"
 
 # Get the list of .rdata files in each directory
 files1 <- list.files(path = dir1, pattern = "\\.rdata$", full.names = TRUE)
-
 
 # Combine the file lists
 all_files <- c(files1)
@@ -24,143 +25,123 @@ for (file in all_files) {
   data_list[[name]] <- data
 }
 
+Glossary <- read_tsv("/date/gcb/gcb_MZ/roadmap_epigenomics/Glossary.tsv")
+Group <- read_tsv("/date/gcb/gcb_MZ/roadmap_epigenomics/Group.tsv")
+Glossary_Group <- inner_join(Glossary, Group)
 
-# Get the names of the tissues
-tissues <- names(data_list)
+# Initialize an empty list to store the subsets
+subsets <- list()
 
-# Initialize the data frame with the first tissue's "Counts.QQnorm" values
-Windows_counts <- data.frame(data_list[[tissues[1]]][["Counts.QQnorm"]])
-names(Windows_counts) <- tissues[1]
+# Iterate through the dataset
+for (i in 1:nrow(Glossary_Group)) {
+  tissue <- Glossary_Group$EDACC_NAME[i]
+  groups <- strsplit(Glossary_Group$Groups[i], ";")[[1]]
+  
+  for (group in groups) {
+    if (!group %in% names(subsets)) {
+      subsets[[group]] <- c()
+    }
+    subsets[[group]] <- c(subsets[[group]], tissue)
+  }
+}
 
-# Loop over the remaining tissues in the data list
-for(tissue in tissues[-1]) {
-  # Get the "Counts.QQnorm" values for the current tissue
+# Load H3K27ac windows
+TSS.windows<-readRDS("/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Windows.rds")
+
+# Convert GRanges to data.frame
+TSS.windows <- as.data.frame(TSS.windows)
+
+# Filter the data
+filtered_TSS.windows <- TSS.windows %>%
+  filter(!grepl("^ENST", name) & name != "UNKNOWN" )%>%
+  #filter(!str_detect(tissue, ";"))  %>% 
+  filter(!is.na(name)) %>% 
+  filter(!is.na(tissue)) %>% 
+  makeGRangesFromDataFrame(keep.extra.columns = TRUE)
+
+filtered_TSS.windows <-filtered_TSS.windows[filtered_TSS.windows$type == "TSS annotate"]
+
+#filtering TSS annotated only windows to use them to generate the tissue cell_type signature 
+
+tss_counts_list <- list()
+
+for (tissue in names(data_list)) {
+  # Extract the counts for the current tissue
   counts <- data_list[[tissue]][["Counts.QQnorm"]]
   
-  # Add the counts as a new column in the data frame
-  Windows_counts[[tissue]] <- counts
+  # Convert the GRanges object to a data frame for easier manipulation
+  tss_df <- as.data.frame(filtered_TSS.windows)
+  
+  # Ensure the indices match between counts and tss_df
+  tss_indices <- which(tss_df$type == "TSS annotate")
+  
+  # Filter the counts based on the TSS regions
+  tss_counts <- counts[tss_indices]
+  
+  # Replace the Counts.QQnorm with the filtered counts
+  data_list[[tissue]][["Counts.QQnorm"]] <- tss_counts
 }
+
 
 # Initialize an empty list to store the filtered data
 filtered_data <- list()
 
-# Loop over each column in the data frame
-for(tissue in names(Windows_counts)) {
-  # Get the indices of the rows that are above 35 in the current column
-  high_indices <- which(Windows_counts[[tissue]] > 35)
-
-  # Check each of these indices against all other columns
-  for(index in high_indices) {
-    # Assume initially that the value is below 15 in all other columns
-    below_15_in_all <- TRUE
-    
-    # Check the value in the same row in all other columns
-    for(other_tissue in names(Windows_counts)) {
-      if(other_tissue != tissue) {
-        if(Windows_counts[index, other_tissue] >= 15) {
-          # If the value is not below 15 in any other column, set the flag to FALSE and break the loop
-          below_15_in_all <- FALSE
-          break
+# Loop over each subset
+for (subset in names(subsets)) {
+  tissues <- subsets[[subset]]
+  
+  # Loop over each tissue in the subset
+  for (tissue in tissues) {
+    if (!is.null(data_list[[tissue]][["Counts.QQnorm"]])) {
+      # Get the normalized signal for the tissue
+      signal <- data_list[[tissue]][["Counts.QQnorm"]]
+      
+      # Get the indices of the rows that are above 35 in the current tissue
+      high_indices <- which(signal > 35)
+      
+      # Check each of these indices against all other tissues outside the subset
+      for (index in high_indices) {
+        # Assume initially that the value is below 15 in all other tissues outside the subset
+        below_15_in_all <- TRUE
+        
+        # Check the value in the same row in all other tissues outside the subset
+        for (other_tissue in names(data_list)) {
+          if (other_tissue != tissue && !other_tissue %in% tissues && !is.null(data_list[[other_tissue]][["Counts.QQnorm"]])) {
+            if (data_list[[other_tissue]][["Counts.QQnorm"]][index] > 15) {
+              # If the value is not below 15 in any other tissue outside the subset, set the flag to FALSE and break the loop
+              below_15_in_all <- FALSE
+              break
+            }
+          }
+        }
+        
+        # If the value is below 15 in all other tissues outside the subset, add it to the filtered data for the current subset
+        if (below_15_in_all) {
+          if (is.null(filtered_data[[subset]])) {
+            filtered_data[[subset]] <- list(values = numeric(), indices = numeric())
+          }
+          filtered_data[[subset]][["values"]] <- c(filtered_data[[subset]][["values"]], signal[index])
+          filtered_data[[subset]][["indices"]] <- c(filtered_data[[subset]][["indices"]], index)
         }
       }
-    }
-    
-    # If the value is below 15 in all other columns, add it to the filtered data for the current column
-    if(below_15_in_all) {
-      if(!exists(tissue, filtered_data)) {
-        filtered_data[[tissue]] <- list()
-      }
-      filtered_data[[tissue]][["values"]] <- c(filtered_data[[tissue]][["values"]], Windows_counts[index, tissue])
-      filtered_data[[tissue]][["indices"]] <- c(filtered_data[[tissue]][["indices"]], index)
-    }
-  }
-}
-
-# Your vector
-datasets <- c("neuron","oligodendrocyte","astrocyte","oligodendrocyte_precursor_cell")
-
-
-
-# Get the names of the tissues that are in your datasets vector
-single_cells <- names(data_list)[names(data_list) %in% datasets]
-
-# Print single_cells
-print(single_cells)
-
-
-# Initialize the data frame with the first tissue's "Counts.QQnorm" values
-Windows_counts2 <- data.frame(data_list[[single_cells[1]]][["Counts.QQnorm"]])
-names(Windows_counts2) <- single_cells[1]
-
-# Loop over the remaining tissues in the data list
-for(single_cell in single_cells[-1]) {
-  # Get the "Counts.QQnorm" values for the current tissue
-  counts <- data_list[[single_cell]][["Counts.QQnorm"]]
-  
-  # Add the counts as a new column in the data frame
-  Windows_counts2[[single_cell]] <- counts
-}
-
-# Initialize an empty list to store the filtered data
-filtered_data2 <- list()
-
-# Loop over each column in the data frame
-for(single_cell in names(Windows_counts2)) {
-  # Get the indices of the rows that are above 35 in the current column
-  high_indices <- which(Windows_counts2[[single_cell]] > 35)
-  
-  # Check each of these indices against all other columns
-  for(index in high_indices) {
-    # Assume initially that the value is below 15 in all other columns
-    below_15_in_all <- TRUE
-    
-    # Check the value in the same row in all other columns
-    for(other_single_cell in names(Windows_counts2)) {
-      if(other_single_cell != single_cell) {
-        if(Windows_counts2[index, other_single_cell] >= 20) {
-          # If the value is not below 15 in any other column, set the flag to FALSE and break the loop
-          below_15_in_all <- FALSE
-          break
-        }
-      }
-    }
-    
-    # If the value is below 15 in all other columns, add it to the filtered data for the current column
-    if(below_15_in_all) {
-      if(!exists(single_cell, filtered_data2)) {
-        filtered_data2[[single_cell]] <- list()
-      }
-      filtered_data2[[single_cell]][["values"]] <- c(filtered_data2[[single_cell]][["values"]], Windows_counts[index, single_cell])
-      filtered_data2[[single_cell]][["indices"]] <- c(filtered_data2[[single_cell]][["indices"]], index)
     }
   }
 }
 
 
+# Print the filtered data
+print(filtered_data)
 
-filtered_data_final<-c(filtered_data,filtered_data2)
 
-
-# 'filtered_data' now contains the values for each column that are above 35 in the current column and below 15 in all other columns
-# Find the difference
-# Get the names of the elements in the lists
-names1 <- names(data_list)
-names2 <- names(filtered_data_final)
-
-# Find the difference in the names
-diff_names <- setdiff(names1, names2)
-
-# Print the difference in the names
-print(diff_names)
 
 
 # Initialize an empty dataframe
 df <- data.frame("signature" = character(), "window" = integer())
 
 # Loop through each tissue in the list
-for(tissue in names(filtered_data_final)){
+for(tissue in names(filtered_data)){
   # Get the indices for the current tissue
-  indices <- filtered_data_final[[tissue]][["indices"]]
+  indices <- filtered_data[[tissue]][["indices"]]
   
   # Create a temporary dataframe with the current tissue and its indices
   temp_df <- data.frame("signature" = tissue, "window" = indices)
@@ -171,82 +152,22 @@ for(tissue in names(filtered_data_final)){
 
 # Print the dataframe
 print(df)
+df<-unique(df)
 
-library(readr)
-library(dplyr)
-library(tidyverse)
-glossary<-read_delim("/date/gcb/gcb_MZ/Chrom_HMM_hg38_annotation/Glossary.txt")
+# Sort the dataset
+sorted_data <- df[order(df$signature, df$window), ]
 
+# Print the sorted dataset
+print(sorted_data)
 
-df$EDACC_NAME <- df$signature
-
-
-df<-left_join(df,glossary) %>% dplyr::select(signature,window,GROUP)
-
-# Assuming df is your dataframe and 'signature' is the column name
-df$signature <- sub("Adipose_Nuclei", "Adipose", df$signature)
-df$signature <- sub("Adult_Liver", "Liver", df$signature)
-
-df$signature <- sub("CD19_Primary_Cells_Peripheral_UW", "B-Cells", df$signature)
-df$signature <- sub("CD3_Primary_Cells_Peripheral_UW", "T-Cells", df$signature)
-df$signature <- sub("CD3_Primary_Cells_Peripheral_UW", "T-Cells", df$signature)
-df$signature <- sub("CD56_Primary_Cells", "NK-Cells", df$signature)
-df$signature <- sub("Stomach_Smooth_Muscle", "Sm.Muscle", df$signature)
-df$signature <- sub("Gastric", "Digestive", df$signature)
-df$signature <- sub("Left_Ventricle", "Heart", df$signature)
-df$signature <- sub("Fetal_Placenta", "Placenta", df$signature)
-df$signature <- sub("CD4_Naive_Primary_Cells", "T-Cells", df$signature)
-df$signature <- sub("CD4+_CD25+_CD127-_Treg_Primary_Cells", "T-Reg", df$signature)
-df$signature <- sub("NHDF-Ad_Adult_Dermal_Fibroblasts", "Epithelial", df$signature)
-df$signature <- sub("Right_Atrium", "Heart", df$signature)
-df$signature <- sub("Skeletal_Muscle_Female", "Muscle", df$signature)
-df$signature <- sub("CD4+_CD25-_Th_Primary_Cells", "T-Helper", df$signature)
-df$signature <- sub("CD8_Naive_Primary_Cells", "T-Cells", df$signature)
-df$signature <- sub("CD8_Memory_Primary_Cells", "T-Cells", df$signature)
-df$signature <- sub("Placenta_Amnion", "Placenta", df$signature)
-df$signature <- sub("NHEK-Epidermal_Keratinocytes", "Epithelial", df$signature)
-df$signature <- sub("CD4+_CD25-_CD45RO+_Memory_Primary_Cells", "T-Cells", df$signature)
-df$signature <- sub("Pancreas", "Pancreas", df$signature)
-df$signature <- sub("Pancreatic_Islets", "Pancreas", df$signature)
-df$signature <- sub("Psoas_Muscle", "Muscle", df$signature)
-df$signature <- sub("Rectal_Smooth_Muscle", "Sm.Muscle", df$signature)
-df$signature <- sub("Right_Ventricle", "Heart", df$signature)
-df$signature <- sub("Rectal_Mucosa.Donor_29", "Digestive", df$signature)
-df$signature <- sub("Rectal_Mucosa.Donor_31", "Digestive", df$signature)
-df$signature <- sub("Colonic_Mucosa", "Digestive", df$signature)
-df$signature <- sub("Esophagus", "Digestive", df$signature)
-df$signature <- sub("Sigmoid_Colon", "Digestive", df$signature)
-df$signature <- sub("Peripheral_Blood_Mononuclear_Primary_Cells", "PBMCs", df$signature)
-
-# Define the entries you want to replace
-entries_to_replace <- c("CD4+_CD25-_CD45RA+_Naive_Primary_Cells", 
-                        "CD4+_CD25-_CD45RO+_Memory_Primary_Cells", 
-                        "CD4+_CD25-_IL17-_PMA-Ionomycin_stimulated_MACS_purified_Th_Primary_Cells", 
-                        "CD4+_CD25-_IL17+_PMA-Ionomcyin_stimulated_Th17_Primary_Cells", 
-                        "CD4+_CD25-_Th_Primary_Cells", 
-                        "CD4+_CD25+_CD127-_Treg_Primary_Cells", 
-                        "CD4+_CD25int_CD127+_Tmem_Primary_Cells")
-
-# Replace the entries in the 'signature' column
-df$signature[df$signature %in% entries_to_replace] <- "T-cells"
-
-entries_to_replace <- c("CD14_Primary_Cells","Monocytes-CD14+_RO01746")
-
-# Replace the entries in the 'signature' column
-df$signature[df$signature %in% entries_to_replace] <- "Monocytes"
-
-print(unique(df$signature))
-
-df<-df %>% dplyr::select(signature,window)
-
-write_csv(df,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Win-sig.csv")
+write_csv(sorted_data,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Win-sig.csv")
 
 win_sig<- list()
 # Create a vector with all values set to 0
-zero_vector <- rep(0, length(unique(df$signature)))
+zero_vector <- rep(0, length(unique(sorted_data$signature)))
 
 # Get the names from the 'window' element
-names_vector <- unique(df$signature)
+names_vector <- unique(sorted_data$signature)
 
 # Create a named vector with all values set to 0
 zero_vector <- setNames(rep(0, length(names_vector)), names_vector)
@@ -254,5 +175,36 @@ zero_vector <- setNames(rep(0, length(names_vector)), names_vector)
 win_sig[["avg"]] <- zero_vector
 win_sig[["var"]] <- zero_vector
 
-saveRDS(win_sig2,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Win-sig.rds")
+saveRDS(win_sig,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Win-sig.rds")
+
+tss_indices <- sorted_data$window
+
+TSS.windows_TSS<-TSS.windows[tss_indices]%>% as.data.frame()
+
+TSS.windows_TSS<-filtered_TSS.windows_TSS %>% dplyr::select(name,tissue) %>% unique()
+
+combined_df<-cbind(TSS.windows_TSS,sorted_data)
+#transfer the cell type signature from K4me3 to hg19 
+
+# Load H3K4me3 windows
+TSS.windows<-readRDS("/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K4me3/Windows.csv")
+
+Win_sig<-read.csv("/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K4me3/Win-sig.csv")
+
+tss_indices <-Win_sig$window
+
+filtered_TSS.windows_TSS<-TSS.windows[tss_indices] 
+
+library(rtracklayer)
+library(easylift)
+library(plyranges)
+
+genome(TSS.windows_hg19) <- "hg19"
+
+# replace "hg38" with the target genome assembly
+# replace "path/to/your/hg19ToHg38.over.chain.gz" with the path to your chain file
+TSS.windows_hg38 <- easylift(TSS.windows_hg19, to = "hg38", chain = "/date/gcb/gcb_MZ/hg19ToHg38.over.chain")
+
+
+
 

@@ -31,9 +31,18 @@ source("/home/mattia/cfChromatin_in_MS/cfChromatin_fun.R")
 
 ###### TSS
 # Catalog part 1
-windows <- load_catalog(annotation_dir = annotation_dir_path,glossary = glossary_path, glossary_group = "ANATOMY", states = c("1_TssA", "2_TssAFlnk"))
+windows<- load_catalog(annotation_dir = annotation_dir_path,glossary = glossary_path, glossary_group = "ANATOMY", states = c("1_TssA", "2_TssAFlnk"))
+windows_enh<- load_catalog(annotation_dir = annotation_dir_path,glossary = glossary_path, glossary_group = "ANATOMY", states = c("6_EnhG","7_Enh"))
 # Catalog part 2 & 3
 windows <- annotate_catalog(windows, feature_tag = "TSS", db = list('UCSC'=TxDb.Hsapiens.UCSC.hg38.knownGene, 'Ensembl'=EnsDb.Hsapiens.v86), db_gap = 2500, db_spe = TRUE, db_tag = "EXTRA_TSS", db_spe_center = 3000)
+#select TSS bigger than 3kb and smallrt than 200bp
+# Filter ranges larger than 3kb
+windows_3kb <- subset(windows, width(windows) > 3000) %>% as.data.frame()
+
+# Filter ranges smaller than 200bp
+windows_200bp <- subset(windows, width(windows) < 200) %>% as.data.frame()
+
+
 # Catalog part 4
 windows <- add_flank(windows, feature_tag = "FLANKING", flanking_size = 1000)
 windows <- add_background(windows, feature_tag = "BACKGROUND", bin_size = 5000)

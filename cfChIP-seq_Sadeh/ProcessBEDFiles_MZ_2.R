@@ -11,9 +11,9 @@ suppressMessages(library(tools))
 suppressMessages(library(ggplot2))
 
 SourceDIR <-"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/"
-SetupDIR<-"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/"
+SetupDIR<-"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K4me3_ref/"
 RootDir =  "/date/gcb/gcb_MZ/Analysis/"
-TargetMod="H3K27ac_hg38"
+TargetMod="H3K4me3_ref"
 DataDir = paste0(RootDir, "Samples/", TargetMod, "/")
 BedDir = paste0(RootDir, "BED/", TargetMod, "/")
 

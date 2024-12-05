@@ -1,0 +1,10 @@
+{
+    "18070-P-SP": {
+        "H3K27ac": {
+            "ChIP": [
+                "/date/gcb/gcb_MZ/P32456/files/P32456/P32456_2005/02-FASTQ/20240904_LH00217_0121_A22MLLCLT3/P32456_2005_S120_L004_R2_001.fastq.gz",
+                "/date/gcb/gcb_MZ/P32456/files/P32456/P32456_2005/02-FASTQ/20240904_LH00217_0121_A22MLLCLT3/P32456_2005_S120_L004_R1_001.fastq.gz"
+            ]
+        }
+    }
+}

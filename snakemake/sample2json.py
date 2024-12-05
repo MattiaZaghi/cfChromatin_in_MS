@@ -65,5 +65,5 @@ print("------------------------------------------")
 print("Check the samples.json file for fastqs belonging to each sample")
 print()
 js = json.dumps(FILES, indent=4, sort_keys=True)
-with open('samples_chip2.json', 'w') as outfile:
+with open('samples_dag.json', 'w') as outfile:
     outfile.write(js)
