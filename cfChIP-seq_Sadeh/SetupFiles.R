@@ -16,9 +16,9 @@ if(!any(grepl("--interactive", initial.options))) {
 } else {
   # If in interactive mode, set the source and data directories explicitly for development purposes.
   SourceDIR = "/date/gcb/gcb_MZ/Analysis/cfChIP-seq/"
-  Mod="H3K27ac_single_cell"
+  Mod="H3K27ac_hg38"
   DataDir = paste0(SourceDIR, "SetupFiles/", Mod,"/")
-  TargetMod = "H3K27ac_single_cell"  # Specify the target modification for analysis.
+  TargetMod = "H3K27ac_hg38"  # Specify the target modification for analysis.
 }
 
 # Load necessary libraries, suppressing warnings that might arise during loading.
@@ -39,7 +39,7 @@ genome.seqinfo = seqinfo(TSS.windows)
 # Define a list of chromosomes to be analyzed.
 ChrList = paste0("chr", c(1:22,"X", "Y"))
 # If the target modification is H3K27ac, adjust the chromosome list based on the hg38 genome.
-if(TargetMod == "H3K27ac_single_cell") {
+if(TargetMod == "H3K27ac_hg38") {
   hg38.seqinfo = Seqinfo(genome="hg38")
   ChrList = (seqnames(hg38.seqinfo))
 }

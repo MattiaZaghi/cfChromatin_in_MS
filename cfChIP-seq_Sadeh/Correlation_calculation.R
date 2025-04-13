@@ -2,6 +2,7 @@ suppressMessages(library(rtracklayer))
 suppressMessages(library(tools))
 suppressMessages(library(ggplot2))
 suppressMessages(library(corrplot))
+suppressMessages(library(reshape2))
 # Define a custom function 'catn' that behaves like 'cat' but appends a newline at the end of the output.
 catn = function(...) { cat(...,"\n") }
 
@@ -105,7 +106,7 @@ files_ref <- list.files(path = file_paths_ref, pattern = "*rdata$", full.names =
 files_ref  <- files_ref [!grepl("_H3K4me3_ChIP", files_ref)]
 # Use grep to get the indices of files that start with 'H'
 files_ref  <- files_ref[c(4:25,36)]
-file_paths_samples <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K27ac_hg38"
+file_paths_samples <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K27ac_hg38/plasma"
 
 files_samples <- list.files(path = file_paths_samples, pattern = "*_ChIP.rdata$", full.names = TRUE)
 files_samples <-files_samples[c(2,4:6,8,10,22:26,31)]
@@ -124,6 +125,13 @@ names <- sub("_H3K27ac_ChIP.rdata$", "", base_names)
 # Extract the first part of each name
 shortened_names <- sub("([^-_+]+).*", "\\1", names)
 
+# Replace "banana" with "blueberry"
+shortened_names[shortened_names  == "14"] <- "14131"
+shortened_names[shortened_names  == "12"] <- "12179"
+shortened_names[shortened_names  == "CD4"] <- "T-cells CD4"
+shortened_names[shortened_names  == "CD3"] <- "T-cells"
+shortened_names[shortened_names  == "CD56"] <- "NK"
+shortened_names[shortened_names  == "CD8"] <- "T-cells CD8"
 # Assign names to the list elements
 names(data_list) <- shortened_names
 # Create a vector of bed file paths
@@ -173,9 +181,35 @@ gene_counts_df<-gene_counts_df[rownames(gene_counts_df) != "UNKNOWN", ]
 # Assuming norm_counts is your matrix of normalized counts
 correlation_matrix <- cor(norm_counts)
 
-# Create the correlation plot with squares and positive values in red
-corrplot(correlation_matrix, method = "color", col = colorRampPalette(c("blue", "white", "red"))(200), tl.cex = 0.8)
+# Melt the matrix into long format
+cor_data <- melt(correlation_matrix)
 
+# Define custom color palette
+col_palette <- colorRampPalette(c("blue", "white", "red"))(200)
+
+# Calculate the number of variables for scaling the legend
+num_vars <- nrow(correlation_matrix)
+
+# Plot using ggplot2
+ggplot(cor_data, aes(Var1, Var2, fill = value)) +
+  geom_tile(color = "white") + # Add white borders for aesthetics
+  scale_fill_gradientn(colors = col_palette, limits = c(0.998, 1), 
+                       name = "Correlation", 
+                       guide = guide_colorbar(barwidth = num_vars * 1, barheight = 1)) + # Adjust legend length
+  theme_minimal() + 
+  theme(axis.text.x = element_text(size = 12, angle = 45, hjust = 1), # Increase x-axis text size
+        axis.text.y = element_text(size = 12), # Increase y-axis text size
+        axis.title.x = element_text(size = 14), # Increase x-axis title size
+        axis.title.y = element_text(size = 14), # Increase y-axis title size
+        legend.position = "bottom", # Move legend to the bottom
+        legend.direction = "horizontal",
+        legend.text = element_text(size = 14),
+        legend.axis.line = element_blank(),
+        legend.title = element_blank(),# Remove legend axis line
+        panel.grid = element_blank(), # Remove grid lines for a cleaner look
+        panel.border = element_rect(color = "black", fill = NA)) + # Add border for corrplot style
+  labs(x = "", y = "", title = "") +
+  coord_fixed()# Keep aspect ratio square
 
 # Assuming H1, H2, H3, and H4 are your objects with gene counts
 gene_counts_list <- lapply(data_list, function(x) x$Counts.QQnorm)
@@ -190,8 +224,24 @@ norm_counts <- as.matrix(gene_counts_df)
 # Assuming norm_counts is your matrix of normalized counts
 correlation_matrix <- cor(norm_counts)
 
-# Create the correlation plot with squares and positive values in red
-corrplot(correlation_matrix, method = "color", col = colorRampPalette(c("blue", "white", "red"))(200), tl.cex = 0.8)
+# Define a refined color palette
+col_palette <- colorRampPalette(c("blue", "white", "red"))(200)
+
+# Create the correlation plot
+corrplot(correlation_matrix, 
+         method = "square",  # Use squares for the plot
+         col = col_palette, 
+         tl.cex = 0.8,       # Text label size
+         tl.col = "black",   # Text label color
+         addgrid.col = "grey", # Grid color
+         title = "Correlation Matrix", # Add a title
+         mar = c(0, 0, 1, 0), # Adjust margins to fit the title
+         cl.pos = "b",       # Position of color legend
+         cl.cex = 0.8,       # Size of color legend text
+         sig.level = 0.05,   # Significance level
+         insig = "blank",    # Insignificant correlations are left blank
+         tl.srt = 45)        # Rotate text labels for better readability
+
 
 library(S4Vectors)
 

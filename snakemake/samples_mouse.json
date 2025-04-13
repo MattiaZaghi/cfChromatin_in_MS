@@ -1,5 +1,5 @@
 {
-    "07068-P-MS-Rituximab-Stable": {
+    "07068_P_MS_Rituximab_Stable": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1001/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1001_S1_L002_R2_001.fastq.gz",
@@ -7,7 +7,7 @@
             ]
         }
     },
-    "H10-P-Ctrl": {
+    "H10_P_Ctrl_H3K27ac": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1027/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1027_S26_L002_R2_001.fastq.gz",
@@ -15,7 +15,7 @@
             ]
         }
     },
-    "H11-P-Ctrl": {
+    "H11_P_Ctrl_H3K27ac": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1028/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1028_S27_L002_R1_001.fastq.gz",
@@ -23,7 +23,7 @@
             ]
         }
     },
-    "H12-P-Ctrl": {
+    "H12_P_Ctrl_H3K27ac": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1029/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1029_S28_L002_R1_001.fastq.gz",
@@ -31,7 +31,7 @@
             ]
         }
     },
-    "H13-P-Ctrl": {
+    "H13_P_Ctrl_H3K27ac": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1030/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1030_S29_L002_R2_001.fastq.gz",
@@ -39,7 +39,7 @@
             ]
         }
     },
-    "H14-P-Ctrl": {
+    "H14_P_Ctrl_H3K27ac": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_2004/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_2004_S43_L002_R1_001.fastq.gz",
@@ -47,7 +47,7 @@
             ]
         }
     },
-    "H15-P-Ctrl": {
+    "H15_P_Ctrl_H3K27ac": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1032/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1032_S30_L002_R1_001.fastq.gz",
@@ -55,7 +55,7 @@
             ]
         }
     },
-    "H16-P-Ctrl": {
+    "H16_P_Ctrl_H3K27ac": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1033/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1033_S31_L002_R2_001.fastq.gz",
@@ -63,7 +63,7 @@
             ]
         }
     },
-    "H17-P-Ctrl": {
+    "H17_P_Ctrl_H3K27ac": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1035/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1035_S33_L002_R1_001.fastq.gz",
@@ -71,7 +71,7 @@
             ]
         }
     },
-    "H18-P-Ctrl": {
+    "H18_P_Ctrl_H3K27ac": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1036/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1036_S34_L002_R1_001.fastq.gz",
@@ -79,7 +79,7 @@
             ]
         }
     },
-    "H19-P-Ctrl": {
+    "H19_P_Ctrl_H3K27ac": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1037/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1037_S35_L002_R2_001.fastq.gz",
@@ -87,7 +87,7 @@
             ]
         }
     },
-    "H20-P-Ctrl": {
+    "H20_P_Ctrl_H3K27ac": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1038/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1038_S36_L002_R1_001.fastq.gz",
@@ -95,7 +95,7 @@
             ]
         }
     },
-    "H21-P-Ctrl": {
+    "H21_P_Ctrl_H3K27ac": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1039/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1039_S37_L002_R1_001.fastq.gz",
@@ -103,7 +103,7 @@
             ]
         }
     },
-    "H22-P-Ctrl": {
+    "H22_P_Ctrl_H3K27ac": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1040/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1040_S38_L002_R2_001.fastq.gz",
@@ -111,7 +111,7 @@
             ]
         }
     },
-    "H23-P-Ctrl": {
+    "H23_P_Ctrl_H3K27ac": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1041/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1041_S39_L002_R1_001.fastq.gz",
@@ -119,7 +119,7 @@
             ]
         }
     },
-    "H24-P-Ctrl": {
+    "H24_P_Ctrl_H3K27ac": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_2001/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_2001_S40_L002_R2_001.fastq.gz",
@@ -127,7 +127,7 @@
             ]
         }
     },
-    "H5-P-Ctrl": {
+    "H5_P_Ctrl_H3K27ac": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1023/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1023_S23_L002_R1_001.fastq.gz",
@@ -135,7 +135,7 @@
             ]
         }
     },
-    "H6-P-Ctrl": {
+    "H6_P_Ctrl_H3K27ac": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1024/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1024_S24_L002_R2_001.fastq.gz",
@@ -143,7 +143,7 @@
             ]
         }
     },
-    "H7-P-Ctrl": {
+    "H7_P_Ctrl_H3K27ac": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1025/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1025_S1_L002_R2_001.fastq.gz",
@@ -151,7 +151,7 @@
             ]
         }
     },
-    "H9-P-Ctrl": {
+    "H9_P_Ctrl_H3K27ac": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1026/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1026_S25_L002_R1_001.fastq.gz",
@@ -159,7 +159,7 @@
             ]
         }
     },
-    "P12179-P-MS-Rituximab-Prog": {
+    "P12179_P_MS_Rituximab_Prog": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1012/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1012_S12_L002_R1_001.fastq.gz",
@@ -167,7 +167,7 @@
             ]
         }
     },
-    "P14020-P-MS-Rituximab-Stable": {
+    "P14020_P_MS_Rituximab_Stable": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1004/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1004_S4_L002_R2_001.fastq.gz",
@@ -175,7 +175,7 @@
             ]
         }
     },
-    "P14131-P-MS-Rituximab-Stable": {
+    "P14131_P_MS_Rituximab_Stable": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1010/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1010_S10_L002_R2_001.fastq.gz",
@@ -183,7 +183,7 @@
             ]
         }
     },
-    "P14229-P-MS-Rituximab-Stable": {
+    "P14229_P_MS_Rituximab_Stable": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1009/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1009_S9_L002_R1_001.fastq.gz",
@@ -191,7 +191,7 @@
             ]
         }
     },
-    "P14245-P-MS-Rituximab-Stable": {
+    "P14245_P_MS_Rituximab_Stable": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1002/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1002_S2_L002_R1_001.fastq.gz",
@@ -199,7 +199,7 @@
             ]
         }
     },
-    "P15024-P-MS-Rituximab-Stable": {
+    "P15024_P_MS_Rituximab_Stable": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1003/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1003_S3_L002_R2_001.fastq.gz",
@@ -207,7 +207,7 @@
             ]
         }
     },
-    "P15041-P-MS-Rituximab-Stable": {
+    "P15041_P_MS_Rituximab_Stable": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1005/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1005_S5_L002_R2_001.fastq.gz",
@@ -215,7 +215,7 @@
             ]
         }
     },
-    "P16186-P-MS-Rituximab-Stable": {
+    "P16186_P_MS_Rituximab_Stable": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1014/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1014_S14_L002_R2_001.fastq.gz",
@@ -223,7 +223,7 @@
             ]
         }
     },
-    "P18070-P-MS-Rituximab-Prog": {
+    "P18070_P_MS_Rituximab_Prog": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1013/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1013_S13_L002_R1_001.fastq.gz",
@@ -231,7 +231,7 @@
             ]
         }
     },
-    "P18075-P-MS-Rituximab-Prog": {
+    "P18075_P_MS_Rituximab_Prog": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1011/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1011_S11_L002_R1_001.fastq.gz",
@@ -239,7 +239,7 @@
             ]
         }
     },
-    "P20015-P-Ctrl": {
+    "P20015_P_Ctrl": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1019/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1019_S19_L002_R2_001.fastq.gz",
@@ -247,7 +247,7 @@
             ]
         }
     },
-    "P20027-P-Ctrl": {
+    "P20027_P_Ctrl": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1020/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1020_S20_L002_R2_001.fastq.gz",
@@ -255,7 +255,7 @@
             ]
         }
     },
-    "P20030-P-Ctrl": {
+    "P20030_P_Ctrl": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1021/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1021_S21_L002_R1_001.fastq.gz",
@@ -263,7 +263,7 @@
             ]
         }
     },
-    "P20040-P-Ctrl": {
+    "P20040_P_Ctrl": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1022/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1022_S22_L002_R1_001.fastq.gz",
@@ -271,7 +271,7 @@
             ]
         }
     },
-    "P24116-P-MS-New-RR": {
+    "P24116_P_MS_New_RR": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1006/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1006_S6_L002_R2_001.fastq.gz",
@@ -279,7 +279,7 @@
             ]
         }
     },
-    "P24117-P-MS-New-RR": {
+    "P24117_P_MS_New_RR": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1007/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1007_S7_L002_R2_001.fastq.gz",
@@ -287,7 +287,7 @@
             ]
         }
     },
-    "P24118-P-MS-New-RR": {
+    "P24118_P_MS_New_RR": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1008/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1008_S8_L002_R2_001.fastq.gz",
@@ -295,7 +295,7 @@
             ]
         }
     },
-    "P24126-P-MS-New-RR": {
+    "P24126_P_MS_New_RR": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1015/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1015_S15_L002_R1_001.fastq.gz",
@@ -303,7 +303,7 @@
             ]
         }
     },
-    "P24132-P-MS-New-RR": {
+    "P24132_P_MS_New_RR": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_1016/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_1016_S16_L002_R1_001.fastq.gz",
@@ -311,7 +311,7 @@
             ]
         }
     },
-    "P24134-P-MS-New-RR": {
+    "P24134_P_MS_New_RR": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_2002/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_2002_S41_L002_R2_001.fastq.gz",
@@ -319,7 +319,7 @@
             ]
         }
     },
-    "P24136-P-MS-New-RR": {
+    "P24136_P_MS_New_RR": {
         "H3K27ac": {
             "ChIP": [
                 "/date/gcb/gcb_MZ/P34608/files/P34608/P34608_2003/02-FASTQ/20250312_LH00217_0175_A22YMFNLT3/P34608_2003_S42_L002_R2_001.fastq.gz",

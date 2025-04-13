@@ -1,5 +1,5 @@
 # proj parameters
-RUN_ID: "Combat_MS_CSF_hg19" # "RUN_id"
+RUN_ID: "cfChromatin_CombatMS_pA_trim" # "RUN_id"
 THREADS: 5
 # trimming
 adapters: "/home/mattia/Trimmomatic/adapters/NebNext_adpters.fa"
@@ -19,12 +19,12 @@ Methylation: 'H3K36me3'
 Polycomb: 'H3K27me3'
 Ref_Acetylation: 'H3K27ac_ref'
 #index Bowtie2
-index_bt2_hg: "/home/mattia/Genomes/hg19/fa/hg19"
+index_bt2_hg: "/home/mattia/Genomes/hg38/fa/hg38"
 #downsample target
 target_reads: "5000000"
 # Path to a JSON file with samples and their corresponding FASTQ files.
 SAMPLES: '/home/mattia/cfChromatin_in_MS/snakemake/SRR.txt'
-SAMPLES_JSON: '/home/mattia/cfChromatin_in_MS/snakemake/samples_dag.json'
+SAMPLES_JSON: '/home/mattia/cfChromatin_in_MS/snakemake/samples_chip.json'
 
 # Set the location of your Snakemake log files
 log: snakemake.log

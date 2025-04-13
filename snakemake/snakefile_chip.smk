@@ -61,60 +61,20 @@ TARGETS.extend(BED_DEDUP)
 
 
 
-ruleorder: merge_fastq_4 >  merge_fastq_2 > merge_fastq >  trimming_trimmomatic >  aligning_bowtie2 >  sorted_samtools > dedup_picard > coverage_deeptools > insertsize_picard > bam_to_bed > bam_to_bed_dedup
+ruleorder: trimming_trimmomatic >  aligning_bowtie2 >  sorted_samtools > dedup_picard > coverage_deeptools > insertsize_picard > bam_to_bed > bam_to_bed_dedup
 
 
 
 
 rule all:
     input: TARGETS
-
 def get_fastq_files(wildcards):
     files = FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]]
-    if len(files) == 4:
-        return "merge_fastq_4"
-    elif len(files) == 2:
-        return "merge_fastq_2"
-
-rule merge_fastq_4:
-    input:
-        fq_1_L001=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][1],
-        fq_1_L002=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][2],
-        fq_2_L001=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][0],
-        fq_2_L002=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][3]
-    output:
-        R1=temp("{myrun}/cat/{sample}_R1.fastq"),
-        R2=temp("{myrun}/cat/{sample}_R2.fastq")
-    threads: config['THREADS']
-    shell:
-        """
-        gunzip -c {input.fq_1_L001} {input.fq_1_L002} > {output.R1}
-        gunzip -c {input.fq_2_L001} {input.fq_2_L002} > {output.R2}
-        """
-
-rule merge_fastq_2:
-    input:
-        fq_1=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][1],
-        fq_2=lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][0]
-    output:
-        R1=temp("{myrun}/cat/{sample}_R1.fastq"),
-        R2=temp("{myrun}/cat/{sample}_R2.fastq")
-    threads: config['THREADS']
-    shell:
-        """
-        gunzip -c {input.fq_1} > {output.R1}
-        gunzip -c {input.fq_2} > {output.R2}
-        """
-
-rule merge_fastq:
-    input: rules=get_fastq_files
-
-
 
 rule trimming_trimmomatic:  
     input:
-        R1       = "{myrun}/cat/{sample}_R1.fastq", 
-        R2       = "{myrun}/cat/{sample}_R2.fastq",
+        R1       = lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][1], 
+        R2       = lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][0],
         adapters = config['adapters'] #"adapters/trimmomatic/adapters-pe.fa"
     output:
         Paired1       = temp("{myrun}/trimmed/trimmomatic/{sample}_R1_paired.fastq"),
