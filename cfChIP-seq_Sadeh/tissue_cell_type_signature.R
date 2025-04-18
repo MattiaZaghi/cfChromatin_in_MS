@@ -2,7 +2,7 @@ library(dplyr)
 library(tidyverse)
 
 # Define the directories
-dir1 <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K27ac_roadmap_hg38/"
+dir1 <- "/date/gcb/gcb_MZ/Analysis/Samples/"
 
 # Get the list of .rdata files in each directory
 files1 <- list.files(path = dir1, pattern = "\\.rdata$", full.names = TRUE)
@@ -46,7 +46,7 @@ for (i in 1:nrow(Glossary_Group)) {
 }
 
 # Load H3K27ac windows
-TSS.windows<-readRDS("/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Windows.rds")
+TSS.windows<-readRDS("/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac/Windows.rds")
 
 # Convert GRanges to data.frame
 TSS.windows <- as.data.frame(TSS.windows)
@@ -160,7 +160,7 @@ sorted_data <- df[order(df$signature, df$window), ]
 # Print the sorted dataset
 print(sorted_data)
 
-write_csv(sorted_data,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Win-sig.csv")
+write_csv(sorted_data,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac/Win-sig.csv")
 
 win_sig<- list()
 # Create a vector with all values set to 0
@@ -175,7 +175,7 @@ zero_vector <- setNames(rep(0, length(names_vector)), names_vector)
 win_sig[["avg"]] <- zero_vector
 win_sig[["var"]] <- zero_vector
 
-saveRDS(win_sig,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Win-sig.rds")
+saveRDS(win_sig,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac/Win-sig.rds")
 
 tss_indices <- sorted_data$window
 
