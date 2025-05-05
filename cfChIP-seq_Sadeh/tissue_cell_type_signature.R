@@ -2,7 +2,7 @@ library(dplyr)
 library(tidyverse)
 
 # Define the directories
-dir1 <- "/date/gcb/gcb_MZ/Analysis/Samples/"
+dir1 <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K27ac_roadmap_hg38/"
 
 # Get the list of .rdata files in each directory
 files1 <- list.files(path = dir1, pattern = "\\.rdata$", full.names = TRUE)
@@ -46,43 +46,14 @@ for (i in 1:nrow(Glossary_Group)) {
 }
 
 # Load H3K27ac windows
-TSS.windows<-readRDS("/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac/Windows.rds")
-
-# Convert GRanges to data.frame
-TSS.windows <- as.data.frame(TSS.windows)
-
-# Filter the data
-filtered_TSS.windows <- TSS.windows %>%
-  filter(!grepl("^ENST", name) & name != "UNKNOWN" )%>%
-  #filter(!str_detect(tissue, ";"))  %>% 
-  filter(!is.na(name)) %>% 
-  filter(!is.na(tissue)) %>% 
-  makeGRangesFromDataFrame(keep.extra.columns = TRUE)
-
-filtered_TSS.windows <-filtered_TSS.windows[filtered_TSS.windows$type == "TSS annotate"]
-
-#filtering TSS annotated only windows to use them to generate the tissue cell_type signature 
-
-tss_counts_list <- list()
-
-for (tissue in names(data_list)) {
-  # Extract the counts for the current tissue
-  counts <- data_list[[tissue]][["Counts.QQnorm"]]
-  
-  # Convert the GRanges object to a data frame for easier manipulation
-  tss_df <- as.data.frame(filtered_TSS.windows)
-  
-  # Ensure the indices match between counts and tss_df
-  tss_indices <- which(tss_df$type == "TSS annotate")
-  
-  # Filter the counts based on the TSS regions
-  tss_counts <- counts[tss_indices]
-  
-  # Replace the Counts.QQnorm with the filtered counts
-  data_list[[tissue]][["Counts.QQnorm"]] <- tss_counts
-}
+TSS.windows<-readRDS("/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_roadmap_hg38/Windows.rds")
 
 
+# Convert the GRanges object to a data frame for easier manipulation
+tss_df <- as.data.frame(TSS.windows)
+
+# Ensure the indices match between counts and tss_df
+tss_indices <- which((tss_df$type == "TSS" | tss_df$type == "EXTRA_TSS") & !grepl("^ENST", tss_df$name) & tss_df$name != "UNKNOWN")
 # Initialize an empty list to store the filtered data
 filtered_data <- list()
 
@@ -96,8 +67,15 @@ for (subset in names(subsets)) {
       # Get the normalized signal for the tissue
       signal <- data_list[[tissue]][["Counts.QQnorm"]]
       
+      # Ensure the indices match between counts and tss_df
+      tss_indices <- which((tss_df$type == "TSS" | tss_df$type == "EXTRA_TSS") & !grepl("^ENST", tss_df$name) & tss_df$name != "UNKNOWN")
+      
       # Get the indices of the rows that are above 35 in the current tissue
       high_indices <- which(signal > 35)
+      
+      
+      # Further subset high_indices based on TSS regions
+      high_indices <- intersect(high_indices, tss_indices)
       
       # Check each of these indices against all other tissues outside the subset
       for (index in high_indices) {
@@ -134,7 +112,6 @@ print(filtered_data)
 
 
 
-
 # Initialize an empty dataframe
 df <- data.frame("signature" = character(), "window" = integer())
 
@@ -160,7 +137,7 @@ sorted_data <- df[order(df$signature, df$window), ]
 # Print the sorted dataset
 print(sorted_data)
 
-write_csv(sorted_data,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac/Win-sig.csv")
+write_csv(sorted_data,"/proj/user/mattia/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Win-sig.csv")
 
 win_sig<- list()
 # Create a vector with all values set to 0
@@ -175,36 +152,12 @@ zero_vector <- setNames(rep(0, length(names_vector)), names_vector)
 win_sig[["avg"]] <- zero_vector
 win_sig[["var"]] <- zero_vector
 
-saveRDS(win_sig,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac/Win-sig.rds")
+saveRDS(win_sig,"/proj/user/mattia/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Win-sig.rds")
 
 tss_indices <- sorted_data$window
 
-TSS.windows_TSS<-TSS.windows[tss_indices]%>% as.data.frame()
+TSS.windows_TSS<-TSS.windows[tss_indices] %>% as.data.frame()
 
 TSS.windows_TSS<-filtered_TSS.windows_TSS %>% dplyr::select(name,tissue) %>% unique()
 
 combined_df<-cbind(TSS.windows_TSS,sorted_data)
-#transfer the cell type signature from K4me3 to hg19 
-
-# Load H3K4me3 windows
-TSS.windows<-readRDS("/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K4me3/Windows.csv")
-
-Win_sig<-read.csv("/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K4me3/Win-sig.csv")
-
-tss_indices <-Win_sig$window
-
-filtered_TSS.windows_TSS<-TSS.windows[tss_indices] 
-
-library(rtracklayer)
-library(easylift)
-library(plyranges)
-
-genome(TSS.windows_hg19) <- "hg19"
-
-# replace "hg38" with the target genome assembly
-# replace "path/to/your/hg19ToHg38.over.chain.gz" with the path to your chain file
-TSS.windows_hg38 <- easylift(TSS.windows_hg19, to = "hg38", chain = "/date/gcb/gcb_MZ/hg19ToHg38.over.chain")
-
-
-
-

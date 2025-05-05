@@ -7,12 +7,17 @@ P15041-P-MS-Rituximab-Stable	P34608_1005	H3K27ac	ChIP	narrow	human
 P24116-P-MS-New-RR	P34608_1006	H3K27ac	ChIP	narrow	human
 P24117-P-MS-New-RR	P34608_1007	H3K27ac	ChIP	narrow	human
 P24118-P-MS-New-RR	P34608_1008	H3K27ac	ChIP	narrow	human
-P14229-P-MS-Rituximab-Stable	P34608_1009	H3K27ac	ChIP	narrow	human
-P14131-P-MS-Rituximab-Stable	P34608_1010	H3K27ac	ChIP	narrow	human
-P18075-P-MS-Rituximab-Prog	P34608_1011	H3K27ac	ChIP	narrow	human
-P12179-P-MS-Rituximab-Prog	P34608_1012	H3K27ac	ChIP	narrow	human
-P18070-P-MS-Rituximab-Prog	P34608_1013	H3K27ac	ChIP	narrow	human
+P14229-P-MS-Rituximab-Stable-pA	P34608_1009	H3K27ac	ChIP	narrow	human
+P14131-P-MS-Rituximab-Stable-pA	P34608_1010	H3K27ac	ChIP	narrow	human
+P18075-P-MS-Rituximab-Prog-pA	P34608_1011	H3K27ac	ChIP	narrow	human
+P12179-P-MS-Rituximab-Prog-pA	P34608_1012	H3K27ac	ChIP	narrow	human
+P18070-P-MS-Rituximab-Prog-pA	P34608_1013	H3K27ac	ChIP	narrow	human
 P16186-P-MS-Rituximab-Stable	P34608_1014	H3K27ac	ChIP	narrow	human
+18070-P-MS-Rituximab-Progressive	P32456_2005	H3K27ac	ChIP	narrow	human
+12179-P-MS-Rituximab-Progressive	P32456_1010	H3K27ac	ChIP	narrow	human
+14229-P-MS-Rituximab-Stable P32456_1011	H3K27ac	ChIP	narrow	human
+14131-P-MS-Rituximab-Stable	P32456_1012	H3K27ac	ChIP	narrow	human
+18075-P-MS-Rituximab-Progressive	P32456_1009	H3K27ac	ChIP	narrow	human
 P24126-P-MS-New-RR	P34608_1015	H3K27ac	ChIP	narrow	human
 P24132-P-MS-New-RR	P34608_1016	H3K27ac	ChIP	narrow	human
 P24134-P-MS-New-RR	P34608_2002	H3K27ac	ChIP	narrow	human
@@ -40,5 +45,5 @@ H21-P-Ctrl	P34608_1039	H3K27ac	ChIP	narrow	human
 H22-P-Ctrl	P34608_1040	H3K27ac	ChIP	narrow	human
 H23-P-Ctrl	P34608_1041	H3K27ac	ChIP	narrow	human
 H24-P-Ctrl	P34608_2001	H3K27ac	ChIP	narrow	human
-
+H17-P-Ctrl	H17_K4	H3K4me3	ChIP	narrow	human
 

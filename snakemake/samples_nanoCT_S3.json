@@ -1,0 +1,26 @@
+{
+    "H11": {
+        "H3K27ac": {
+            "S3-nanoCT": [
+                "/date/gcb/gcb_MZ/250425_VH02084_4_AAGNYM5M5_fastq/MZ/H11_S3_S3/H11_S3_S3_L001_R1_001.fastq.gz",
+                "/date/gcb/gcb_MZ/250425_VH02084_4_AAGNYM5M5_fastq/MZ/H11_S3_S3/H11_S3_S3_L001_R2_001.fastq.gz"
+            ]
+        }
+    },
+    "H15": {
+        "H3K27ac": {
+            "S3-nanoCT": [
+                "/date/gcb/gcb_MZ/250425_VH02084_4_AAGNYM5M5_fastq/MZ/H15_S3_S1/H15_S3_S1_L001_R2_001.fastq.gz",
+                "/date/gcb/gcb_MZ/250425_VH02084_4_AAGNYM5M5_fastq/MZ/H15_S3_S1/H15_S3_S1_L001_R1_001.fastq.gz"
+            ]
+        }
+    },
+    "H21": {
+        "H3K27ac": {
+            "S3-nanoCT": [
+                "/date/gcb/gcb_MZ/250425_VH02084_4_AAGNYM5M5_fastq/MZ/H21_S3_S2/H21_S3_S2_L001_R1_001.fastq.gz",
+                "/date/gcb/gcb_MZ/250425_VH02084_4_AAGNYM5M5_fastq/MZ/H21_S3_S2/H21_S3_S2_L001_R2_001.fastq.gz"
+            ]
+        }
+    }
+}

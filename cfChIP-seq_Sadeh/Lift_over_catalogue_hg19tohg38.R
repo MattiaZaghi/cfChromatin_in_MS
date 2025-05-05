@@ -3,12 +3,17 @@ library(easylift)
 library(plyranges)
 
 # Define directories
-input_dir <- "/date/gcb/gcb_MZ/Analysis/BED/H3K27ac/"
-output_dir <- "/date/gcb/gcb_MZ/Analysis/BED/H3K27ac_hg38/"
+input_dir <- "/date/gcb/gcb_MZ/Analysis/BED/H3K4me3/"
+output_dir <- "/proj/user/mattia/Analysis/BED/H3K4me3_hg38/"
 chain_file <- "/date/gcb/gcb_MZ/hg19ToHg38.over.chain"
 
-# List all BED files in the input directory that start with "GSM"
-bed_files <- list.files(input_dir, pattern = "^GSM.*\\.bed$", full.names = TRUE)
+
+# List all BED files in the input directory that start with "H00"
+bed_files <- list.files(input_dir, pattern = "^H00.*\\.tagAlign.gz$", full.names = TRUE)
+
+# Select the first 15 files
+bed_files <- head(bed_files, 15)
+
 
 # Function to perform lift-over
 lift_over_bed <- function(bed_file, chain_file, output_dir) {
@@ -30,3 +35,7 @@ lift_over_bed <- function(bed_file, chain_file, output_dir) {
 for (bed_file in bed_files) {
   lift_over_bed(bed_file, chain_file, output_dir)
 }
+
+
+
+

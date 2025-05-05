@@ -28,10 +28,12 @@ ALL_SAMPLES =  CHIPS + CUT_TAGS
 
 BAM=expand("{myrun}/dedup/picard/{sample}.bam", sample=ALL_SAMPLES, myrun=RUNID)
 ALL_FLAGSTAT = expand("{myrun}/dedup/picard/{sample}.flagstat", sample = ALL_SAMPLES,myrun=RUNID)
-FILTER_FLAGSTAT = expand("{myrun}/filter/samtools/{sample}.flagstat", sample = ALL_SAMPLES,myrun=RUNID)
-FILTER = expand("{myrun}/filter/samtools/{sample}.bam", sample = ALL_SAMPLES,myrun=RUNID)
+#FILTER_FLAGSTAT = expand("{myrun}/filter/samtools/{sample}.flagstat", sample = ALL_SAMPLES,myrun=RUNID)
+#FILTER = expand("{myrun}/filter/samtools/{sample}.bam", sample = ALL_SAMPLES,myrun=RUNID)
 #ALL_BIGWIG_DEDUP = expand("{myrun}/coverage/deeptools/{sample}_RPKM.bw", sample = ALL_SAMPLES,myrun=RUNID)
-BED=expand("{myrun}/bed/bedtools/{sample}.bed", sample = ALL_SAMPLES,myrun=RUNID)
+#BED=expand("{myrun}/bed/bedtools/{sample}.bed", sample = ALL_SAMPLES,myrun=RUNID)
+#DOWNSAMPLE=expand("{myrun}/downsample/sambamba/{sample}.bam", sample=ALL_SAMPLES, myrun=RUNID)
+#DOWNSAMPLE_BIGWIG=expand("{myrun}/coverage/deeptools/downsample/{sample}_RPKM.bw", sample=ALL_SAMPLES, myrun=RUNID)
 BED_DEDUP=expand("{myrun}/bed/bedtools/dedup/{sample}.bed", sample = ALL_SAMPLES,myrun=RUNID)
 ALL_BIGWIG= expand("{myrun}/coverage/deeptools/{sample}_RPKM.bw", sample = ALL_SAMPLES,myrun=RUNID)
 #GOPEAKS = expand("{myrun}/peaks/gopeaks/{sample}_peaks.bed", sample = CUT_TAGS,myrun=RUNID)
@@ -44,7 +46,9 @@ SIZE=expand("{myrun}/dedup/picard/insert/{sample}_insert.pdf", sample = ALL_SAMP
 
 TARGETS = []
 TARGETS.extend(BAM)
-TARGETS.extend(FILTER)
+#TARGETS.extend(DOWNSAMPLE)
+#TARGETS.extend(DOWNSAMPLE_BIGWIG)
+#TARGETS.extend(FILTER)
 #TARGETS.extend(GOPEAKS)
 #TARGETS.extend(GOPEAKS_BROAD)
 #TARGETS.extend(ALL_BIGWIG_DEDUP)
@@ -53,7 +57,7 @@ TARGETS.extend(ALL_BIGWIG)
 #TARGETS.extend(MACS2_BROAD)
 TARGETS.extend(ALL_FLAGSTAT)
 TARGETS.extend(SIZE)
-TARGETS.extend(BED)
+#TARGETS.extend(BED)
 TARGETS.extend(BED_DEDUP)
 
 
@@ -61,40 +65,56 @@ TARGETS.extend(BED_DEDUP)
 
 
 
-ruleorder: trimming_trimmomatic >  aligning_bowtie2 >  sorted_samtools > dedup_picard > coverage_deeptools > insertsize_picard > bam_to_bed > bam_to_bed_dedup
+ruleorder: trimming_trimmomatic >  aligning_bowtie2 >  sorted_samtools > dedup_picard > coverage_deeptools > insertsize_picard > bam_to_bed_dedup
 
 
 
 
 rule all:
     input: TARGETS
-def get_fastq_files(wildcards):
-    files = FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]]
 
-rule trimming_trimmomatic:  
+import re
+
+def get_R1(wildcards):
+    sample = wildcards.sample
+    files = FILES[sample.split('_')[0]][sample.split('_')[1]][sample.split('_')[2]]
+    for file in files:
+        if re.search(r'_R1_', file):
+            return file
+    raise ValueError("R1 file not found")
+
+def get_R2(wildcards):
+    sample = wildcards.sample
+    files = FILES[sample.split('_')[0]][sample.split('_')[1]][sample.split('_')[2]]
+    for file in files:
+        if re.search(r'_R2_', file):
+            return file
+    raise ValueError("R2 file not found")
+
+rule trimming_trimmomatic:
     input:
-        R1       = lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][1], 
-        R2       = lambda wildcards: FILES[wildcards.sample.split('_')[0]][wildcards.sample.split('_')[1]][wildcards.sample.split('_')[2]][0],
-        adapters = config['adapters'] #"adapters/trimmomatic/adapters-pe.fa"
+        R1 = get_R1,
+        R2 = get_R2,
+        adapters = config['adapters']
     output:
-        Paired1       = temp("{myrun}/trimmed/trimmomatic/{sample}_R1_paired.fastq"),
-        Paired2       = temp("{myrun}/trimmed/trimmomatic/{sample}_R2_paired.fastq"),
-        Unpaired1 = temp("{myrun}/trimmed/trimmomatic/{sample}_R1_unpaired.fastq"),
-        Unpaired2 = temp("{myrun}/trimmed/trimmomatic/{sample}_R2_unpaired.fastq")
+        Paired1 = temp("{myrun}/trimmed/trimmomatic/{sample}_R1_paired.fastq"),
+        Paired2 = temp("{myrun}/trimmed/trimmomatic/{sample}_R2_paired.fastq")
+        #Unpaired1 = temp("{myrun}/trimmed/trimmomatic/{sample}_R1_unpaired.fastq"),
+        #Unpaired2 = temp("{myrun}/trimmed/trimmomatic/{sample}_R2_unpaired.fastq")
     params:
         dir = "{myrun}/trimmed/trimmomatic/"
     resources:
-        mem_mb=64000
+        mem_mb = 64000
     threads: config['THREADS']
     conda:
-        "/home/mattia/miniconda3/envs/trimmomatic.yml"
+        "/home/mattia/miniconda3/envs/cutadapt.yaml"
     shell:
         """
-        mkdir -p {params.dir} 
+        mkdir -p {params.dir}
         
-        trimmomatic PE -threads {threads} -phred33 {input.R1} {input.R2} {output.Paired1} {output.Unpaired1} {output.Paired2} {output.Unpaired2} ILLUMINACLIP:{input.adapters}:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 CROP:100
+        cutadapt -g CTGTCTCTTATACACATCTGACGCTGCCGACGA -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA -G GTGACTGGAGTTCAGACGTGTGCTCTTCCGATCT  -G AGATGTGTATAAGAGACAG  -G GTGACTGGAGTTCAGACGTGTGCTCTTCCGATCTAGATGTGTATAAGAGACAG -o {output.Paired1} -p {output.Paired2} {input.R1} {input.R2}
+        """
 
-        """    
 
 
 rule aligning_bowtie2:
@@ -120,7 +140,7 @@ rule aligning_bowtie2:
         """
         mkdir -p {params.dir}
         
-        bowtie2 -x {params.index} -1 {input.Paired1} -2 {input.Paired2} -S {output.sam} -p {threads} --no-mixed --no-discordant
+        bowtie2 -x {params.index} -1 {input.Paired1} -2 {input.Paired2} -S {output.sam} -p {threads}  --very-sensitive
 
         """
 
@@ -232,8 +252,8 @@ rule stat_samtools:
         """
 rule down_sample:
     input:  
-        filter ="{myrun}/filter/samtools/{sample}.bam",
-        stat ="{myrun}/filter/samtools/{sample}.flagstat"
+        filter ="{myrun}/dedup/picard/{sample}.bam",
+        stat ="{myrun}/dedup/picard/{sample}.flagstat"
     output: 
         downsample_bam="{myrun}/downsample/sambamba/{sample}.bam", 
         downsample_bai="{myrun}/downsample/sambamba/{sample}.bam.bai"
@@ -273,10 +293,31 @@ rule downsample_stat_samtools:
         samtools flagstat -@ {threads} {input.downsample_bam} > {output.downsample_flagstat} 
         
         """
+rule coverage_deeptools_downsample:
+    input: 
+        dedup  = "{myrun}/downsample/sambamba/{sample}.bam"
+    output:
+        bw="{myrun}/coverage/deeptools/downsample/{sample}_RPKM.bw"
+    params:
+        genome_size_bp  = config['genome_size_bp'],
+        mapping_qual_bw = config['binsize'],
+        norm= config['norm_method'],
+        smooth= config['smooth_length']
+    resources:
+        mem_mb=64000
+    threads: config['THREADS']
+    log: "{myrun}/coverage/deeptools/{sample}.log"
+    conda:
+        "/home/mattia/miniconda3/envs/deeptools.yml"
+    shell:
+        """
+        bamCoverage -b {input.dedup} --outFileName {output.bw} --normalizeUsing {params.norm} --binSize {params.mapping_qual_bw} --smoothLength {params.smooth} --numberOfProcessors {threads} --exactScaling  
+
+        """
 
 rule coverage_deeptools:
     input: 
-        dedup  = "{myrun}/filter/samtools/{sample}.bam"
+        dedup  = "{myrun}/dedup/picard/{sample}.bam"
     output:
         bw="{myrun}/coverage/deeptools/{sample}_RPKM.bw"
     params:

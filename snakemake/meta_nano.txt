@@ -1,0 +1,3 @@
+sample_name	fastq_name	factor	assay	type	reference
+H7	H7_Nano	H3K27ac	nanoCT	narrow	human
+H15	H15_Nano	H3K27ac	nanoCT	narrow	human

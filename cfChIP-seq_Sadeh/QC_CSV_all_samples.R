@@ -3,15 +3,16 @@ suppressMessages(library(tools))
 suppressMessages(library(ggplot2))
 suppressMessages(library(tidyverse))
 suppressMessages(library(dplyr))
+suppressMessages(library(extrafont))
 
 # Define the directory
-directory <- "/date/gcb/gcb_MZ/Analysis/Output/H3K4me3"
+directory <- "/proj/user/mattia/Analysis/Output/H3K27ac_hg38/QC/"
 
 # Get a list of all CSV files in the directory
 all_files <- list.files(directory, pattern = "\\.csv$", full.names = TRUE)
 
 # Remove the files that contain "_H3K4me3_ChIP"
-file_paths <- all_files[!grepl("_H3K4me3_ChIP", all_files)]
+file_paths <- all_files
 
 
 # Initialize an empty data frame
@@ -25,14 +26,24 @@ for (file_path in file_paths) {
   # Merge the data
   merged_data <- rbind(merged_data, data)
 }
-
-
+merged_data$Total<-NULL
+merged_data$TSS<-NULL
 # Rename the first column as "sample"
 colnames(merged_data)[1] <- "sample"
 # Rename the first column as "sample"
-colnames(merged_data)[6] <- "Total Signal"
+colnames(merged_data)[5] <- "Total"
 # Rename the first column as "sample"
-colnames(merged_data)[7] <- "Background Signal"
+colnames(merged_data)[6] <- "Background"
+# Rename the first column as "sample"
+colnames(merged_data)[7] <- "TSS"
+# Rename the first column as "sample"
+colnames(merged_data)[8] <- "Background in TSS"
+# Rename the first column as "sample"
+colnames(merged_data)[9] <- "Enhancers"
+# Rename the first column as "sample"
+colnames(merged_data)[10] <- "Background in Enhancers"
+# Rename the first column as "sample"
+colnames(merged_data)[15] <- "Global SNR"
 
 # Save the merged data to a new CSV file
 write.csv(merged_data, "/date/gcb/gcb_MZ/Analysis/Output/H3K4me3/QC_all_Sadeh_samples.csv", row.names = FALSE)
@@ -41,29 +52,54 @@ write.csv(merged_data, "/date/gcb/gcb_MZ/Analysis/Output/H3K4me3/QC_all_Sadeh_sa
 
 #plot Yield
 
-# Assuming the two columns you want to plot are `Total Signal` and `Another Column`
-to_plot <-merged_data %>% 
-  dplyr::select(`Total Signal`,`Background Signal`) %>% 
-  gather(key=Group, value=value, "Total Signal","Background Signal")
 
-# Define the order
-levels_order <- c("Total Signal","Background Signal")  # replace with your actual labels
+# Exclude specified samples
+exclude_samples <- c("12179-P-MS-Rituximab-Progressive_H3K27ac_ChIP",
+                     "14131-P-MS-Rituximab-Stable_H3K27ac_ChIP",
+                     "14-229-P-MS-Rituximab-Stable_H3K27ac_ChIP",
+                     "18070-P-MS-Rituximab-Progressive_H3K27ac_ChIP",
+                     "18075-P-MS-Rituximab-Progressive_H3K27ac_ChIP")
+data <- merged_data[!merged_data$sample %in% exclude_samples, ]
 
-# Convert the column to a factor and specify the order of levels
-to_plot$Category <- factor(to_plot$Group, levels = levels_order)
+# Group samples
+data <- data %>%
+  dplyr::mutate(Group = case_when(
+    grepl("S3-nanoCT", sample) ~ "S3-nanoCT",
+    grepl("nanoCT", sample) ~ "nanoCT",
+    grepl("^H", sample) ~ "ctrl-pA",
+    grepl("P20", sample) ~ "ctrl-pA-old",
+    grepl("^GSM", sample) ~ "baca et al.",
+    grepl("New-RR", sample) ~ "New-pA-MS",
+    TRUE ~ "Rituximab-pA-MS"
+  ))
+exclude_samples <- c("New-pA-MS",
+                     "ctrl-pA-old",
+                     "Rituximab-pA-MS")
+data <- data[!data$Group %in% exclude_samples, ]
 
-ggplot(to_plot, aes(x=Group, y=value, fill=Group)) +
+# Reshape data to long format
+to_plot <- data %>%
+  pivot_longer(cols = c("Global SNR"), names_to = "Signal_Type", values_to = "value")
+
+
+# Reorder Signal_Type levels
+to_plot$Signal_Type <- factor(to_plot$Signal_Type, levels = c("Global SNR"))
+
+
+# Plotting
+ggplot(to_plot, aes(x = Group, y = value, fill = Group)) +
   geom_boxplot(width = 0.1, color = "#000000", outlier.shape = NA) +
   geom_jitter(width = 0.1, size = 1, color = "#000000") +
   ggthemes::theme_base() +
   xlab("") +
-  ylab("% of Signal") +
-  scale_x_discrete(labels = c("H3K4me3 CfChromatin Background","H3K4me3 CfChromatin in TSS")) +
+  ylab("Signal/Noise") +
+  ylim(0,80)+
+  facet_wrap(~ Signal_Type, scales = "free_y") +
   theme(panel.border = element_rect()) +
   theme_classic() + theme(legend.position = "none") +
-  theme(axis.text.x = element_text(size = 7, family = "Arial", angle = 45, hjust = 1),
-        axis.text.y = element_text(size = 10, family = "Arial"),
-        axis.title.y = element_text(size = 10, family = "Arial"),
+  theme(axis.text.x = element_text(size = 9,  angle = 45, hjust = 1),
+        axis.text.y = element_text(size = 12, ),
+        axis.title.y = element_text(size = 12, ),
         axis.line = element_line(size = 1))
-
+ggsave("/proj/user/mattia/Analysis/Output/H3K27ac_hg38/Signal_SNR_nanoCT.png", plot = last_plot(), device = NULL, path = NULL, width = 130, height = 115, units = "mm", dpi = 300, limitsize = TRUE)  
 

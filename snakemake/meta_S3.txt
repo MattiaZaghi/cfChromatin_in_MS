@@ -1,0 +1,4 @@
+sample_name	fastq_name	factor	assay	type	reference
+H11	H11_S3	H3K27ac	S3-nanoCT	narrow	human
+H15	H15_S3	H3K27ac	S3-nanoCT	narrow	human
+H21	H21_S3	H3K27ac	S3-nanoCT	narrow	human

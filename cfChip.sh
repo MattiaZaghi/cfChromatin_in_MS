@@ -15,7 +15,7 @@ run_script() {
     # First step create rdata computing counts and background
     Rscript --vanilla ${Analysis}/cfChIP-seq/ProcessBEDFiles.R -r ${Analysis} --outputdir ${Output} --trackdir ${track} -m ${m} -BCN ${sample}
     # Additional step write meta plot, normcounts table and backgroundplots
-    Rscript --vanilla ${Analysis}/cfChIP-seq/ProcessBEDFiles.R -r ${Analysis} --outputdir ${Output} --trackdir ${track} -m ${m} -M --backgroundplot --normcounts=NORMCOUNTS_${sample} ${sample}
+    Rscript --vanilla ${Analysis}/cfChIP-seq/ProcessBEDFiles.R -r ${Analysis} --outputdir ${Output} --trackdir ${track} -m ${m} --backgroundplot --normcounts=NORMCOUNTS_${sample} ${sample}
     # Additional step write tracks
     Rscript --vanilla ${Analysis}/cfChIP-seq/ProcessBEDFiles.R -r ${Analysis} --outputdir ${Output} --trackdir ${track} -m ${m} -T ${sample}
 }

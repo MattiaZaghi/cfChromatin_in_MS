@@ -20,7 +20,7 @@ BedDir = paste0(RootDir, "BED/", TargetMod, "/")
 
 TSS.windows = readRDS(paste0(SetupDIR,"Windows.rds"))
 genome.seqinfo = seqinfo(TSS.windows)
-ChrList = paste0("chr", c(1:22,"X", "Y","M"))
+ChrList = paste0("chr", c(1:22,"X", "Y"))
 
 BaseFileName <- function( fname, extList = c(".gz$", ".bed$",".rdata$", ".bw$", ".tagAlign$", "-H3K4me3") ) {
   x = fname

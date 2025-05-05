@@ -1,11 +1,11 @@
 library(GenomicRanges)
 library(dplyr)
 library(readr)
-
+library(plyranges)
 options(scipen = 999)
 
 # Load the GRanges object
-TSS.windows <- readRDS("/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Windows.rds")
+TSS.windows <- readRDS("/proj/user/mattia/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Windows.rds")
 
 # Assuming TSS.windows is your GRanges object
 # Filter rows where type is "Enhancer"
@@ -71,6 +71,15 @@ write_tsv(meta_enhancers_df, file = "/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupF
 GeneDescription <- read_csv("/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K4me3/GeneDescription.csv") %>% 
   dplyr::rename(name = 1)
 
+#filter a bed file of only merged enhancers 
+
+meta_enhacers_many <- as.data.frame(meta_enhancers) %>% dplyr::filter(name=="a.Many")%>% 
+makeGRangesFromDataFrame()%>% reduce()
+
+write_bed(meta_enhacers_many,"/proj/user/mattia/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/enhancers_many.bed")
+
+ Save as BED file
+write_tsv(meta_enhancers_df, file = "/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Meta-enhancers.bed", col_names = FALSE)
 
 library(GenomicRanges)
 library(dplyr)

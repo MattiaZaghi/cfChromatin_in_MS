@@ -1,8 +1,8 @@
 # proj parameters
-RUN_ID: "Round2_fresh_hg19" # "RUN_id"
+RUN_ID: "S3_nanoCT" # "RUN_id"
 THREADS: 5
 # trimming
-adapters: "/home/mattia/Trimmomatic/adapters/NexteraPE-PE.fa"
+adapters: "/home/mattia/Trimmomatic/adapters/Neb_Next_s3.fa"
 # peaks
 genome_size_bp: 2730871774
 peaks_qvalue: 0.01
@@ -17,9 +17,9 @@ Acetylation: 'H3K27ac'
 Methylation: 'H3K36me3'
 Polycomb: 'H3K27me3'
 #index Bowtie2
-index_bt2_hg: "/home/mattia/Genomes/hg19/fa/hg19"
+index_bt2_hg: "/home/mattia/Genomes/hg38/fa/hg38"
 #downsample target
 target_reads: "5000000"
 # Path to a JSON file with samples and their corresponding FASTQ files.
 SAMPLES: '/home/mattia/cfChromatin_in_MS/snakemake/SRR.txt'
-SAMPLES_JSON: '/home/mattia/cfChromatin_in_MS/snakemake/samples_Cut_Tag.json'
+SAMPLES_JSON: '/home/mattia/cfChromatin_in_MS/snakemake/samples_nanoCT_S3.json'

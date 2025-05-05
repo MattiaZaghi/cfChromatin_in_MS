@@ -1,0 +1,18 @@
+{
+    "H15": {
+        "H3K27ac": {
+            "nanoCT": [
+                "/date/gcb/gcb_MZ/250425_VH02084_4_AAGNYM5M5_fastq/MZ/H15_Nano_S4/H15_Nano_S4_L001_R2_001.fastq.gz",
+                "/date/gcb/gcb_MZ/250425_VH02084_4_AAGNYM5M5_fastq/MZ/H15_Nano_S4/H15_Nano_S4_L001_R1_001.fastq.gz"
+            ]
+        }
+    },
+    "H7": {
+        "H3K27ac": {
+            "nanoCT": [
+                "/date/gcb/gcb_MZ/250425_VH02084_4_AAGNYM5M5_fastq/MZ/H7_Nano_S5/H7_Nano_S5_L001_R1_001.fastq.gz",
+                "/date/gcb/gcb_MZ/250425_VH02084_4_AAGNYM5M5_fastq/MZ/H7_Nano_S5/H7_Nano_S5_L001_R2_001.fastq.gz"
+            ]
+        }
+    }
+}
