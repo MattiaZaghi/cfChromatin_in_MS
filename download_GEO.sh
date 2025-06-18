@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+###############################################################################
+# get_cfchip_GSE243474.sh
+# Download, extract and rename cfChIP-seq H3K4me3 / H3K27ac BED files from
+# GEO series GSE243474, while printing progress messages.
+#
+# Usage:
+#   bash get_cfchip_GSE243474.sh        # normal, concise logging
+#   bash get_cfchip_GSE243474.sh -v     # verbose (all commands echoed)
+###############################################################################
+set -euo pipefail
+
+###############################################################################
+# 0.  Logging helpers
+###############################################################################
+log() { printf '[%(%F %T)T] %s\n' -1 "$*"; }          # date-stamped message
+[[ ${1:-} == "-v" ]] && { log "Verbose mode on"; set -x; }
+
+###############################################################################
+# 1.  Constants
+###############################################################################
+ACC=GSE243474
+SERIES_DIR=${ACC:0:6}nnn                 #  GSE243nnn  (GEO FTP convention)
+FTP=ftp://ftp.ncbi.nlm.nih.gov/geo/series/${SERIES_DIR}/${ACC}
+RAW=${ACC}_RAW.tar
+OUTDIR=${ACC}_cfChIP
+
+###############################################################################
+# 2.  Prepare working directory
+###############################################################################
+mkdir -p "$OUTDIR"
+cd "$OUTDIR"
+
+###############################################################################
+# 3.  Download RAW tarball
+###############################################################################
+log "Step 1/4 – Downloading ${RAW} from GEO …"
+if [[ -f $RAW ]]; then
+    log "  • ${RAW} already present – skipping download."
+else
+    wget -nv -c "${FTP}/suppl/${RAW}"
+fi
+
+###############################################################################
+# 4.  Select BED files of interest (only *.bed.gz, no *_sorted_peaks*)
+###############################################################################
+log "Step 2/4 – Scanning archive for H3K4me3 / H3K27ac cfChIP BEDs …"
+tar -tf "$RAW" \
+ | grep -E '(_K4[^/]*\.bed\.gz|_K27[^/]*\.bed\.gz)$' \
+ | grep -v 'narrowPeak' \
+ > wanted.txt
+   # keeps only pure BEDs
+NUM_WANTED=$(wc -l < wanted.txt)
+[[ $NUM_WANTED -eq 0 ]] && { log "  • No matching files – aborting."; exit 1; }
+log "  • Found ${NUM_WANTED} matching files."
+
+###############################################################################
+# 5.  Extract only those files  (flatten every path component)
+###############################################################################
+log "Step 3/4 – Extracting selected files …"
+tar -xvf "$RAW" -T wanted.txt --transform='s:.*/::'
+log "  • Extraction completed."
+
+
+
+log "Step 4/4 – Renaming files …"
+shopt -s nullglob
+
+declare -A seen
+for f in *_K4*.bed.gz *_K27*.bed.gz; do
+    id=${f%%_*}                      # first chunk of the filename
+    id=${id#TUMOR_}                  # NEW: avoid double “TUMOR”
+    mark=$(grep -oE 'K4[^_]*|K27[^_]*' <<<"$f")
+
+    if [[ $id =~ ^HP ]]; then
+        new="CTRL_${id}_${mark}.bed.gz"
+    else
+        key="${id}_${mark}"
+        seen[$key]=$(( ${seen[$key]:-0} + 1 ))
+        idx=$(printf "R%02d" "${seen[$key]}")
+        mark=${mark/_ac/}            # K27ac → K27
+        new="TUMOR_${id}_${mark}_${idx}.bed.gz"
+    fi
+    mv -v -- "$f" "$new"
+done
+
+
+###############################################################################
+# 7.  Wrap-up
+###############################################################################
+log "All done – result files are in: $(pwd)"

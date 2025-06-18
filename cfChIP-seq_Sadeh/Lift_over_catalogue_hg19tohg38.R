@@ -3,13 +3,13 @@ library(easylift)
 library(plyranges)
 
 # Define directories
-input_dir <- "/date/gcb/gcb_MZ/Analysis/BED/H3K4me3/"
-output_dir <- "/proj/user/mattia/Analysis/BED/H3K4me3_hg38/"
+input_dir <- "/proj/user/mattia/Analysis/BED/H3K27ac_baca/"
+output_dir <- "/proj/user/mattia/Analysis/BED/H3K27ac_hg38/"
 chain_file <- "/date/gcb/gcb_MZ/hg19ToHg38.over.chain"
 
 
 # List all BED files in the input directory that start with "H00"
-bed_files <- list.files(input_dir, pattern = "^H00.*\\.tagAlign.gz$", full.names = TRUE)
+bed_files <- list.files(input_dir, pattern = "*\\.bed$", full.names = TRUE)
 
 # Select the first 15 files
 bed_files <- head(bed_files, 15)

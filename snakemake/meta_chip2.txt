@@ -1,4 +1,0 @@
-sample_name	fastq_name	factor	assay	type	reference
-H17-P-Ctrl	H17_K4	H3K4me3	ChIP	narrow	human
-
-
