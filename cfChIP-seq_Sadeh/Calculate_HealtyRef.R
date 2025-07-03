@@ -4,11 +4,11 @@ library(parallel)
 
 print("Setting up directories and loading utility functions...")
 SourceDIR<-"/home/mattia/cfChromatin_in_MS/cfChIP-seq_Sadeh/"
-SetupDIR<-"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/"
-TSS.windows<-readRDS("/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/Windows.rds")
-TargetMod<-"H3K27ac_hg38"
+SetupDIR<-"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac/"
+TSS.windows<-readRDS("/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac/Windows.rds")
+TargetMod<-"H3K27ac"
 source(paste0(SourceDIR, "Calculate_HealtyRef_fun.R")) # Utility functions for non-negative matrix factorization.
-data_dir <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K27ac_hg38/"
+data_dir <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K27ac/"
 
 print("Loading .rdata files...")
 rdata_files <- list.files(path = data_dir, pattern = "\\.rdata$", full.names = TRUE)
@@ -19,10 +19,17 @@ for (rdata_file in rdata_files) {
   data_list[[var_name]] <- loaded_data
 }
 # Your vector
-Healthy <- c("GSM7787973_HP030132_H3K27Ac","GSM7787975_HP030642_H3K27Ac","GSM7787978_HP031645_H3K27Ac", 
-             "GSM7787980_HP034881_H3K27Ac",
-             "GSM7787982_HP035094_H3K27Ac", 
-             "GSM7787985_HP038748_H3K27Ac" )
+Healthy <- c("H10-P-Ctrl_H3K27ac_ChIP-V3", "H19-P-Ctrl_H3K27ac_ChIP-V3", "H5-P-Ctrl_H3K27ac_ChIP-V2",
+"H11-P-Ctrl_H3K27ac_ChIP-V3", "H1-P-Ctrl_H3K27ac_ChIP-V2", "H5-P-Ctrl_H3K27ac_ChIP-V3",
+"H12-P-Ctrl_H3K27ac_ChIP-V3", "H20-P-Ctrl_H3K27ac_ChIP-V3", "H6-P-Ctrl_H3K27ac_ChIP-V2-1D",
+"H13-P-Ctrl_H3K27ac_ChIP-V3", "H21-P-Ctrl_H3K27ac_ChIP-V3", "H6-P-Ctrl_H3K27ac_ChIP-V2",
+"H14-P-Ctrl_H3K27ac_ChIP-V3", "H22-P-Ctrl_H3K27ac_ChIP-V3", "H6-P-Ctrl_H3K27ac_ChIP-V3",
+"H15-P-Ctrl_H3K27ac_ChIP-V3", "H23-P-Ctrl_H3K27ac_ChIP-V3", "H7-P-Ctrl_H3K27ac_ChIP-V2",
+"H16-P-Ctrl_H3K27ac_ChIP-V3", "H24-P-Ctrl_H3K27ac_ChIP-V3", "H7-P-Ctrl_H3K27ac_ChIP-V3",
+"H17-P-Ctrl_H3K27ac_ChIP-V3", "H2-P-Ctrl_H3K27ac_ChIP-V2", "H8-P-Ctrl_H3K27ac_ChIP-V2-1D",
+"H17-P-Ctrl_H3K4me3_ChIP-V3", "H3-P-Ctrl_H3K27ac_ChIP-V2-1D", "H8-P-Ctrl_H3K27ac_ChIP-V2",
+"H18-P-Ctrl_H3K27ac_ChIP-V3", "H4-P-Ctrl_H3K27ac_ChIP-V2", "H9-P-Ctrl_H3K27ac_ChIP-V3"
+ )
 
 
 # Get the names of the tissues that are in your datasets vector
@@ -53,7 +60,7 @@ sd_threshold <- median(sd_ratios$Ratio)
 final_housekeeping_genes <- sd_ratios$gene[sd_ratios$Ratio < sd_threshold]
 
 print("Saving final housekeeping genes...")
-saveRDS(final_housekeeping_genes,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/CommonGenes.rds")
+saveRDS(final_housekeeping_genes,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac/CommonGenes.rds")
 
 print("Normalizing gene levels...")
 GeneCounts.CommonGenes <- do.call(cbind, lapply(data_list, function(sample) sample$GeneDiff[names(sample$GeneDiff) %in% final_housekeeping_genes]))
@@ -89,7 +96,7 @@ gene.est = cfChIP.EstimateMeanVarianceBasis(GeneCounts, GeneBackground, QQnorm)
 
 print("Compiling consensus data and saving it as an RDS file...")
 consensus = list(Win.avg = win.est$avg, Win.var = win.est$var, Gene.avg = gene.est$avg, Gene.var = gene.est$var)
-saveRDS(consensus,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac_hg38/HealthyRef.rds")
+saveRDS(consensus,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac/HealthyRef.rds")
 
 print("All tasks completed.")
 

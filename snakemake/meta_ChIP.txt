@@ -68,3 +68,16 @@ H1-P-Ctrl	P31260_1001	H3K27ac	ChIP-V2	narrow	human
 H2-P-Ctrl	P31260_1004	H3K27ac	ChIP-V2	narrow	human
 H3-P-Ctrl	P32456_2003	H3K27ac	ChIP-V2-1D	narrow	human
 H4-P-Ctrl	P32456_2001	H3K27ac	ChIP-V2	narrow	human
+H4-P-Ctrl	P32456_2001	H3K27ac	ChIP-V2	narrow	human
+16170-P-MS-Rituximab-Stable	P29307_1001	H3K27ac	ChIP-V1-250	narrow	human
+16170-C-MS-Rituximab-Stable	P29307_1002	H3K27ac	ChIP-V1-400	narrow	human
+16057-P-MS-Rituximab-Progressive	P29307_1003	H3K27ac	ChIP-V1-200	narrow	human
+16057-P-MS-Rituximab-Progressive	P29307_1004	H3K27ac	ChIP-V1-100	narrow	human
+04061-P-MS-Rituximab-Stable	P29307_1005	H3K27ac	ChIP-V1-150	narrow	human
+04061-P-MS-Rituximab-Stable	P29307_1006	H3K27ac	ChIP-V1-100	narrow	human
+12097-P-MS-Rituximab-Stable	P29307_1007	H3K27ac	ChIP-V1-100	narrow	human
+12097-C-MS-Rituximab-Stable	P29307_1010	H3K27ac	ChIP-V1-100	narrow	human
+14223-P-MS-Rituximab-Stable	P29307_1013	H3K27ac	ChIP-V1-100	narrow	human
+14223-C-MS-Rituximab-Stable	P29307_1016	H3K27ac	ChIP-V1-100	narrow	human
+19019-P-Ctrl	P29307_1019	H3K27ac	ChIP-V1-100	narrow	human
+19019-C-Ctrl	P29307_1022	H3K27ac	ChIP-V1-100	narrow	human

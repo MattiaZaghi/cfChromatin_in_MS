@@ -2,7 +2,8 @@ library(plyranges)
 library(readr)
 library(stringr)
 library(TxDb.Hsapiens.UCSC.hg38.knownGene)
-library(EnsDb.Hsapiens.v86)
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+library(EnsDb.Hsapiens.v75)
 library(org.Hs.eg.db)
 library(parallel)
 library(rtracklayer)
@@ -17,8 +18,8 @@ sessionInfo()
 #############################################################################################################################
 
 #working_path <- "/media/sf_ubuntu_music/cfChromatin/"
-working_path <- "/proj/user/mattia/"
-annotation_dir_path <- paste0(working_path, "roadmap_epigenomics_annotation/")
+working_path <- "/date/gcb/gcb_MZ/"
+annotation_dir_path <- paste0(working_path, "roadmap_epigenomics_annotation/hg19/")
 glossary_path <- paste0(annotation_dir_path, "Glossary.txt")
 
 core <- 20
@@ -33,11 +34,13 @@ source("/home/mattia/cfChromatin_in_MS/cfChromatin_func_new.R")
 ###### TSS
 # Catalog part 1
 windows_tss <- load_catalog(annotation_dir = annotation_dir_path, glossary = glossary_path, glossary_group = "ANATOMY", states = c("1_TssA", "2_TssAFlnk"))
+windows_tss<- dropSeqlevels(windows_tss, "chrM", pruning.mode = "coarse")
 # Catalog part 2 & 3
-windows_tss <- annotate_catalog(windows_tss, feature_tag = "TSS", db = list('UCSC'=TxDb.Hsapiens.UCSC.hg38.knownGene, 'Ensembl'=EnsDb.Hsapiens.v86), db_gap = 2500, db_spe = TRUE, db_tag = "EXTRA_TSS", db_spe_center = 3000)
-#windows_enh<- load_catalog(annotation_dir = annotation_dir_path,glossary = glossary_path, glossary_group = "ANATOMY", states = c("6_EnhG","7_Enh"))
-#windows_enh$type<-"Enhancer"
-windows<-c(windows_tss)#windows_enh)
+windows_tss <- annotate_catalog(windows_tss, feature_tag = "TSS", db = list('UCSC'=TxDb.Hsapiens.UCSC.hg19.knownGene, 'Ensembl'=EnsDb.Hsapiens.v75), db_gap = 2500, db_spe = TRUE, db_tag = "EXTRA_TSS", db_spe_center = 3000)
+windows_enh<- load_catalog(annotation_dir = annotation_dir_path,glossary = glossary_path, glossary_group = "ANATOMY", states = c("6_EnhG","7_Enh"))
+windows_enh$type<-"Enhancer"
+windows_enh<- dropSeqlevels(windows_enh, "chrM", pruning.mode = "coarse")
+windows<-c(windows_tss,windows_enh)
 
 
 # Catalog part 4
@@ -67,26 +70,26 @@ TSS_Enhancers_windows <- makeGRangesFromDataFrame(df_windows,keep.extra.columns 
 TSS_Enhancers_windows <- dropSeqlevels(TSS_Enhancers_windows, "chrM", pruning.mode = "coarse")
 
 # Get the current type values
-current_types <- TSS.windows$type
+current_types <- TSS_Enhancers_windows$type
 
 # Convert uppercase types to lowercase
-TSS.windows$type <- ifelse(current_types %in% c("BACKGROUND", "FLANKING"),
+TSS_Enhancers_windows$type <- ifelse(current_types %in% c("BACKGROUND", "FLANKING"),
                            tolower(current_types),
                            current_types)
 
-genome(TSS_Enhancers_windows) <- "hg38"
+library(BSgenome.Hsapiens.UCSC.hg19)
+hg19.si <- seqinfo(BSgenome.Hsapiens.UCSC.hg19)              # all offline
 
-isCircular(TSS_Enhancers_windows)<-windows@seqinfo@is_circular
+# gr is your existing GRanges
+keep <- intersect(seqlevels(TSS_Enhancers_windows), seqlevels(hg19.si))
+hg19.si <- hg19.si[keep]          # drop sequences you do not use
 
-seqlengths(TSS_Enhancers_windows)<-windows@seqinfo@seqlengths
-#hg38.seqinfo = Seqinfo(genome="hg38")
+seqinfo(TSS_Enhancers_windows) <- hg19.si            # fills seqlengths and genome field
+genome(TSS_Enhancers_windows)                        # check it now reads "hg19"
 
-#TSS_Enhancers_windows@seqinfo<-hg38.seqinfo
-
-#TSS_Enhancers_windows<-trim(TSS_Enhancers_windows)
-
+TSS_Enhancers_windows<-trim(TSS_Enhancers_windows)
 # Save files
-saveRDS(TSS_Enhancers_windows,"Analysis/cfChIP-seq/SetupFiles/H3K4me3_hg38/Windows.rds")
-write.table(df_windows, file="Analysis/cfChIP-seq/SetupFiles/H3K4me3_hg38/Windows.csv", quote=F, sep=",", row.names=F, col.names=F)
+saveRDS(TSS_Enhancers_windows,"Analysis/cfChIP-seq/SetupFiles/H3K27ac/Windows.rds")
+write.table(df_windows, file="Analysis/cfChIP-seq/SetupFiles/H3K27ac/Windows.csv", quote=F, sep=",", row.names=F, col.names=F)
 
-write_bed(TSS_Enhancers_windows,"Analysis/cfChIP-seq/SetupFiles/H3K4me3_hg38/Windows.bed")
+write_bed(TSS_Enhancers_windows,"Analysis/cfChIP-seq/SetupFiles/H3K27ac/Windows.bed")

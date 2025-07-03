@@ -2,7 +2,11 @@
 #configfile: "./snakemake/config_Cut_Tag.yaml"
 
 
+
+import json
+
 FILES = json.load(open(config['SAMPLES_JSON']))
+
 
 import csv
 import os
@@ -26,42 +30,28 @@ RUNID = config["RUN_ID"]
 ## list BAM files
 ALL_SAMPLES =  CHIPS + CUT_TAGS
 
-BAM=expand("{myrun}/dedup/picard/{sample}.bam", sample=ALL_SAMPLES, myrun=RUNID)
-ALL_FLAGSTAT = expand("{myrun}/dedup/picard/{sample}.flagstat", sample = ALL_SAMPLES,myrun=RUNID)
-FILTER_FLAGSTAT = expand("{myrun}/filter/samtools/{sample}.flagstat", sample = ALL_SAMPLES,myrun=RUNID)
-FILTER = expand("{myrun}/filter/samtools/{sample}.bam", sample = ALL_SAMPLES,myrun=RUNID)
-#ALL_BIGWIG_DEDUP = expand("{myrun}/coverage/deeptools/{sample}_RPKM.bw", sample = ALL_SAMPLES,myrun=RUNID)
+BAM=expand("{myrun}/filter/samtools/{sample}.bam", sample=ALL_SAMPLES, myrun=RUNID)
+ALL_FLAGSTAT = expand("{myrun}/filter/samtools/{sample}.flagstat", sample = ALL_SAMPLES,myrun=RUNID)
 BED=expand("{myrun}/bed/bedtools/{sample}.bed", sample = ALL_SAMPLES,myrun=RUNID)
-BED_DEDUP=expand("{myrun}/bed/bedtools/dedup/{sample}.bed", sample = ALL_SAMPLES,myrun=RUNID)
 ALL_BIGWIG= expand("{myrun}/coverage/deeptools/{sample}_RPKM.bw", sample = ALL_SAMPLES,myrun=RUNID)
-#GOPEAKS = expand("{myrun}/peaks/gopeaks/{sample}_peaks.bed", sample = CUT_TAGS,myrun=RUNID)
-#GOPEAKS_BROAD = expand("{myrun}/peaks/gopeaks/{sample}_broad_peaks.bed", sample = CUT_TAGS,myrun=RUNID)
-#MACS2 = expand("{myrun}/peaks/macs2/{sample}_peaks.narrowPeak", sample = ALL_SAMPLES,myrun=RUNID)
-#MACS2_BROAD = expand("{myrun}/peaks/macs2/{sample}_peaks.broadPeak", sample = ALL_SAMPLES,myrun=RUNID)
-SIZE=expand("{myrun}/dedup/picard/insert/{sample}_insert.pdf", sample = ALL_SAMPLES,myrun=RUNID)
+SIZE=expand("{myrun}/filter/samtools/{sample}_insert.pdf", sample = ALL_SAMPLES,myrun=RUNID)
 
 
 
 TARGETS = []
 TARGETS.extend(BAM)
-TARGETS.extend(FILTER)
-#TARGETS.extend(GOPEAKS)
-#TARGETS.extend(GOPEAKS_BROAD)
-#TARGETS.extend(ALL_BIGWIG_DEDUP)
 TARGETS.extend(ALL_BIGWIG)
-#TARGETS.extend(MACS2)
-#TARGETS.extend(MACS2_BROAD)
 TARGETS.extend(ALL_FLAGSTAT)
 TARGETS.extend(SIZE)
 TARGETS.extend(BED)
-TARGETS.extend(BED_DEDUP)
 
 
 
 
 
 
-ruleorder: trimming_trimmomatic >  aligning_bowtie2 >  sorted_samtools > dedup_picard > coverage_deeptools > insertsize_picard > bam_to_bed > bam_to_bed_dedup
+
+ruleorder: trimming_trimmomatic > aligning_bwa > filtered_sorted_samtools > dedup_picard > filter_chr_samtools > filter_stat > coverage_deeptools > insertsize_picard > bam_to_bed 
 
 
 
@@ -139,43 +129,77 @@ rule aligning_bowtie2:
         bowtie2 -x {params.index} -1 {input.Paired1} -2 {input.Paired2} -S {output.sam} -p {threads} --no-mixed --no-discordant
 
         """
-
-
-rule sorted_samtools:
+rule aligning_bwa:
+    """
+    Align paired-end reads with BWA-MEM v0.7.17.
+    Output: unsorted SAM (same as the old Bowtie2 rule)
+    """
     input:
-        sam = "{myrun}/mapped/bowtie2/{sample}.sam"
+        Paired1 = "{myrun}/trimmed/trimmomatic/{sample}_R1_paired.fastq",
+        Paired2 = "{myrun}/trimmed/trimmomatic/{sample}_R2_paired.fastq"
     output:
-        bam = temp("{myrun}/sorted/samtools/{sample}.bam")
+        sam = temp("{myrun}/mapped/bwa/{sample}.sam")
+    log:
+        "{myrun}/mapped/bwa/{sample}.log"
     params:
-        dir = "{myrun}/sorted/samtools/"
-    threads: config['THREADS'] 
+        index = config["index_bwa_hg"],    # prefix used when you ran `bwa index`
+        dir   = "{myrun}/mapped/bwa"
+    threads: config["THREADS"]
     resources:
-        mem_mb=64000
+        mem_mb = 64000
     conda:
-        "/home/mattia/miniconda3/envs/samtools.yml"
+        "/home/mattia/miniconda3/envs/bwa.yml"      # contains bwa 0.7.17
     shell:
         """
         mkdir -p {params.dir}
-        
-        samtools sort -o {output.bam} -O bam {input.sam} -@ {threads} 
-        
-        samtools index {output.bam} -@ {threads}
-
+        bwa mem -M -t {threads} {params.index} {input.Paired1} {input.Paired2} > {output.sam} 2> {log}
         """
+
+
+rule filtered_sorted_samtools:
+    """
+    1. Keep only primary alignments with MAPQ >= 10   (unique reads)
+    2. Sort by coordinate
+    3. Remove PCR/optical duplicates
+    4. Index the BAM
+    """
+    input:
+        sam = "{myrun}/mapped/bwa/{sample}.sam"
+    output:
+        bam = temp("{myrun}/view/samtools/{sample}.bam"),
+        sorted = temp("{myrun}/sorted/samtools/{sample}.bam")
+    params:
+        dir = "{myrun}/"
+    threads: config["THREADS"]
+    resources:
+        mem_mb = 64000
+    conda:
+        "/home/mattia/miniconda3/envs/samtools.yml"   # samtools >=1.10 for markdup
+    shell:
+        """
+        mkdir -p {params.dir}
+
+        samtools view -b -F 0x904 -q 10 {input.sam} -o {output.bam}
+
+        samtools sort -@ {threads} {output.bam} -o {output.sorted}
+
+        samtools index -@ {threads} {output.sorted}
+        """
+
 
 rule dedup_picard:
     input:
         bam =  "{myrun}/sorted/samtools/{sample}.bam"
     output:
-        RG = "{myrun}/dedup/picard/{sample}_RG.bam",
-        dedup = "{myrun}/dedup/picard/{sample}.bam",
-        bai   = "{myrun}/dedup/picard/{sample}.bam.bai",
+        RG = temp("{myrun}/dedup/picard/{sample}_RG.bam"),
+        dedup = temp("{myrun}/dedup/picard/{sample}.bam"),
         metrics = "{myrun}/dedup/picard/{sample}.bam_metrics.txt"
     params:
-        dir="{myrun}/dedup/picard/",
-        tmp="{myrun}/dedup/picard/tmp"
+        dir="{myrun}/dedup/picard",
+        tmp="{myrun}/dedup/picard/tmp",
+        mem="200g"
     resources:
-        mem_mb=140000
+        mem_mb=300000
     threads: config['THREADS'] 
     conda:
         "/home/mattia/miniconda3/envs/samtools.yml"
@@ -185,7 +209,7 @@ rule dedup_picard:
 
         picard AddOrReplaceReadGroups I={input.bam} O={output.RG} RGID=1 RGLB=lib1 RGPL=illumina RGPU=unit1 RGSM=sample1
         
-        picard MarkDuplicates I={output.RG} O={output.dedup} M={output.metrics} VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=coordinate REMOVE_DUPLICATES=true TMP_DIR={params.tmp} 
+        java -Xmx{params.mem} -jar picard MarkDuplicates I={output.RG} O={output.dedup} M={output.metrics} VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=coordinate REMOVE_DUPLICATES=true TMP_DIR={params.tmp} 
 
         samtools index {output.dedup} -@ {threads}
 
@@ -199,10 +223,9 @@ rule filter_chr_samtools:
     input:
         dedup  = "{myrun}/dedup/picard/{sample}.bam"
     output:
-        filter = "{myrun}/filter/samtools/{sample}.bam",
-        bai="{myrun}/filter/samtools/{sample}.bam.bai"
+        filter = "{myrun}/filter/samtools/{sample}.bam"
     params:
-        dir    = "{myrun}/filter/samtools/"
+        dir    = "{myrun}/filter/samtools"
     resources:
         mem_mb=140000
     threads: config['THREADS']
@@ -221,74 +244,59 @@ rule filter_stat:
     input:
         filter = "{myrun}/filter/samtools/{sample}.bam",
     output:
-        downsample_filter= "{myrun}/filter/samtools/{sample}.flagstat"
+        flagstat= "{myrun}/filter/samtools/{sample}.flagstat"
     resources: mem_mb=64000
     threads: config['THREADS']
     conda:
         "/home/mattia/miniconda3/envs/samtools.yml"
     shell:
         """        
-        samtools flagstat -@ {threads} {input.downsample_bam} > {output.downsample_flagstat} 
+        samtools flagstat -@ {threads} {input.filter} > {output.flagstat} 
         
         """
-rule stat_samtools:
-    input:
-        dedup  = "{myrun}/dedup/picard/{sample}.bam"
-    output:
-        flagstat = "{myrun}/dedup/picard/{sample}.flagstat"
-    resources:
-        mem_mb=140000
-    threads: config['THREADS']
-    conda:
-        "/home/mattia/miniconda3/envs/samtools.yml"
-    shell:
-        """        
-        samtools flagstat -@ {threads} {input.dedup} > {output.flagstat} 
-    
-        """
-rule down_sample:
-    input:  
-        filter ="{myrun}/filter/samtools/{sample}.bam",
-        stat ="{myrun}/filter/samtools/{sample}.flagstat"
-    output: 
-        downsample_bam="{myrun}/downsample/sambamba/{sample}.bam", 
-        downsample_bai="{myrun}/downsample/sambamba/{sample}.bam.bai"
-    resources:
-        mem_mb=64000, cpus=20
-    threads: config['THREADS']
-    run:
-        import re
-        import subprocess
-        with open (input[1], "r") as f:
+#rule down_sample:
+    #input:  
+        #filter ="{myrun}/filter/samtools/{sample}.bam",
+        #stat ="{myrun}/filter/samtools/{sample}.flagstat"
+    #output: 
+        #downsample_bam="{myrun}/downsample/sambamba/{sample}.bam", 
+        #downsample_bai="{myrun}/downsample/sambamba/{sample}.bam.bai"
+    #resources:
+        #mem_mb=64000, cpus=20
+    #threads: config['THREADS']
+    #run:
+        #import re
+        #import subprocess
+        #with open (input[1], "r") as f:
             #fifth line contains the number of mapped reads
-            line = f.readlines()[4]
-            match_number = re.match(r'(\d.+) \+.+', line)
-            total_reads = int(match_number.group(1))
+            #line = f.readlines()[4]
+            #match_number = re.match(r'(\d.+) \+.+', line)
+            #total_reads = int(match_number.group(1))
 
-        target_reads = config["target_reads"] # 15million reads  by default, set up in the config.yaml file
-        if total_reads > int(target_reads):
-            down_rate = int(target_reads)/total_reads
-        else:
-            down_rate = 1
+        #target_reads = config["target_reads"] # 15million reads  by default, set up in the config.yaml file
+        #if total_reads > int(target_reads):
+            #down_rate = int(target_reads)/total_reads
+       # else:
+            #down_rate = 1
 
-        shell("/home/mattia/miniconda3/envs/sambamba/bin/sambamba view -f bam -t {threads} --subsampling-seed=3 -s {rate} {inbam} |  /proj/tmp/tmp_MZ/anaconda3/envs/samtools/bin/samtools sort -m 2G -@ 5 -T {outbam}.tmp > {outbam} ".format(rate = down_rate, inbam = input[0], outbam = output[0]))
+        #shell("/home/mattia/miniconda3/envs/sambamba/bin/sambamba view -f bam -t {threads} --subsampling-seed=3 -s {rate} {inbam} |  /proj/tmp/tmp_MZ/anaconda3/envs/samtools/bin/samtools sort -m 2G -@ 5 -T {outbam}.tmp > {outbam} ".format(rate = down_rate, inbam = input[0], outbam = output[0]))
 
-        shell("/home/mattia/miniconda3/envs/samtools/bin/samtools index {outbam}".format(outbam = output[0]))
+        #shell("/home/mattia/miniconda3/envs/samtools/bin/samtools index {outbam}".format(outbam = output[0]))
 
-rule downsample_stat_samtools:
-    input:
-        downsample_bam = "{myrun}/downsample/sambamba/{sample}.bam"
-    output:
-        downsample_flagstat = "{myrun}/downsample/sambamba/{sample}.flagstat"
-    resources: mem_mb=64000
-    threads: config['THREADS']
-    conda:
-        "/home/mattia/miniconda3/envs/samtools.yml"
-    shell:
-        """        
-        samtools flagstat -@ {threads} {input.downsample_bam} > {output.downsample_flagstat} 
+#rule downsample_stat_samtools:
+    #input:
+        #downsample_bam = "{myrun}/downsample/sambamba/{sample}.bam"
+    #output:
+        #downsample_flagstat = "{myrun}/downsample/sambamba/{sample}.flagstat"
+    #resources: mem_mb=64000
+    #threads: config['THREADS']
+    #conda:
+        #"/home/mattia/miniconda3/envs/samtools.yml"
+    #shell:
+        #"""        
+        #samtools flagstat -@ {threads} {input.downsample_bam} > {output.downsample_flagstat} 
         
-        """
+       # """
 
 rule coverage_deeptools:
     input: 
@@ -316,11 +324,11 @@ rule insertsize_picard:
     input:
         dedup = "{myrun}/filter/samtools/{sample}.bam"
     output:
-        metrics="{myrun}/dedup/picard/insert/{sample}_insert.txt",
-        pdf="{myrun}/dedup/picard/insert/{sample}_insert.pdf"
+        metrics="{myrun}/filter/samtools/{sample}_insert.txt",
+        pdf="{myrun}/filter/samtools/{sample}_insert.pdf"
     params:
-        dir="{myrun}/dedup/picard/insert",
-        tmp="{myrun}/dedup/picard/tmp"
+        dir="{myrun}/filter/samtools/insert",
+        tmp="{myrun}/filter/samtools/tmp"
     resources:
         mem_mb=140000
     threads: config['THREADS'] 
@@ -355,26 +363,6 @@ rule bam_to_bed:
 
         """
 
-rule bam_to_bed_dedup:
-    input: 
-        filter = "{myrun}/dedup/picard/{sample}.bam"
-    output:
-        bed="{myrun}/bed/bedtools/dedup/{sample}.bed"
-    params:
-        dir  = "{myrun}/bed/bedtools/"
-    resources:
-        mem_mb=64000
-    threads: config['THREADS']
-    conda:
-        "/home/mattia/miniconda3/envs/bedtools.yml"
-    shell:
-        """
-
-        mkdir -p {params.dir}
-
-        bedtools bamtobed -i {input.filter}  > {output.bed}
-
-        """
 #rule R_script:
     #input: 
         #bed  = "{myrun}/dedup/picard/{sample}.bam",

@@ -63,26 +63,38 @@ log "  • Extraction completed."
 
 
 
-log "Step 4/4 – Renaming files …"
-shopt -s nullglob
+###############################################################################
+# 6.  Rename files: CTRL = healthy, TUMOR = patient + tumour-type + counter
+###############################################################################
+log "Step 4/4 – Renaming files …"                                          # [1]
+shopt -s nullglob                                                          # [2]
 
-declare -A seen
-for f in *_K4*.bed.gz *_K27*.bed.gz; do
-    id=${f%%_*}                      # first chunk of the filename
-    id=${id#TUMOR_}                  # NEW: avoid double “TUMOR”
-    mark=$(grep -oE 'K4[^_]*|K27[^_]*' <<<"$f")
+declare -A seen                                                            # [2]
+for f in *_K4*.bed.gz *_K27*.bed.gz; do                                    # [1]
+    id=${f%%_*}                    # GSM7789068, HP01, mLC33 …            # [1]
+    id=${id#TUMOR_}                # drop any stray leading word           # [2]
+    mark=$(grep -oE 'K4[^_]*|K27[^_]*' <<<"$f")                            # [1]
 
-    if [[ $id =~ ^HP ]]; then
-        new="CTRL_${id}_${mark}.bed.gz"
-    else
-        key="${id}_${mark}"
-        seen[$key]=$(( ${seen[$key]:-0} + 1 ))
-        idx=$(printf "R%02d" "${seen[$key]}")
-        mark=${mark/_ac/}            # K27ac → K27
-        new="TUMOR_${id}_${mark}_${idx}.bed.gz"
+    # NEW – grab the tumour-type (token right after the histone mark)      # [1]
+    tumour_type=$(echo "$f" | awk -F'_' -v m="$mark" '{                    \
+                    for(i=1;i<=NF;i++) if($i==m){print $(i+1); break}      \
+                  }')                                                      # [2]
+
+    if [[ $id =~ ^HP ]]; then                                             # control sample  # [1]
+        new="CTRL_${id}_${mark}.bed.gz"                                    # [1]
+    else                                                                   # tumour sample   # [1]
+        key="${tumour_type}_${mark}"                                       # [2]
+        seen[$key]=$(( ${seen[$key]:-0} + 1 ))                             # [2]
+        idx=$(printf "R%02d" "${seen[$key]}")                              # [2]
+        mark=${mark/_ac/}                 # shorten K27ac → K27            # [1]
+        new="TUMOR_${tumour_type}_${mark}_${idx}.bed.gz"                   # [1]
     fi
-    mv -v -- "$f" "$new"
+    mv -v -- "$f" "$new"                                                   # [2]
 done
+
+log "  • Finished renaming – $(ls CTRL_*.bed.gz | wc -l) controls and \
+$(ls TUMOR_*.bed.gz | wc -l) tumours."                                     # [1]
+
 
 
 ###############################################################################
