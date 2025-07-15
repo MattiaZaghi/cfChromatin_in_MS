@@ -16,9 +16,9 @@ if(!any(grepl("--interactive", initial.options))) {
 } else {
   # If in interactive mode, set the source and data directories explicitly for development purposes.
   SourceDIR = "/date/gcb/gcb_MZ/Analysis/cfChIP-seq/"
-  Mod="H3K27ac_hg38"
+  Mod="H3K4me3_rodmap_hg19"
   DataDir = paste0(SourceDIR, "SetupFiles/", Mod,"/")
-  TargetMod = "H3K27ac_hg38"  # Specify the target modification for analysis.
+  TargetMod = "H3K4me3_rodmap_hg19"  # Specify the target modification for analysis.
 }
 
 # Load necessary libraries, suppressing warnings that might arise during loading.
@@ -29,6 +29,7 @@ suppressWarnings(library(reshape2))
 suppressWarnings(library(rtracklayer))
 
 # Set the annotation directory to the data directory.
+
 ANNOTDIR = DataDir
 
 # Load TSS window data from an RDS file located in the annotation directory.
@@ -39,9 +40,9 @@ genome.seqinfo = seqinfo(TSS.windows)
 # Define a list of chromosomes to be analyzed.
 ChrList = paste0("chr", c(1:22,"X", "Y"))
 # If the target modification is H3K27ac, adjust the chromosome list based on the hg38 genome.
-if(TargetMod == "H3K27ac_hg38") {
-  hg38.seqinfo = Seqinfo(genome="hg38")
-  ChrList = (seqnames(hg38.seqinfo))
+if(TargetMod == "H3K4me3_sCER") {
+  hg19.seqinfo = Seqinfo(genome="hg19")
+  ChrList = (seqnames(hg19.seqinfo))
 }
 
 # Print a message indicating the start of the background model building process.
@@ -62,7 +63,7 @@ sortGR = function(GR) {
 # 'width' specifies the width of each tile, and 'jump' specifies the step size for overlapping tiles.
 buildOverlapingTiles = function(width, jump = width/4) {
   # Generate tiles for the entire genome based on the specified width.
-  T = tileGenome(hg38.seqinfo, tilewidth = width, cut.last.tile.in.chrom = TRUE)
+  T = tileGenome(hg19.seqinfo, tilewidth = width, cut.last.tile.in.chrom = TRUE)
   # Filter tiles to include only those in the specified chromosome list.
   T = T[chrom(T) %in% ChrList]
   T0 = T

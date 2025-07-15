@@ -277,12 +277,12 @@ if( !exists("Background.Regions")) {
 
 
 Background.Ind.Strech = 
-  Background.windows = TSS.windows$type == "background" & width(TSS.windows) > 4000
+  Background.windows = TSS.windows$type == "background" & GenomicRanges::width(TSS.windows) > 4000
 
 Background.windows.width = 5
 
 if (TargetMod == "H3K4me3-scer") { # TODO: set a cutoff for human/yeast in params
-  Background.windows = TSS.windows$type == "background" & width(TSS.windows) > 400
+  Background.windows = TSS.windows$type == "background" & GenomicRanges::width(TSS.windows) > 400
   Background.windows.width = 2
 }
 

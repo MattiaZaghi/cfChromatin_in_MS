@@ -4,7 +4,7 @@ THREADS: 5
 # trimming
 adapters: "/home/mattia/Trimmomatic/adapters/NebNext_adpters.fa"
 # peaks
-genome_size_bp: 2730871774
+genome_size_bp: hs
 peaks_qvalue: 0.01
 #Coverage
 binsize: "10"

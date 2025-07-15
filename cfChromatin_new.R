@@ -89,7 +89,7 @@ genome(TSS_Enhancers_windows)                        # check it now reads "hg19"
 
 TSS_Enhancers_windows<-trim(TSS_Enhancers_windows)
 # Save files
-saveRDS(TSS_Enhancers_windows,"Analysis/cfChIP-seq/SetupFiles/H3K27ac/Windows.rds")
-write.table(df_windows, file="Analysis/cfChIP-seq/SetupFiles/H3K27ac/Windows.csv", quote=F, sep=",", row.names=F, col.names=F)
+saveRDS(TSS_Enhancers_windows,"Analysis/cfChIP-seq/SetupFiles/H3K4me3_rodmap_hg19/Windows.rds")
+write.table(df_windows, file="Analysis/cfChIP-seq/SetupFiles/H3K4me3_rodmap_hg19/Windows.csv", quote=F, sep=",", row.names=F, col.names=F)
 
-write_bed(TSS_Enhancers_windows,"Analysis/cfChIP-seq/SetupFiles/H3K27ac/Windows.bed")
+write_bed(TSS_Enhancers_windows,"Analysis/cfChIP-seq/SetupFiles/H3K4me3_rodmap_hg19/Windows.bed")

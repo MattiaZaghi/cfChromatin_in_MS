@@ -3,39 +3,39 @@
 # -----------------------------------------------------------
 samples:
   H3K27ac_rep1:
-    adt_r1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K27ac_rep1_ADT_S7_L001_R1_001.fastq.gz"
+    adt_i1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K27ac_rep1_ADT_S7_L001_I1_001.fastq.gz"
     adt_r2: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K27ac_rep1_ADT_S7_L001_R2_001.fastq.gz"
-    hto_r1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K27ac_rep1_HTO_S8_L001_R1_001.fastq.gz"
+    hto_i1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K27ac_rep1_HTO_S8_L001_I1_001.fastq.gz"
     hto_r2: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K27ac_rep1_HTO_S8_L001_R2_001.fastq.gz"
 
   H3K27ac_rep2:
-    adt_r1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K27ac_rep2_ADT_S9_L001_R1_001.fastq.gz"
+    adt_i1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K27ac_rep2_ADT_S9_L001_I1_001.fastq.gz"
     adt_r2: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K27ac_rep2_ADT_S9_L001_R2_001.fastq.gz"
-    hto_r1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K27ac_rep2_HTO_S10_L001_R1_001.fastq.gz"
+    hto_i1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K27ac_rep2_HTO_S10_L001_I1_001.fastq.gz"
     hto_r2: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K27ac_rep2_HTO_S10_L001_R2_001.fastq.gz"
 
   H3K4me1_rep1:
-    adt_r1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K4me1_rep1_ADT_S1_L001_R1_001.fastq.gz"
+    adt_i1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K4me1_rep1_ADT_S1_L001_I1_001.fastq.gz"
     adt_r2: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K4me1_rep1_ADT_S1_L001_R2_001.fastq.gz"
-    hto_r1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K4me1_rep1_HTO_S2_L001_R1_001.fastq.gz"
+    hto_i1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K4me1_rep1_HTO_S2_L001_I1_001.fastq.gz"
     hto_r2: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K4me1_rep1_HTO_S2_L001_R2_001.fastq.gz"
 
   H3K4me1_rep2:
-    adt_r1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K4me1_rep2_ADT_S3_L001_R1_001.fastq.gz"
+    adt_i1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K4me1_rep2_ADT_S3_L001_I1_001.fastq.gz"
     adt_r2: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K4me1_rep2_ADT_S3_L001_R2_001.fastq.gz"
-    hto_r1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K4me1_rep2_HTO_S4_L001_R1_001.fastq.gz"
+    hto_i1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K4me1_rep2_HTO_S4_L001_I1_001.fastq.gz"
     hto_r2: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K4me1_rep2_HTO_S4_L001_R2_001.fastq.gz"
 
   H3K4me3_rep1:
-    adt_r1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K4me3_ADT_S5_L001_R1_001.fastq.gz"
+    adt_i1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K4me3_ADT_S5_L001_I1_001.fastq.gz"
     adt_r2: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K4me3_ADT_S5_L001_R2_001.fastq.gz"
-    hto_r1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K4me3_HTO_S6_L001_R1_001.fastq.gz"
+    hto_i1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K4me3_HTO_S6_L001_I1_001.fastq.gz"
     hto_r2: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K4me3_HTO_S6_L001_R2_001.fastq.gz"
 
   H3K27me3_rep1:
-    adt_r1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K27me3_ADT_S11_L001_R1_001.fastq.gz"
+    adt_i1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K27me3_ADT_S11_L001_I1_001.fastq.gz"
     adt_r2: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K27me3_ADT_S11_L001_R2_001.fastq.gz"
-    hto_r1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K27me3_HTO_S12_L001_R1_001.fastq.gz"
+    hto_i1: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K27me3_HTO_S12_L001_I1_001.fastq.gz"
     hto_r2: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs_H3K27me3_HTO_S12_L001_R2_001.fastq.gz"
 
 # -----------------------------------------------------------
@@ -47,8 +47,8 @@ outdir: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/Antibodies/PBMCs/processed_dat
 # 3.  Paths to the ALREADY-BUILT Salmon feature indices
 # -----------------------------------------------------------
 indices:
-  adt: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/indices/adt_index"
-  hto: "/date/gcb/gcb_MZ/multiNanoCT/Human_PBMCs/indices/hto_index"
+  adt: "/home/mattia/cfChromatin_in_MS/single_cell_data_processing/indices/adt_index"
+  hto: "/home/mattia/cfChromatin_in_MS/single_cell_data_processing/indices/hto_index"
 
 # -----------------------------------------------------------
 # 4.  Read geometry for CITE-seq / Feature-barcode libraries

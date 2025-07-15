@@ -1,0 +1,26 @@
+[2025-07-08 14:50:39.725] [puff::index::jointLog] [info] Running fixFasta
+[2025-07-08 14:50:39.730] [puff::index::jointLog] [info] Filter size not provided; estimating from number of distinct k-mers
+[2025-07-08 14:50:39.731] [puff::index::jointLog] [info] ntHll estimated 47296 distinct k-mers, setting filter size to 2^20
+[2025-07-08 14:50:39.766] [puff::index::jointLog] [info] Starting the Pufferfish indexing by reading the GFA binary file.
+[2025-07-08 14:50:39.766] [puff::index::jointLog] [info] Setting the index/BinaryGfa directory hto_index
+[2025-07-08 14:50:39.767] [puff::index::jointLog] [info] Done wrapping the rank vector with a rank9sel structure.
+[2025-07-08 14:50:39.767] [puff::index::jointLog] [info] contig count for validation: 9
+[2025-07-08 14:50:39.767] [puff::index::jointLog] [info] Total # of Contigs : 9
+[2025-07-08 14:50:39.767] [puff::index::jointLog] [info] Total # of numerical Contigs : 9
+[2025-07-08 14:50:39.768] [puff::index::jointLog] [info] Total # of contig vec entries: 10
+[2025-07-08 14:50:39.768] [puff::index::jointLog] [info] bits per offset entry 4
+[2025-07-08 14:50:39.768] [puff::index::jointLog] [info] Done constructing the contig vector. 10
+[2025-07-08 14:50:39.770] [puff::index::jointLog] [info] # segments = 9
+[2025-07-08 14:50:39.770] [puff::index::jointLog] [info] total length = 125
+[2025-07-08 14:50:39.770] [puff::index::jointLog] [info] Reading the reference files ...
+[2025-07-08 14:50:39.773] [puff::index::jointLog] [info] positional integer width = 7
+[2025-07-08 14:50:39.773] [puff::index::jointLog] [info] seqSize = 125
+[2025-07-08 14:50:39.773] [puff::index::jointLog] [info] rankSize = 125
+[2025-07-08 14:50:39.773] [puff::index::jointLog] [info] edgeVecSize = 0
+[2025-07-08 14:50:39.773] [puff::index::jointLog] [info] num keys = 71
+[2025-07-08 14:50:39.822] [puff::index::jointLog] [info] mphf size = 0.000785828 MB
+[2025-07-08 14:50:39.822] [puff::index::jointLog] [info] chunk size = 125
+[2025-07-08 14:50:39.822] [puff::index::jointLog] [info] chunk 0 = [0, 119)
+[2025-07-08 14:50:39.822] [puff::index::jointLog] [info] finished populating pos vector
+[2025-07-08 14:50:39.822] [puff::index::jointLog] [info] writing index components
+[2025-07-08 14:50:39.825] [puff::index::jointLog] [info] finished writing dense pufferfish index

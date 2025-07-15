@@ -35,7 +35,8 @@ ALL_FLAGSTAT = expand("{myrun}/filter/samtools/{sample}.flagstat", sample = ALL_
 BED=expand("{myrun}/bed/bedtools/{sample}.bed", sample = ALL_SAMPLES,myrun=RUNID)
 ALL_BIGWIG= expand("{myrun}/coverage/deeptools/{sample}_RPKM.bw", sample = ALL_SAMPLES,myrun=RUNID)
 SIZE=expand("{myrun}/filter/samtools/{sample}_insert.pdf", sample = ALL_SAMPLES,myrun=RUNID)
-
+PEAKS_NARROW = expand("{myrun}/peaks/macs3/{sample}_peaks.narrowPeak", sample=ALL_SAMPLES, myrun=RUNID)
+PEAKS_SUMMITS = expand("{myrun}/peaks/macs3/{sample}_summits.bed", sample=ALL_SAMPLES, myrun=RUNID)
 
 
 TARGETS = []
@@ -44,14 +45,15 @@ TARGETS.extend(ALL_BIGWIG)
 TARGETS.extend(ALL_FLAGSTAT)
 TARGETS.extend(SIZE)
 TARGETS.extend(BED)
+TARGETS.extend(PEAKS_NARROW)      
+TARGETS.extend(PEAKS_SUMMITS)     
 
 
 
 
 
 
-
-ruleorder: trimming_trimmomatic > aligning_bwa > filtered_sorted_samtools > dedup_picard > filter_chr_samtools > filter_stat > coverage_deeptools > insertsize_picard > bam_to_bed 
+ruleorder: trimming_trimmomatic > aligning_bwa > filtered_sorted_samtools > dedup_picard > filter_chr_samtools > filter_stat > coverage_deeptools > insertsize_picard > bam_to_bed  > macs3
 
 
 
@@ -196,8 +198,7 @@ rule dedup_picard:
         metrics = "{myrun}/dedup/picard/{sample}.bam_metrics.txt"
     params:
         dir="{myrun}/dedup/picard",
-        tmp="{myrun}/dedup/picard/tmp",
-        mem="200g"
+        tmp="{myrun}/dedup/picard/tmp"
     resources:
         mem_mb=300000
     threads: config['THREADS'] 
@@ -209,7 +210,7 @@ rule dedup_picard:
 
         picard AddOrReplaceReadGroups I={input.bam} O={output.RG} RGID=1 RGLB=lib1 RGPL=illumina RGPU=unit1 RGSM=sample1
         
-        java -Xmx{params.mem} -jar picard MarkDuplicates I={output.RG} O={output.dedup} M={output.metrics} VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=coordinate REMOVE_DUPLICATES=true TMP_DIR={params.tmp} 
+        picard MarkDuplicates I={output.RG} O={output.dedup} M={output.metrics} VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=coordinate REMOVE_DUPLICATES=true TMP_DIR={params.tmp} 
 
         samtools index {output.dedup} -@ {threads}
 
@@ -359,10 +360,44 @@ rule bam_to_bed:
 
         mkdir -p {params.dir}
 
-        bedtools bamtobed -i {input.filter}  > {output.bed}
+        bedtools bamtobed -i {input.filter}  > {output.bed} -bedpe
 
         """
 
+# Corrected MACS3 rule
+rule macs3:
+    input:
+        treatment = "{myrun}/filter/samtools/{sample}.bam"  # Fixed input path
+    output:
+        peaks_narrow = "{myrun}/peaks/macs3/{sample}_peaks.narrowPeak",
+        summits = "{myrun}/peaks/macs3/{sample}_summits.bed",
+        peaks_xls = "{myrun}/peaks/macs3/{sample}_peaks.xls",
+        model = "{myrun}/peaks/macs3/{sample}_model.r"
+    params:
+        outdir = "{myrun}/peaks/macs3/",
+        gsize = config['genome_size_bp'],
+        qvalue = config['peaks_qvalue']  # Should be 0.01 in config
+    resources: 
+        mem_mb=64000
+    threads: config['THREADS']
+    log: "{myrun}/peaks/macs3/{sample}.log"
+    conda:
+        "/home/mattia/miniconda3/envs/macs3.yml"
+    shell:
+        """
+        mkdir -p {params.outdir}
+        
+        macs3 callpeak \
+            -t {input.treatment} \
+            --name {wildcards.sample} \
+            --outdir {params.outdir} \
+            -f BAM \
+            --gsize {params.gsize} \
+            -q {params.qvalue} \
+            --keep-dup all \
+            --call-summits \
+            2> {log}
+        """
 #rule R_script:
     #input: 
         #bed  = "{myrun}/dedup/picard/{sample}.bam",

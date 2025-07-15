@@ -17,7 +17,7 @@ rule all:
 rule alevin_quant:
     input:
         idx = lambda wc: cfg["indices"][wc.kind],                # <-- fixed
-        r1  = lambda wc: cfg["samples"][wc.sample][f"{wc.kind}_r1"],
+        r1  = lambda wc: cfg["samples"][wc.sample][f"{wc.kind}_i1"],
         r2  = lambda wc: cfg["samples"][wc.sample][f"{wc.kind}_r2"]
     output:
         quant = temp("{outdir}/{sample}/{kind}/alevin/quants_mat.gz")
@@ -32,11 +32,9 @@ rule alevin_quant:
         """
         salmon alevin -l ISR -i {input.idx} \
               -1 {input.r1} -2 {input.r2} \
-              -p {threads}  --chromium \
-              --citeseq \
+              -p {threads}  --citeseq \
               --featureStart {params.fs} --featureLength {params.fl} \
-              --expectCells {params.ec} --naiveEqclass \
-              -o {params.out}
+              -o {params.out} --naiveEqclass
 
         touch {output.quant}
         """

@@ -10,32 +10,43 @@ TargetMod<-"H3K27ac"
 source(paste0(SourceDIR, "Calculate_HealtyRef_fun.R")) # Utility functions for non-negative matrix factorization.
 data_dir <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K27ac/"
 
-print("Loading .rdata files...")
-rdata_files <- list.files(path = data_dir, pattern = "\\.rdata$", full.names = TRUE)
-data_list <- list()
-for (rdata_file in rdata_files) {
-  var_name <- tools::file_path_sans_ext(basename(rdata_file))
-  loaded_data <- readRDS(rdata_file)
-  data_list[[var_name]] <- loaded_data
+
+# Define your healthy reference samples
+Healthy <- c(
+  "GSM7787973_HP030132_H3K27Ac", "GSM7787975_HP030642_H3K27Ac", 
+  "GSM7787978_HP031645_H3K27Ac", "GSM7787980_HP034881_H3K27Ac", 
+  "GSM7787982_HP035094_H3K27Ac", "GSM7787985_HP038748_H3K27Ac", 
+  "GSM7787987_HP041556_H3K27Ac", "GSM7787993_HP056703_H3K27Ac", 
+  "GSM7788000_HP098228_H3K27Ac"
+)
+
+
+print("Loading only required .rdata files...")
+# Get all .rdata files in the directory
+all_rdata_files <- list.files(path = data_dir, pattern = "\\.rdata$", full.names = TRUE)
+
+# Filter files to only those matching your healthy samples
+target_files <- character(0)
+for (healthy_sample in Healthy) {
+  # Look for files that contain the healthy sample name
+  matching_files <- all_rdata_files[grepl(paste0(healthy_sample, "\\.rdata$"), all_rdata_files)]
+  target_files <- c(target_files, matching_files)
 }
-# Your vector
-Healthy <- c("H10-P-Ctrl_H3K27ac_ChIP-V3", "H19-P-Ctrl_H3K27ac_ChIP-V3", "H5-P-Ctrl_H3K27ac_ChIP-V2",
-"H11-P-Ctrl_H3K27ac_ChIP-V3", "H1-P-Ctrl_H3K27ac_ChIP-V2", "H5-P-Ctrl_H3K27ac_ChIP-V3",
-"H12-P-Ctrl_H3K27ac_ChIP-V3", "H20-P-Ctrl_H3K27ac_ChIP-V3", "H6-P-Ctrl_H3K27ac_ChIP-V2-1D",
-"H13-P-Ctrl_H3K27ac_ChIP-V3", "H21-P-Ctrl_H3K27ac_ChIP-V3", "H6-P-Ctrl_H3K27ac_ChIP-V2",
-"H14-P-Ctrl_H3K27ac_ChIP-V3", "H22-P-Ctrl_H3K27ac_ChIP-V3", "H6-P-Ctrl_H3K27ac_ChIP-V3",
-"H15-P-Ctrl_H3K27ac_ChIP-V3", "H23-P-Ctrl_H3K27ac_ChIP-V3", "H7-P-Ctrl_H3K27ac_ChIP-V2",
-"H16-P-Ctrl_H3K27ac_ChIP-V3", "H24-P-Ctrl_H3K27ac_ChIP-V3", "H7-P-Ctrl_H3K27ac_ChIP-V3",
-"H17-P-Ctrl_H3K27ac_ChIP-V3", "H2-P-Ctrl_H3K27ac_ChIP-V2", "H8-P-Ctrl_H3K27ac_ChIP-V2-1D",
-"H17-P-Ctrl_H3K4me3_ChIP-V3", "H3-P-Ctrl_H3K27ac_ChIP-V2-1D", "H8-P-Ctrl_H3K27ac_ChIP-V2",
-"H18-P-Ctrl_H3K27ac_ChIP-V3", "H4-P-Ctrl_H3K27ac_ChIP-V2", "H9-P-Ctrl_H3K27ac_ChIP-V3"
- )
 
+# Load only the filtered files
+data_list <- list()
+for (rdata_file in target_files) {
+  var_name <- tools::file_path_sans_ext(basename(rdata_file))
+  # Only load if the variable name is in your Healthy vector
+  if (var_name %in% Healthy) {
+    loaded_data <- readRDS(rdata_file)
+    data_list[[var_name]] <- loaded_data
+    print(paste("Loaded:", var_name))
+  }
+}
 
-# Get the names of the tissues that are in your datasets vector
-data_list <- data_list[names(data_list) %in% Healthy]
-
-# Print single_cells
+# Print loaded samples
+print("Loaded samples:")
 print(names(data_list))
 
 
