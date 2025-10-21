@@ -30,11 +30,8 @@ for (file_path in file_paths) {
   merged_data <- rbind(merged_data, data)
 } 
 
-# Save the merged data to a new CSV file
-write.csv(merged_data, "/date/gcb/gcb_MZ/Analysis/Output/H3K27ac/QC/QC_all_samples.csv", row.names = FALSE)
 
-merged_data$Total<-NULL
-merged_data$Enhancer<-NULL
+
 # Rename the first column as "sample"
 colnames(merged_data)[1] <- "sample"
 # Rename the first column as "sample"
@@ -92,8 +89,17 @@ data <- merged_data %>%
 
 print(data)
 
+data <- merged_data %>%
+  dplyr::mutate(disease = case_when(
+    grepl("-P-.*MS", sample) ~ "MS",
+    grepl("-P-.*H", sample) ~ "Healthy donors",
+    grepl("GSM.*HP", sample) ~ "Baca healthy",
+    grepl("GSM", sample) ~ "Baca cancer",
+    TRUE ~ NA_character_
+  ))
 
-print(data)
+data <- data[data$Type %in% c("Baca healthy", "Baca cancer","P-V2","P-V3"), ]
+
 
     
 exclude_samples <- c("NA")
@@ -109,26 +115,39 @@ to_plot$Signal_Type <- factor(to_plot$Signal_Type, levels = c("% of Signal","% o
 
 
 # Reorder Group levels
-to_plot$Group <- factor(to_plot$Type, levels = c("Baca cancerl", "Baca healthy", "P-V1","P-V2","P-V3",
-                                                  "C-V1","C-V2","C-V3"))# Specify your desired order here
+to_plot$Group <- factor(to_plot$Type, levels = c("Baca cancerl", "Baca healthy","P-V2","P-V3"))# Specify your desired order here
 
 
 # Plotting
-ggplot(to_plot, aes(x =Type, y = value, fill = Type)) +
+ggplot(to_plot, aes(x = Type, y = value, fill = Type)) +
   geom_boxplot(width = 0.1, color = "#000000", outlier.shape = NA) +
   geom_jitter(width = 0.1, size = 1, color = "#000000") +
+  # Add the mean value as a red point
+  #stat_summary(fun.y = mean, geom = "point", shape = 18, size = 2, color = "black") +
+  # Print the mean number (rounded to 2 decimals) above the boxplot
+  stat_summary(
+    fun = mean,
+    geom = "text",
+    aes(label = round(..y.., 2)),
+    vjust = -5,
+    color = "black"
+  ) +
   ggthemes::theme_base() +
   xlab("") +
   ylab("% of Reads") +
-  #ylim(0,80)+
+  ylim(0,100) +
   facet_wrap(~ Signal_Type, scales = "free_y") +
   theme(panel.border = element_rect()) +
-  theme_classic() + theme(legend.position = "none") +
-  theme(axis.text.x = element_text(size = 9,  angle = 45, hjust = 1),
-        axis.text.y = element_text(size = 12, ),
-        axis.title.y = element_text(size = 12, ),
-        axis.line = element_line(size = 1))
-ggsave("/date/gcb/gcb_MZ/Analysis/QC/Signal_percentage_frag.png", plot = last_plot(), device = NULL, path = NULL, width = 150, height = 115, units = "mm", dpi = 300, limitsize = TRUE)  
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(
+    axis.text.x = element_text(size = 9,  angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
+    axis.line = element_line(size = 1)
+  )
+
+ggsave("/date/gcb/gcb_MZ/Analysis/QC/Signal_percentage_frag-hg19.png", plot = last_plot(), device = NULL, path = NULL, width = 170, height = 115, units = "mm", dpi = 300, limitsize = TRUE)  
 
 
 #select sample with signal enrichment over 65%

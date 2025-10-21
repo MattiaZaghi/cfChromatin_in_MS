@@ -27,5 +27,19 @@ target_reads: "5000000"
 SAMPLES: '/home/mattia/cfChromatin_in_MS/snakemake/SRR.txt'
 SAMPLES_JSON: '/home/mattia/cfChromatin_in_MS/snakemake/samples_ChIP.json'
 
+chrom_sizes: "/home/mattia/Genomes/hg19/hg19.chrom.sizes"
+
+input_beds_glob: "/proj/user/mattia/healthy_baca/*.bed"
+
+outdir: "bigwig"
+
+normalize_cpm: true
+
+threads: 5
+
+blacklist_bed: "/home/mattia/Genomes/hg19/hg19-blacklist.v2.bed"
+
+strand: "none"
+
 # Set the location of your Snakemake log files
 log: snakemake.log

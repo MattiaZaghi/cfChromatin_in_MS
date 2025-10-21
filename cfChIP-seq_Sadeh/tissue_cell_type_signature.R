@@ -1,5 +1,6 @@
 library(dplyr)
 library(tidyverse)
+library(plyranges)
 
 # Define the directories
 dir1 <- "/date/gcb/gcb_MZ/Analysis/Samples/H3K4me3_roadmap_hg19/"
@@ -161,3 +162,8 @@ TSS.windows_TSS<-TSS.windows[tss_indices] %>% as.data.frame()
 TSS.windows_TSS<-filtered_TSS.windows_TSS %>% dplyr::select(name,tissue) %>% unique()
 
 combined_df<-cbind(TSS.windows_TSS,sorted_data)
+
+Brain_TSS<- TSS.windows_TSS %>% dplyr::filter(tissue==c("BRAIN"))
+
+write_bed(Brain_TSS,"/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac/Brain_TSS.bed")
+

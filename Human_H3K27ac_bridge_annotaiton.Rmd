@@ -440,8 +440,35 @@ saveRDS(Brain.combined,"/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/combin
 
 Now let´s perform the data integration between the two single cell H3K27ac
 
+try to armonize better the two datasets
+
+
 ```{r}
-#Brain.combined<-readRDS("/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/combined_human_CNS_H3K27ac.rds")
+Brain.combined<-readRDS("/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/combined_human_CNS_H3K27ac.rds")
+
+Brain.combined<-RunUMAP(Brain.combined, reduction = "lsi", dims = 2:30)
+#unintegrated UMAP looking not that good
+DimPlot(Brain.combined, reduction = "umap", group.by = c("dataset"))
+```
+
+let's try to integrate together the 2 datasets
+
+
+```{r}
+Brain.combined <- IntegrateLayers(object = Brain.combined, method = CCAIntegration, orig.reduction = "lsi", new.reduction = "integrated.cca",
+    verbose = FALSE)
+
+# re-join layers after integration
+ifnb[["RNA"]] <- JoinLayers(ifnb[["RNA"]])
+
+ifnb <- FindNeighbors(ifnb, reduction = "integrated.cca", dims = 1:30)
+ifnb <- FindClusters(ifnb, resolution = 1)
+```
+
+
+
+```{r}
+Brain.combined<-readRDS("/date/gcb/gcb_MZ/Analysis/Single_Cell_data_mining/combined_human_CNS_H3K27ac.rds")
 # find integration anchors
 DefaultAssay(Human_pairTag_Cortex_multiome) <- "H3K27ac_bins"
 DefaultAssay(Human_CZI_Cortex_SC) <- "H3K27ac_bins"
