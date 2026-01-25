@@ -53,7 +53,7 @@ TARGETS.extend(PEAKS_SUMMITS)
 
 
 
-ruleorder: trimming_trimmomatic > aligning_bwa > filtered_sorted_samtools > dedup_picard > filter_chr_samtools > filter_stat > coverage_deeptools > insertsize_picard > bam_to_bed  > macs3
+ruleorder: trimming_trimmomatic > aligning_bwa > filtered_sorted_samtools > dedup_picard > filter_chr_samtools > filter_stat > coverage_deeptools > insertsize_picard > bam_to_bed > bam_to_bed_bedtools > macs3
 
 
 
@@ -347,32 +347,49 @@ rule bam_to_bed:
     input: 
         filter = "{myrun}/filter/samtools/{sample}.bam"
     output:
-        bed="{myrun}/bed/bedtools/{sample}.bed"
+        bed = "{myrun}/bed/macs3/{sample}.bed"
     params:
-        dir  = "{myrun}/bed/bedtools/"
+        dir = "{myrun}/bed/macs3/"
     resources:
-        mem_mb=64000
+        mem_mb = 64000
     threads: config['THREADS']
     conda:
-        "/home/mattia/miniconda3/envs/bedtools.yml"
+        "/home/mattia/miniconda3/envs/macs3.yml"  # Update conda env
     shell:
         """
-
         mkdir -p {params.dir}
-
-        bedtools bamtobed -i {input.filter}  > {output.bed} -bedpe
-
+        
+        macs3 randsample -i {input.filter} -f BAMPE -p 100 -o {output.bed}
         """
+
+rule bam_to_bed_bedtools:
+    input: 
+        filter = "{myrun}/filter/samtools/{sample}.bam"
+    output:
+        bed = "{myrun}/bed/bedtools/{sample}.bed"
+    params:
+        dir = "{myrun}/bed/bedtools/"
+    resources:
+        mem_mb = 64000
+    threads: config['THREADS']
+    conda:
+        "/home/mattia/miniconda3/envs/macs3.yml"  # Update conda env
+    shell:
+        """
+        mkdir -p {params.dir}
+        
+        bedtools bamtobed -i {input.filter}  -bedpe > {output.bed}
+        """
+
 
 # Corrected MACS3 rule
 rule macs3:
     input:
-        treatment = "{myrun}/filter/samtools/{sample}.bam"  # Fixed input path
+        treatment = "{myrun}/bed/macs3/{sample}.bed"  # Fixed input path
     output:
         peaks_narrow = "{myrun}/peaks/macs3/{sample}_peaks.narrowPeak",
         summits = "{myrun}/peaks/macs3/{sample}_summits.bed",
-        peaks_xls = "{myrun}/peaks/macs3/{sample}_peaks.xls",
-        model = "{myrun}/peaks/macs3/{sample}_model.r"
+        peaks_xls = "{myrun}/peaks/macs3/{sample}_peaks.xls"
     params:
         outdir = "{myrun}/peaks/macs3/",
         gsize = config['genome_size_bp'],
@@ -391,11 +408,10 @@ rule macs3:
             -t {input.treatment} \
             --name {wildcards.sample} \
             --outdir {params.outdir} \
-            -f BAM \
+            -f BEDPE \
             --gsize {params.gsize} \
             -q {params.qvalue} \
             --keep-dup all \
-            --call-summits \
             2> {log}
         """
 #rule R_script:

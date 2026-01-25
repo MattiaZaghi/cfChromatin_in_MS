@@ -84,22 +84,27 @@ data <- merged_data %>%
     grepl("-P-.*V3", sample) ~ "P-V3",
     grepl("GSM.*HP", sample) ~ "Baca healthy",
     grepl("GSM", sample) ~ "Baca cancer",
+    grepl("Tak", sample) ~ "P-V2-Takara-4729",
     TRUE ~ NA_character_
   ))
+
 
 print(data)
 
 data <- merged_data %>%
   dplyr::mutate(disease = case_when(
-    grepl("-P-.*MS", sample) ~ "MS",
-    grepl("-P-.*H", sample) ~ "Healthy donors",
+    grepl("MS-Mix.*Tak", sample) ~ "MS-Mattia",
+    grepl("-P-.*MS", sample) ~ "MS-Mattia",
+    grepl("-P-.*H", sample) ~ "Healthy-Mattia",
+    grepl("Tak", sample) ~ "Healthy-Mattia",
     grepl("GSM.*HP", sample) ~ "Baca healthy",
     grepl("GSM", sample) ~ "Baca cancer",
     TRUE ~ NA_character_
   ))
 
-data <- data[data$Type %in% c("Baca healthy", "Baca cancer","P-V2","P-V3"), ]
+data <- data[data$Type %in% c("Baca healthy", "Baca cancer","P-V1","P-V2","P-V3","P-V2-Takara-4729"), ]
 
+data <- data[data$disease %in% c("Baca healthy", "Baca cancer","Healthy-Mattia","MS-Mattia"), ]
 
     
 exclude_samples <- c("NA")
@@ -107,19 +112,19 @@ data <- data[!data$Group %in% exclude_samples, ]
 
 # Reshape data to long format
 to_plot <- data %>%
-  pivot_longer(cols = c("% of Signal","% of Background"), names_to = "Signal_Type", values_to = "value")
+  pivot_longer(cols = "% of Background", names_to = "Signal_Type", values_to = "value")
 
 
 # Reorder Signal_Type levels
-to_plot$Signal_Type <- factor(to_plot$Signal_Type, levels = c("% of Signal","% of Background"))
+to_plot$Signal_Type <- factor(to_plot$Signal_Type, levels = "% of Background")
 
 
 # Reorder Group levels
-to_plot$Group <- factor(to_plot$Type, levels = c("Baca cancerl", "Baca healthy","P-V2","P-V3"))# Specify your desired order here
+to_plot$Group <- factor(to_plot$Type, levels = c("Baca healthy", "Baca cancer","P-V1","P-V2","P-V3","P-V2-Takara-4729"))# Specify your desired order here
 
 
 # Plotting
-ggplot(to_plot, aes(x = Type, y = value, fill = Type)) +
+p<-ggplot(to_plot, aes(x = Type, y = value, fill = Type)) +
   geom_boxplot(width = 0.1, color = "#000000", outlier.shape = NA) +
   geom_jitter(width = 0.1, size = 1, color = "#000000") +
   # Add the mean value as a red point
@@ -130,27 +135,28 @@ ggplot(to_plot, aes(x = Type, y = value, fill = Type)) +
     geom = "text",
     aes(label = round(..y.., 2)),
     vjust = -5,
-    color = "black"
+    color = "black",
+    size = 7
   ) +
   ggthemes::theme_base() +
   xlab("") +
-  ylab("% of Reads") +
-  ylim(0,100) +
+  ylab("% of Signal") +
+  #ylim(0,100) +
   facet_wrap(~ Signal_Type, scales = "free_y") +
   theme(panel.border = element_rect()) +
   theme_classic() +
   theme(legend.position = "none") +
   theme(
-    axis.text.x = element_text(size = 9,  angle = 45, hjust = 1),
-    axis.text.y = element_text(size = 12),
-    axis.title.y = element_text(size = 12),
-    axis.line = element_line(size = 1)
+    axis.text.x = element_text(size = 18,  angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 20),
+    axis.title.y = element_text(size = 20),
+    axis.line = element_line(size = 1),
+    strip.text = element_text(size = 24, face = "bold")
   )
+p
+ggplot2::ggsave("/date/gcb/gcb_MZ/Analysis/QC/background_percentage.png", width = 24, height = 16, dpi = 300, plot = p)
 
-ggsave("/date/gcb/gcb_MZ/Analysis/QC/Signal_percentage_frag-hg19.png", plot = last_plot(), device = NULL, path = NULL, width = 170, height = 115, units = "mm", dpi = 300, limitsize = TRUE)  
-
-
-#select sample with signal enrichment over 65%
+á#select sample with signal enrichment over 65%
 
 
 data_65 <- data[!grepl("GSM", data$sample), ]

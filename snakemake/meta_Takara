@@ -1,0 +1,9 @@
+sample_name	fastq_name	factor	assay	type	reference
+MS-Mix	MS_MIX	H3K27ac	ChIP-Tak	narrow	human
+H30-Ctrl	H30	H3K27ac	ChIP-Tak	narrow	human
+H32-Ctrl	H32	H3K27ac	ChIP-Tak	narrow	human
+H41-Ctrl	H41	H3K27ac	ChIP-Tak	narrow	human
+H42-Ctrl	H42	H3K27ac	ChIP-Tak	narrow	human
+H43-Ctrl	H43	H3K27ac	ChIP-Tak	narrow	human
+H44-Ctrl	H44	H3K27ac	ChIP-Tak	narrow	human
+

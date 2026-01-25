@@ -1,8 +1,8 @@
 # proj parameters
-RUN_ID: "cfChrom_hg19" # "RUN_id"
+RUN_ID: "cfChrom_Tak" # "RUN_id"
 THREADS: 5
 # trimming
-adapters: "/home/mattia/Trimmomatic/adapters/NebNext_adpters.fa"
+adapters: "/home/mattia/Trimmomatic/adapters/TruSeq3-PE-2.fa"
 # peaks
 genome_size_bp: hs
 peaks_qvalue: 0.01
@@ -25,7 +25,7 @@ index_bwa_hg: "/home/mattia/Genomes/hg19/fa/bwa/hg19"
 target_reads: "5000000"
 # Path to a JSON file with samples and their corresponding FASTQ files.
 SAMPLES: '/home/mattia/cfChromatin_in_MS/snakemake/SRR.txt'
-SAMPLES_JSON: '/home/mattia/cfChromatin_in_MS/snakemake/samples_ChIP.json'
+SAMPLES_JSON: '/home/mattia/cfChromatin_in_MS/snakemake/samples_ChIP_Takara.json'
 
 chrom_sizes: "/home/mattia/Genomes/hg19/hg19.chrom.sizes"
 

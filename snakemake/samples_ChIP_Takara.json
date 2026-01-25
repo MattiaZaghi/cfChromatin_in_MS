@@ -1,0 +1,58 @@
+{
+    "H30-Ctrl": {
+        "H3K27ac": {
+            "ChIP-Tak": [
+                "/date/gcb/gcb_NextSeq_sensitive/251215_VH02084_15_AAHL7YNM5/Analysis/2/Data/fastq/H30_S2_R2_001.fastq.gz",
+                "/date/gcb/gcb_NextSeq_sensitive/251215_VH02084_15_AAHL7YNM5/Analysis/2/Data/fastq/H30_S2_R1_001.fastq.gz"
+            ]
+        }
+    },
+    "H32-Ctrl": {
+        "H3K27ac": {
+            "ChIP-Tak": [
+                "/date/gcb/gcb_NextSeq_sensitive/251215_VH02084_15_AAHL7YNM5/Analysis/2/Data/fastq/H32_S3_R2_001.fastq.gz",
+                "/date/gcb/gcb_NextSeq_sensitive/251215_VH02084_15_AAHL7YNM5/Analysis/2/Data/fastq/H32_S3_R1_001.fastq.gz"
+            ]
+        }
+    },
+    "H41-Ctrl": {
+        "H3K27ac": {
+            "ChIP-Tak": [
+                "/date/gcb/gcb_NextSeq_sensitive/251215_VH02084_15_AAHL7YNM5/Analysis/2/Data/fastq/H41_S4_R2_001.fastq.gz",
+                "/date/gcb/gcb_NextSeq_sensitive/251215_VH02084_15_AAHL7YNM5/Analysis/2/Data/fastq/H41_S4_R1_001.fastq.gz"
+            ]
+        }
+    },
+    "H42-Ctrl": {
+        "H3K27ac": {
+            "ChIP-Tak": [
+                "/date/gcb/gcb_NextSeq_sensitive/251215_VH02084_15_AAHL7YNM5/Analysis/2/Data/fastq/H42_S5_R2_001.fastq.gz",
+                "/date/gcb/gcb_NextSeq_sensitive/251215_VH02084_15_AAHL7YNM5/Analysis/2/Data/fastq/H42_S5_R1_001.fastq.gz"
+            ]
+        }
+    },
+    "H43-Ctrl": {
+        "H3K27ac": {
+            "ChIP-Tak": [
+                "/date/gcb/gcb_NextSeq_sensitive/251215_VH02084_15_AAHL7YNM5/Analysis/2/Data/fastq/H43_S6_R1_001.fastq.gz",
+                "/date/gcb/gcb_NextSeq_sensitive/251215_VH02084_15_AAHL7YNM5/Analysis/2/Data/fastq/H43_S6_R2_001.fastq.gz"
+            ]
+        }
+    },
+    "H44-Ctrl": {
+        "H3K27ac": {
+            "ChIP-Tak": [
+                "/date/gcb/gcb_NextSeq_sensitive/251215_VH02084_15_AAHL7YNM5/Analysis/2/Data/fastq/H44_S7_R1_001.fastq.gz",
+                "/date/gcb/gcb_NextSeq_sensitive/251215_VH02084_15_AAHL7YNM5/Analysis/2/Data/fastq/H44_S7_R2_001.fastq.gz"
+            ]
+        }
+    },
+    "MS-Mix": {
+        "H3K27ac": {
+            "ChIP-Tak": [
+                "/date/gcb/gcb_NextSeq_sensitive/251215_VH02084_15_AAHL7YNM5/Analysis/2/Data/fastq/MS_MIX_S1_R2_001.fastq.gz",
+                "/date/gcb/gcb_NextSeq_sensitive/251215_VH02084_15_AAHL7YNM5/Analysis/2/Data/fastq/MS_MIX_S1_R1_001.fastq.gz"
+            ]
+        }
+    }
+}
