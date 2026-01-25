@@ -1,0 +1,67 @@
+# Extended Configuration File for cfChromatin Pipeline with SNAPIE Features
+# Add these parameters to your existing config_Cut_Tag.yaml
+
+# ===== ORIGINAL PARAMETERS (from cfChromatin - KEEP AS IS) =====
+# RUN_ID: "run_name"
+# THREADS: 8
+# genome_size_bp: 3200000000  # For human genome
+# binsize: 50
+# norm_method: "RPKM"  # or "BPM"
+# smooth_length: 150
+# peaks_qvalue: 0.01
+# SAMPLES_JSON: "path/to/samples.json"
+# adapters: "path/to/adapters.fa"
+# index_bt2_hg: "path/to/bowtie2/index"
+# index_bwa_hg: "path/to/bwa/index"
+# c_t: "CUT_TAG"  # Control sample identifier
+# chip: "ChIP"    # ChIP sample identifier
+
+# ===== NEW PARAMETERS (for extended features) =====
+
+# FastQC Configuration
+fastqc_enabled: true
+fastqc_min_length: 36  # Minimum read length threshold
+
+# Fragment Analysis
+frag_length_min: 30  # Minimum fragment size to consider
+frag_length_max: 1000  # Maximum fragment size to consider
+nmer_motif: 3  # k-mer length for motif analysis (2-5 bp typically)
+
+# Peak Annotation
+gtf_annotation: ""  # Path to GTF/GFF file for annotation
+                     # Example: "ref_files/hg38/genes.gtf"
+                     # Leave empty to skip annotation
+
+# Reference Genome (required for motif/GC analysis)
+genome_fasta: ""  # Path to reference genome FASTA
+                   # Example: "ref_files/hg38/hg38.fa"
+                   # Leave empty to skip GC/motif analysis
+
+# Enrichment Analysis
+enrichment_marks:  # List of histone marks to analyze
+  - H3K4me3
+  - H3K27ac
+
+# Directory containing enrichment reference files
+# Structure should be: ref_files/enrichment_states/{mark}/on.target.filt.bed
+#                                                     {mark}/off.target.filt.bed
+enrichment_on_target_dir: "ref_files/enrichment_states"
+
+# SNP Fingerprinting (optional, for sample identity verification)
+snp_reference: ""  # Path to VCF file with known SNPs
+                    # Example: "ref_files/snps/common_snps.vcf.gz"
+                    # Leave empty to skip fingerprinting
+
+# SMaSH script location (for SNP fingerprinting)
+smash_script: "auxiliar_programs/SMaSH.py"
+
+# Quality Report Settings
+generate_multiqc: true  # Generate MultiQC HTML report
+qc_output_dir: "qc_reports"  # Output directory for QC reports
+
+# Library Complexity Settings
+preseq_seed: 12345  # Random seed for reproducibility
+
+# Advanced Settings
+enable_properly_paired_filter: false  # Set to true to create pp-filtered BAM
+temp_keep_sam: false  # Keep intermediate SAM files (uses disk space)
