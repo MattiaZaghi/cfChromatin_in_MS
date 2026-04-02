@@ -1,0 +1,41 @@
+# Converted from nextflow.config (initial scaffold).
+genome: "hg19"
+report_peak_genomic_annotation: false
+fragle_ct_estimation: true
+exclude_dac_regions: true
+deduped_bam: false
+outputFolder: "/date/gcb/gcb_MZ/SNAPIE"
+until: "BAM_SIGNAL_PROCESSING"
+read_method: "PE"
+trim_method: "FASTP"
+containers:
+  multiqc: "quay.io/biocontainers/multiqc:1.25.2--pyhdfd78af_0"
+  bwa: "quay.io/biocontainers/bwa:0.7.18--he4a0461_1"
+  samtools: "quay.io/biocontainers/samtools:1.15.1--h1170115_0"
+
+# Paths to auxiliar programs (preserve relative paths)
+pathEnrichmentScript: "auxiliar_programs/enrichment.sh"
+pathRPileups: "auxiliar_programs/read_pileups.R"
+pathSNPSMaSH: "auxiliar_programs/SMaSH.py"
+
+# Samples / input 
+samplesheet: /home/mattia/SNAPIE/config/samplesheet.csv
+sample_dir_bam: null
+ 
+# Paths
+refdir: "/home/mattia/Genomes/hg19/"
+genome_fa: "/home/mattia/Genomes/hg19/fa/bwa/hg19"
+chrom_sizes: "/home/mattia/Genomes/hg19/hg19.chrom.sizes"
+reads_dir: "reads"
+controls_dir: "controls"
+ 
+# Tool parameters (mirrors nextflow.config)
+filter_samtools_pe_params: "-f 3 -F 3844 -q 30"
+filter_samtools_se_params: "-F 3844 -q 30"
+trimming_params: "--q 20"
+trimming_params_fastp: "--adapter_sequence=AGATCGGAAGAGCACACGTCTGAACTCCAGTCA --adapter_sequence_r2=AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+bwa_params: "-I 250,200,2000,10"
+#deeptools
+binsize: "10"
+norm_method: "RPKM"
+smooth_length: "300"

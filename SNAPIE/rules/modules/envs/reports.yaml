@@ -1,0 +1,7 @@
+name: snapie-reports
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python
+  - pandas
