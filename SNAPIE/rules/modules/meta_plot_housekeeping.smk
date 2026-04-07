@@ -1,38 +1,35 @@
 rule meta_plot_housekeeping:
     """
-    Generate meta-coverage plots around housekeeping gene TSSs for each sample.
+    Generate meta-coverage plots around TSS and Enhancer regions for each sample.
+    Matches the cfChIP-seq Sadeh pipeline style:
+      - Left panel:  TSS meta-plot (Meta-genes.bed with CpG/expression groups)
+      - Right panel: Enhancer meta-plot (Meta-enhancers.bed with tissue-breadth groups)
+      - Black heatmap background, red color, line plot above.
     Input: deeptools bigWig (normalized coverage).
     Output: per-sample PDF in reports/meta_plots/.
     """
     conda: "envs/r_plots.yaml"
     input:
-        bw=config['outputFolder'] + "/bigwig/deeptools/{sample}.bw",
-        regions=config.get('housekeeping_bed',
-                           'housekeeping_genes_comprehensive.bed')
+        bw=config['outputFolder'] + "/bigwig/deeptools/{sample}.bw"
     output:
         pdf=config['outputFolder'] + "/reports/meta_plots/{sample}_housekeeping_meta.pdf"
     params:
         sample="{sample}",
         script=config.get('pathMetaPlotScript',
                           'auxiliar_programs/meta_plot_housekeeping.R'),
-        metaplot_r=config.get('pathMetaPlotR',
-                              'auxiliar_programs/meta_plot_r_functions.R'),
-        window=config.get('meta_plot_window', 10000),
+        metaplot_r=config.get('pathMetaPlotR', ''),
+        meta_genes=config.get('meta_genes_bed', ''),
+        meta_enhancers=config.get('meta_enhancers_bed', ''),
         binsize=config.get('meta_plot_binsize', 25),
-        color=config.get('meta_plot_color', 'steelblue'),
         outdir=config['outputFolder'] + "/reports/meta_plots/"
     threads: 1
     shell:
         """
         mkdir -p {params.outdir}
-        Rscript {params.script} \
-            --bw      {input.bw} \
-            --regions {input.regions} \
-            --output  {output.pdf} \
-            --sample  {params.sample} \
-            --window  {params.window} \
-            --binsize {params.binsize} \
-            --color   {params.color} \
-            || true
+        ARGS="--bw {input.bw} --output {output.pdf} --sample {params.sample} --binsize {params.binsize}"
+        [ -n "{params.metaplot_r}" ]     && ARGS="$ARGS --metaplot_r {params.metaplot_r}"
+        [ -n "{params.meta_genes}" ]     && ARGS="$ARGS --meta_genes {params.meta_genes}"
+        [ -n "{params.meta_enhancers}" ] && ARGS="$ARGS --meta_enhancers {params.meta_enhancers}"
+        Rscript {params.script} $ARGS || true
         touch {output.pdf}
         """

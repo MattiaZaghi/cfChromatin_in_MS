@@ -1,10 +1,10 @@
 # Converted from nextflow.config (initial scaffold).
 genome: "hg19"
-report_peak_genomic_annotation: false
-fragle_ct_estimation: true
+report_peak_genomic_annotation: true
+fragle_ct_estimation: false
 exclude_dac_regions: true
-deduped_bam: false
-outputFolder: "/date/gcb/gcb_MZ/SNAPIE"
+deduped_bam: true
+outputFolder: "/date/gcb/gcb_MZ/SNAPIE2"
 until: "BAM_SIGNAL_PROCESSING"
 read_method: "PE"
 trim_method: "FASTP"
@@ -39,3 +39,10 @@ bwa_params: "-I 250,200,2000,10"
 binsize: "10"
 norm_method: "RPKM"
 smooth_length: "300"
+
+# Meta-coverage plots (cfChIP-seq Sadeh style: TSS + Enhancer panels)
+pathMetaPlotScript: "auxiliar_programs/meta_plot_housekeeping.R"
+pathMetaPlotR: "/home/mattia/cfChromatin_in_MS/cfChIP-seq_Sadeh/MetaPlot.R"
+meta_genes_bed: "/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac/Meta-genes.bed"
+meta_enhancers_bed: "/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac/Meta-enhancers.bed"
+meta_plot_binsize: 25

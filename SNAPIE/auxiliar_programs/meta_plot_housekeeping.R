@@ -1,17 +1,18 @@
 #!/usr/bin/env Rscript
 # meta_plot_housekeeping.R
-# Generates meta-coverage plots around housekeeping gene TSSs from a bigWig file.
-# Uses MetaPlot.R functions (CollectMeta, ggPlotCovergeGroups, ggPlotHeatMap).
+# Generates meta-coverage plots matching the cfChIP-seq Sadeh pipeline style:
+#   - Left panel:  TSS meta-plot (Meta-genes.bed, groups: CpG.High/Low, NonCpG.High/Low, NotExpressed)
+#   - Right panel: Enhancer meta-plot (Meta-enhancers.bed, groups: Many/Middle/none)
+#   - Black heatmap background with red color, line plot above
 #
 # Usage:
 #   Rscript meta_plot_housekeeping.R \
-#     --bw        /path/to/sample.bw \
-#     --regions   /path/to/housekeeping_genes.bed \
-#     --output    /path/to/sample_housekeeping_meta.pdf \
-#     --sample    SAMPLE_NAME \
-#     --metaplot  /path/to/MetaPlot.R \
-#     --window    10000 \
-#     --binsize   25
+#     --bw            /path/to/sample.bw \
+#     --meta_genes    /path/to/Meta-genes.bed \
+#     --meta_enhancers /path/to/Meta-enhancers.bed \
+#     --output        /path/to/sample_meta.pdf \
+#     --sample        SAMPLE_NAME \
+#     --metaplot_r    /path/to/MetaPlot.R   # optional, functions embedded if absent
 
 suppressPackageStartupMessages({
   library(optparse)
@@ -24,30 +25,34 @@ suppressPackageStartupMessages({
 
 # ─── Argument parsing ─────────────────────────────────────────────────────────
 option_list <- list(
-  make_option("--bw",       type="character", help="Input bigWig file"),
-  make_option("--regions",  type="character", help="Housekeeping genes BED file (4-col: chr start end name)"),
-  make_option("--output",   type="character", help="Output PDF file"),
-  make_option("--sample",   type="character", default="sample", help="Sample name for plot title"),
-  make_option("--metaplot", type="character", default=NULL,
-              help="Path to MetaPlot.R (if not provided, functions are defined internally)"),
-  make_option("--window",   type="integer",   default=10000,
-              help="Total window size in bp around TSS [default: 10000 = ±5kb]"),
-  make_option("--binsize",  type="integer",   default=25,
-              help="Bin size in bp for coverage aggregation [default: 25]"),
-  make_option("--color",    type="character", default="steelblue",
-              help="Heatmap color [default: steelblue]")
+  make_option("--bw",             type="character", help="Input bigWig file"),
+  make_option("--meta_genes",     type="character", default=NULL,
+              help="Meta-genes BED file (6-col with name groups: a.CpG.High, b.CpG.Low, ...)"),
+  make_option("--meta_enhancers", type="character", default=NULL,
+              help="Meta-enhancers BED file (6-col with name groups: a.Many, b.Middle, z.none)"),
+  make_option("--output",         type="character", help="Output PDF file"),
+  make_option("--sample",         type="character", default="sample", help="Sample name for plot title"),
+  make_option("--metaplot_r",     type="character", default=NULL,
+              help="Path to MetaPlot.R (functions embedded if not provided)"),
+  make_option("--binsize",        type="integer",   default=25,
+              help="Bin size in bp [default: 25]")
 )
 opt <- parse_args(OptionParser(option_list=option_list))
 
-if (is.null(opt$bw) || is.null(opt$regions) || is.null(opt$output)) {
-  stop("--bw, --regions, and --output are required.")
+if (is.null(opt$bw) || is.null(opt$output)) {
+  stop("--bw and --output are required.")
+}
+if (is.null(opt$meta_genes) && is.null(opt$meta_enhancers)) {
+  stop("At least one of --meta_genes or --meta_enhancers is required.")
 }
 
 # ─── Load MetaPlot functions ──────────────────────────────────────────────────
-if (!is.null(opt$metaplot) && file.exists(opt$metaplot)) {
-  source(opt$metaplot)
+if (!is.null(opt$metaplot_r) && file.exists(opt$metaplot_r)) {
+  message("Sourcing MetaPlot functions from: ", opt$metaplot_r)
+  source(opt$metaplot_r)
 } else {
-  # Embed CollectMeta and plotting functions (from MetaPlot.R)
+  message("Using embedded MetaPlot functions")
+
   CollectMeta <- function(Cov, Regions, Width, Offset, WindowSize=10, Norm=1) {
     Regions <- resize(Regions, width=Offset + 0.5 * width(Regions), fix="end")
     Regions <- resize(Regions, width=Width, fix="start")
@@ -65,7 +70,7 @@ if (!is.null(opt$metaplot) && file.exists(opt$metaplot)) {
   }
 
   ggPlotCovergeGroups <- function(A, pos=5000, label="TSS", Kbytes=100,
-                                  xtickSpace=5, extraSpace=4, main="", ylim=NULL) {
+                                  xtickSpace=5, extraSpace=0, main="", ylim=NULL) {
     if (is.null(ylim)) {
       M <- max(0, max(sapply(A, max), na.rm=TRUE) * 1.1)
       m <- min(0, min(sapply(A, min), na.rm=TRUE) * 1.1)
@@ -93,16 +98,16 @@ if (!is.null(opt$metaplot) && file.exists(opt$metaplot)) {
     xlim <- c(-Kbytes * pos / 1000, iwidth - Kbytes * (pos / 1000 + extraSpace))
     p <- p + scale_x_continuous(name="", breaks=labelat, labels=labelval,
                                  limits=xlim, expand=c(0, 0))
-    p <- p + scale_y_continuous(name="Coverage", expand=c(0, 0), limits=ylim)
+    p <- p + scale_y_continuous(name="", expand=c(0, 0), limits=ylim)
     p <- p + labs(title=main)
     p <- p + theme(text=element_text(colour="black", size=8),
                    axis.text=element_text(colour="black", size=8))
     p
   }
 
-  ggPlotHeatMap <- function(A, xlab="", ylab="Gene", zlab="Coverage", title="",
+  ggPlotHeatMap <- function(A, xlab="", ylab="", zlab="Coverage", title="",
                             zlim=NULL, offset=5000, label="TSS", Kbytes=100,
-                            color="red", bg.color="white", xtickSpace=5) {
+                            color="red", bg.color="black", xtickSpace=5) {
     m   <- do.call(rbind, A)
     n   <- ncol(m)
     rownames(m) <- seq_len(nrow(m))
@@ -112,6 +117,7 @@ if (!is.null(opt$metaplot) && file.exists(opt$metaplot)) {
     labels <- paste0(breaks / Kbytes, "Kb")
     labels[labels == "0Kb"] <- label
     ybreaks <- cumsum(sapply(A, nrow))
+    ylabels <- names(A)
     df      <- melt(m, varnames=c("y", "x"))
     df$x    <- df$x - ioff
     t1 <- quantile(m, probs=0.99, na.rm=TRUE)
@@ -135,31 +141,119 @@ if (!is.null(opt$metaplot) && file.exists(opt$metaplot)) {
                    axis.text=element_text(colour="black", size=8))
     p
   }
+
+  PlotMeta <- function(Cov, PlotList, WindowSize=25, Norm=1) {
+    # fixCoverage: pad chromosomes to seqlengths from the coverage object itself
+    sl <- lengths(Cov)
+    fixCoverage <- function(Cv) {
+      for (chr in names(sl)) {
+        l <- length(Cv[[chr]])
+        m <- sl[[chr]]
+        if (!is.na(m) && l < m)
+          Cv[[chr]] <- append(Cv[[chr]], Rle(0, m - l))
+      }
+      Cv
+    }
+    Cov <- fixCoverage(Cov)
+    message("Norm: ", Norm)
+
+    p.list <- lapply(PlotList, function(pl) {
+      RegionGroups <- split(pl$BED, pl$BED$name)
+      RegionGroups <- RegionGroups[order(names(RegionGroups), decreasing=TRUE)]
+      message("Groups: ", paste(names(RegionGroups), collapse=", "))
+      names(RegionGroups) <- sub("^[[:lower:]]\\.", "", names(RegionGroups))
+
+      Ms <- lapply(RegionGroups, function(g) {
+        CollectMeta(Cov, g, pl$Width, pl$Offset, WindowSize, Norm)
+      })
+      Ls <- lapply(Ms, colMeans)
+
+      if (!is.null(pl$Max) && as.numeric(pl$Max) > 0) {
+        clim <- c(0, as.numeric(pl$Max))
+      } else {
+        Ls_max <- max(max(unlist(Ls)))
+        if (Ls_max > 3) {
+          clim <- c(0, 5 * ceiling(Ls_max / 5))
+        } else {
+          clim <- c(0, ceiling(Ls_max))
+        }
+      }
+      message("clim: ", paste(clim, collapse=", "))
+
+      Kb   <- 1000 / WindowSize
+      p_meta <- ggPlotCovergeGroups(Ls, pos=pl$Offset, label=pl$Label,
+                                    xtickSpace=pl$Tick / 1000,
+                                    Kbytes=Kb, ylim=clim, extraSpace=0)
+      p_heat <- ggPlotHeatMap(Ms, offset=pl$Offset, label=pl$Label,
+                              Kbytes=Kb, ylab="", color=pl$Color,
+                              bg.color=pl$BGColor, zlim=clim,
+                              xtickSpace=pl$Tick / 1000)
+      p_heat <- p_heat + guides(fill="none") +
+        theme(axis.text.x=element_blank(),
+              axis.ticks.x=element_blank(),
+              axis.title.x=element_blank())
+      list(p_meta, p_heat)
+    })
+
+    p.list.flat <- c(lapply(p.list, function(l) l[[1]]),
+                     lapply(p.list, function(l) l[[2]]))
+    plot_grid(plotlist=p.list.flat, ncol=length(PlotList), align="vh",
+              rel_heights=rep(c(1, 2), length(PlotList)), axis="lrtb")
+  }
 }
 
-# ─── Import bigWig ─────────────────────────────────────────────────────────────
+# ─── Import bigWig as RleList coverage ────────────────────────────────────────
 message("Importing bigWig: ", opt$bw)
-bw_gr  <- import(opt$bw, as="GRanges")
-# Build RleList coverage from the bigWig signal
-Cov    <- coverage(bw_gr, weight=bw_gr$score)
+bw_gr <- import(opt$bw, as="GRanges")
+Cov   <- coverage(bw_gr, weight=bw_gr$score)
 
-# ─── Load housekeeping gene regions → TSS GRanges ─────────────────────────────
-message("Loading housekeeping regions: ", opt$regions)
-bed    <- read.table(opt$regions, header=FALSE, sep="\t", stringsAsFactors=FALSE,
-                     col.names=c("chr", "start", "end", "name"))
+# ─── Build PlotList ───────────────────────────────────────────────────────────
+mp_list <- list()
 
-# Use gene start as TSS (1-based), single-bp anchor
-tss_gr <- GRanges(
-  seqnames = bed$chr,
-  ranges   = IRanges(start=bed$start + 1L, width=1L),   # BED is 0-based
-  strand   = "*",
-  name     = bed$name
-)
-# Keep only chromosomes present in the bigWig
-tss_gr <- tss_gr[as.character(seqnames(tss_gr)) %in% names(Cov)]
+if (!is.null(opt$meta_genes) && file.exists(opt$meta_genes)) {
+  message("Loading Meta-genes BED: ", opt$meta_genes)
+  meta_genes <- import(opt$meta_genes)
+  # Keep only chromosomes present in the bigWig
+  meta_genes <- meta_genes[as.character(seqnames(meta_genes)) %in% names(Cov)]
+  if (length(meta_genes) > 0) {
+    mp_list[["Gene"]] <- list(
+      BED     = meta_genes,
+      Offset  = 5000,
+      Width   = 25000,
+      Tick    = 5000,
+      Label   = "TSS",
+      Max     = -1,
+      Color   = "red",
+      BGColor = "black"
+    )
+  } else {
+    warning("No Meta-genes regions overlap with bigWig chromosomes — skipping TSS panel.")
+  }
+}
 
-if (length(tss_gr) == 0) {
-  warning("No housekeeping regions overlap with bigWig chromosomes. Writing empty output.")
+if (!is.null(opt$meta_enhancers) && file.exists(opt$meta_enhancers)) {
+  message("Loading Meta-enhancers BED: ", opt$meta_enhancers)
+  meta_enh <- import(opt$meta_enhancers)
+  meta_enh <- meta_enh[as.character(seqnames(meta_enh)) %in% names(Cov)]
+  if (length(meta_enh) > 0) {
+    mp_list[["Enhancer"]] <- list(
+      BED     = meta_enh,
+      Offset  = 25000,
+      Width   = 50000,
+      Tick    = 10000,
+      Label   = "Enhancer",
+      Max     = -1,
+      Color   = "red",
+      BGColor = "black"
+    )
+  } else {
+    warning("No Meta-enhancer regions overlap with bigWig chromosomes — skipping Enhancer panel.")
+  }
+}
+
+if (length(mp_list) == 0) {
+  warning("No valid regions found. Writing empty output.")
+  dir.create(dirname(opt$output), showWarnings=FALSE, recursive=TRUE)
   pdf(opt$output, width=8, height=6)
   plot.new()
   title(paste0(opt$sample, " — no overlapping regions found"))
@@ -167,76 +261,15 @@ if (length(tss_gr) == 0) {
   quit(status=0)
 }
 
-# ─── Compute coverage matrix ───────────────────────────────────────────────────
-Width    <- opt$window      # total bp
-Offset   <- Width / 2       # TSS at window centre
-BinSize  <- opt$binsize
-
-message(sprintf("Computing coverage matrix (%d regions, ±%d bp, %d bp bins)",
-                length(tss_gr), Offset, BinSize))
-
-# Group all housekeeping genes as one group named by sample
-region_list <- list()
-region_list[[opt$sample]] <- tss_gr
-
-Ms <- lapply(region_list, function(g) {
-  CollectMeta(Cov, g, Width=Width, Offset=Offset, WindowSize=BinSize, Norm=1)
-})
-
-# Average profiles
-Ls <- lapply(Ms, colMeans)
-
-# Colour limits
-Ls_max <- max(unlist(Ls))
-if (Ls_max > 3) {
-  clim <- c(0, 5 * ceiling(Ls_max / 5))
-} else {
-  clim <- c(0, max(ceiling(Ls_max), 1))
-}
-
-Kbytes   <- 1000 / BinSize   # windows per kb
-TickStep <- 2000             # x-axis tick every 2 kb
-
-# ─── Build plots ──────────────────────────────────────────────────────────────
-p_meta <- ggPlotCovergeGroups(
-  Ls,
-  pos       = Offset,
-  label     = "TSS",
-  Kbytes    = Kbytes,
-  xtickSpace= TickStep / 1000,
-  extraSpace= 0,
-  main      = paste0(opt$sample, " — Housekeeping gene coverage"),
-  ylim      = clim
-)
-
-p_heat <- ggPlotHeatMap(
-  Ms,
-  offset    = Offset,
-  label     = "TSS",
-  Kbytes    = Kbytes,
-  ylab      = "Genes (ranked by coverage)",
-  zlab      = "Coverage",
-  title     = "",
-  color     = opt$color,
-  bg.color  = "white",
-  zlim      = clim,
-  xtickSpace= TickStep / 1000
-)
-p_heat <- p_heat +
-  guides(fill="none") +
-  theme(axis.text.x=element_blank(),
-        axis.ticks.x=element_blank(),
-        axis.title.x=element_blank())
-
-# ─── Combine and save ─────────────────────────────────────────────────────────
-message("Saving plot: ", opt$output)
+# ─── Plot and save ────────────────────────────────────────────────────────────
+message(sprintf("Generating meta-plot for %s (%d panel(s))", opt$sample, length(mp_list)))
 dir.create(dirname(opt$output), showWarnings=FALSE, recursive=TRUE)
 
-p_combined <- plot_grid(p_heat, p_meta, ncol=1, align="v",
-                        rel_heights=c(2, 1), axis="lrtb")
+p <- PlotMeta(Cov=Cov, PlotList=mp_list, WindowSize=opt$binsize, Norm=1)
+p <- p + ggtitle(opt$sample)
 
-pdf(opt$output, width=8, height=10)
-print(p_combined)
+pdf(opt$output, width=8 * length(mp_list), height=11)
+print(p)
 dev.off()
 
-message("Done.")
+message("Done: ", opt$output)
