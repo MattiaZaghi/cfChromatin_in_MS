@@ -50,6 +50,18 @@ if (is.null(opt$meta_genes) && is.null(opt$meta_enhancers)) {
 if (!is.null(opt$metaplot_r) && file.exists(opt$metaplot_r)) {
   message("Sourcing MetaPlot functions from: ", opt$metaplot_r)
   source(opt$metaplot_r)
+  # MetaPlot.R defines CollectMeta/ggPlotCovergeGroups/ggPlotHeatMap/PlotMeta
+  # but NOT fixCoverage (that lives in cfChIP-Functions.R) — define it here
+  fixCoverage <- function(Cov) {
+    sl <- lengths(Cov)
+    for (chr in names(sl)) {
+      l <- length(Cov[[chr]])
+      m <- sl[[chr]]
+      if (!is.na(m) && l < m)
+        Cov[[chr]] <- append(Cov[[chr]], Rle(0, m - l))
+    }
+    Cov
+  }
 } else {
   message("Using embedded MetaPlot functions")
 
