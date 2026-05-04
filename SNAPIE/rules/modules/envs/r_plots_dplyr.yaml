@@ -1,0 +1,16 @@
+name: r_plots_dplyr
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - r-base>=4.2
+  - r-optparse
+  - r-ggplot2
+  - r-cowplot
+  - r-reshape2
+  - r-dplyr
+  - bioconductor-rtracklayer
+  - bioconductor-genomicranges
+  - bioconductor-iranges
+  - bioconductor-biocgenerics

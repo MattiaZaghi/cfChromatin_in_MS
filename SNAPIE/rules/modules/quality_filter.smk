@@ -3,7 +3,7 @@ rule quality_filter:
     input:
         bam=config['outputFolder'] + "/align/unique/{sample}.unique.sorted.bam"
     output:
-        filtered=config['outputFolder'] + "/align/filtered/{sample}.filtered.unique.sorted.bam",
+        filtered=temp(config['outputFolder'] + "/align/filtered/{sample}.filtered.unique.sorted.bam"),
         versions=config['outputFolder'] + "/align/{sample}/samtools_QualityFilter_mqc_versions.yml"
     params:
         pe_flags=config.get('filter_samtools_pe_params', '-f 3 -F 3844 -q 30'),

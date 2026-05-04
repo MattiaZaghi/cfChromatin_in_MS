@@ -2,7 +2,7 @@ rule end_motif_gc:
     conda: "envs/align.yaml"
     input:
         bam=config['outputFolder'] + "/align/namesorted/{sample}.n_sorted.bam",
-        genome=config.get('ref_dir', 'ref_files') + "/" + config.get('genome', 'hg19') + ".fa"
+        genome=config.get('genome_fasta', config.get('refdir', 'ref_files') + "/fa/" + config.get('genome', 'hg19') + ".fa")
     output:
         motif=config['outputFolder'] + "/motifs/{sample}/{sample}_4NMER_bp_motif.bed"
     params:
@@ -51,9 +51,9 @@ rule end_motif_gc:
         awk -v nmer="$NMER" 'OFS="\t" {{print $1, $2, $2+nmer, $7, $8, $9, $11, $12, $1, $2, $6}}' "$BEDFILT" > "$BPR1"
         awk -v nmer="$NMER" 'OFS="\t" {{print $4, $6-nmer, $6, $7, $8, $10, $11, $12, $1, $2, $6}}' "$BEDFILT" > "$BPR2"
 
-        bedtools getfasta -fi "$GENOME" -bed "$BPR1" -s -bedOut -fo | \
+        paste "$BPR1" <(bedtools getfasta -fi "$GENOME" -bed "$BPR1" -s -tab -fo /dev/stdout | awk '{{print $2}}') | \
             awk 'OFS="\t" {{print $1, $10, $11, $6, $7, $8, toupper($12)}}' > "$BPR1FA"
-        bedtools getfasta -fi "$GENOME" -bed "$BPR2" -s -bedOut -fo | \
+        paste "$BPR2" <(bedtools getfasta -fi "$GENOME" -bed "$BPR2" -s -tab -fo /dev/stdout | awk '{{print $2}}') | \
             awk 'OFS="\t" {{print toupper($12)}}' > "$BPR2FA"
 
         awk '{{getline line < f2; print $0 "\t" line}}' f2="$BPR2FA" "$BPR1FA" > {output.motif}

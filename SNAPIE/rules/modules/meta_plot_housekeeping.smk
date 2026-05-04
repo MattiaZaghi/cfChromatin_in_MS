@@ -10,7 +10,7 @@ rule meta_plot_housekeeping:
     """
     conda: "envs/r_plots.yaml"
     input:
-        bw=config['outputFolder'] + "/bigwig/deeptools/{sample}.bw"
+        bw=config['outputFolder'] + "/bigwig/{sample}.bw"
     output:
         pdf=config['outputFolder'] + "/reports/meta_plots/{sample}_housekeeping_meta.pdf"
     params:

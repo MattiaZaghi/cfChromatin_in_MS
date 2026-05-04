@@ -4,7 +4,7 @@ rule align_bwa:
         reads1=config['outputFolder'] + "/trim/{sample}_R1_trimmed.fq.gz",
         reads2=config['outputFolder'] + "/trim/{sample}_R2_trimmed.fq.gz"
     output:
-        sam=temporary(config['outputFolder'] + "/align/raw/{sample}.sam")
+        sam=temp(config['outputFolder'] + "/align/raw/{sample}.sam")
     params:
         threads=10,
         time="20:00:00",
@@ -25,7 +25,7 @@ rule sam_to_bam:
     input:
         sam=config['outputFolder'] + "/align/raw/{sample}.sam"
     output:
-        bam=config['outputFolder'] + "/align/raw/{sample}.bam"
+        bam=temp(config['outputFolder'] + "/align/raw/{sample}.bam")
     params:
         threads=10,
         time="20:00:00",

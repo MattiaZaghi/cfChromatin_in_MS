@@ -1,0 +1,24 @@
+# Claude
+.claude/
+
+# Snakemake runtime
+.snakemake/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Large genome/sequencing files
+*.bam
+*.bai
+*.bigwig
+*.bw
+*.bedgraph
+*.fastq
+*.fastq.gz
+*.fq
+*.fq.gz

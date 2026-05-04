@@ -4,7 +4,7 @@ report_peak_genomic_annotation: true
 fragle_ct_estimation: false
 exclude_dac_regions: true
 deduped_bam: true
-outputFolder: "/date/gcb/gcb_MZ/SNAPIE2"
+outputFolder: "/date/gcb/gcb_MZ/SNAPIE"
 until: "BAM_SIGNAL_PROCESSING"
 read_method: "PE"
 trim_method: "FASTP"
@@ -19,12 +19,13 @@ pathRPileups: "auxiliar_programs/read_pileups.R"
 pathSNPSMaSH: "auxiliar_programs/SMaSH.py"
 
 # Samples / input 
-samplesheet: /home/mattia/SNAPIE/config/samplesheet.csv
+samplesheet: /home/mattia/cfChromatin_in_MS/SNAPIE/config/samplesheet.csv
 sample_dir_bam: null
  
 # Paths
 refdir: "/home/mattia/Genomes/hg19/"
 genome_fa: "/home/mattia/Genomes/hg19/fa/bwa/hg19"
+genome_fasta: "/home/mattia/Genomes/hg19/fa/hg19.fa"
 chrom_sizes: "/home/mattia/Genomes/hg19/hg19.chrom.sizes"
 reads_dir: "reads"
 controls_dir: "controls"
@@ -40,7 +41,20 @@ binsize: "10"
 norm_method: "RPKM"
 smooth_length: "300"
 
+# External published fragment BED files (Sadeh et al., GSE accession)
+external_bed_dir: "/date/gcb/gcb_MZ/Analysis/BED/H3K27ac"
+
+# H3K27ac enrichment score (chromHMM on/off-target reference BEDs)
+# Build once with: python auxiliar_programs/build_chromhmm_reference.py
+#   --chromhmm_dir  /path/to/roadmap_chromhmm_beds
+#   --chrom_sizes   /home/mattia/Genomes/hg19/hg19.chrom.sizes
+#   --blacklist     /home/mattia/Genomes/hg19/hg19-blacklist.v2.bed
+#   --out_dir       ref_files  --threads 8
+chromhmm_ontarget:  "ref_files/chromhmm_ontarget_H3K27ac.bed"
+chromhmm_offtarget: "ref_files/chromhmm_offtarget_H3K27ac.bed"
+
 # Meta-coverage plots (cfChIP-seq Sadeh style: TSS + Enhancer panels)
+housekeeping_promoters_bed: "ref_files/housekeeping_promoters.bed"
 pathMetaPlotScript: "auxiliar_programs/meta_plot_housekeeping.R"
 pathMetaPlotR: "/home/mattia/cfChromatin_in_MS/cfChIP-seq_Sadeh/MetaPlot.R"
 meta_genes_bed: "/date/gcb/gcb_MZ/Analysis/cfChIP-seq/SetupFiles/H3K27ac/Meta-genes.bed"

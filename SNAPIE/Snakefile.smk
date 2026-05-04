@@ -46,6 +46,7 @@ include: "rules/modules/snp_smash_fingerprint.smk"
 # Fragments processing
 include: "rules/modules/end_motif_gc.smk"
 include: "rules/modules/calcFragsLength.smk"
+include: "rules/modules/frag_size_plot.smk"
 include: "rules/modules/bam_to_bed.smk"
 include: "rules/modules/unique_frags.smk"
 include: "rules/modules/frags_report.smk"
@@ -56,7 +57,6 @@ include: "rules/modules/fragle_ct_estimation.smk"
 include: "rules/modules/ct_report.smk"
 
 # Signal processing
-include: "rules/modules/bam_to_bedgraph.smk"
 include: "rules/modules/bedgraph_to_bigwig.smk"
 include: "rules/modules/call_peaks.smk"
 include: "rules/modules/peaks_annotations.smk"
@@ -67,8 +67,18 @@ include: "rules/modules/merge_enrichment_reports.smk"
 include: "rules/modules/chromatin_count_normalization.smk"
 include: "rules/modules/igv_reports.smk"
 
+# Enrichment score QC (requires pre-built chromHMM reference BEDs)
+include: "rules/modules/enrichment_score.smk"
+
+# Sample QC flagging (data-driven knee-point thresholds)
+include: "rules/modules/qc_flag.smk"
+
+# External published cohort enrichment (Sadeh et al. GSM BED files)
+include: "rules/modules/external_enrichment.smk"
+
 # Meta plots
 include: "rules/modules/meta_plot_housekeeping.smk"
+include: "rules/modules/meta_plot_hk_promoters.smk"
 
 # Reports
 include: "rules/modules/quality_report_lite.smk"
@@ -109,30 +119,56 @@ else:
     FINAL_BAM = DEDUP
     FINAL_BAI = expand(OUT + "/align/dedup/{sample}.dedup.unique.sorted.bam.bai", sample=SAMPLES)
 
-BED          = expand(OUT + "/frags/{sample}.bed",               sample=SAMPLES)
-BEDGRAPH     = expand(OUT + "/bedgraph/{sample}.bedgraph",        sample=SAMPLES)
-BIGWIG       = expand(OUT + "/bigwig/{sample}.bw",               sample=SAMPLES)
-DEEPTOOLS_BW = expand(OUT + "/bigwig/deeptools/{sample}.bw",     sample=SAMPLES)
+BED    = expand(OUT + "/frags/{sample}.bed",   sample=SAMPLES)
+BIGWIG = expand(OUT + "/bigwig/{sample}.bw",   sample=SAMPLES)
 PEAKS        = expand(OUT + "/peaks/{sample}.narrowPeak",        sample=SAMPLES)
-FRAG_SIZES   = expand(OUT + "/frags/{sample}/{sample}.fragment_sizes.txt", sample=SAMPLES)
+FRAG_SIZES        = expand(OUT + "/frags/{sample}/{sample}.fragment_sizes.txt", sample=SAMPLES)
+FRAG_SIZE_PERSAMPLE = expand(OUT + "/reports/qc/frag_size/{sample}_fragment_size.pdf", sample=SAMPLES)
+FRAG_SIZE_GROUPS  = OUT + "/reports/qc/fragment_size_by_group.pdf"
 MOTIFS       = expand(OUT + "/motifs/{sample}/{sample}_4NMER_bp_motif.bed", sample=SAMPLES)
 LIB_COMPLEX  = expand(OUT + "/align/{sample}/{sample}.lc_extrap.txt", sample=SAMPLES)
 UNIQUE_FRAGS = expand(OUT + "/frags/{sample}/{sample}_unique_frags.csv", sample=SAMPLES)
 
 META_PLOTS    = expand(OUT + "/reports/meta_plots/{sample}_housekeeping_meta.pdf", sample=SAMPLES)
+HK_PROM_META  = expand(OUT + "/reports/qc/hk_meta/{sample}_hk_promoters_meta.pdf", sample=SAMPLES)
+
+# Enrichment score targets — only added when chromHMM reference BEDs exist
+_ENRICH_ON_PATH  = config.get('chromhmm_ontarget',  'ref_files/chromhmm_ontarget_H3K27ac.bed')
+_ENRICH_OFF_PATH = config.get('chromhmm_offtarget', 'ref_files/chromhmm_offtarget_H3K27ac.bed')
+_ENRICHMENT_AVAILABLE = (
+    os.path.exists(_ENRICH_ON_PATH) and os.path.getsize(_ENRICH_ON_PATH) > 0 and
+    os.path.exists(_ENRICH_OFF_PATH) and os.path.getsize(_ENRICH_OFF_PATH) > 0
+)
+ENRICHMENT_PLOTS        = expand(OUT + "/reports/enrichment/{sample}_enrichment_score.pdf", sample=SAMPLES)
+ENRICHMENT_COMPARISON   = OUT + "/reports/enrichment/enrichment_comparison_plots.pdf"
+ENRICHMENT_CROSS_COMP   = OUT + "/reports/enrichment/enrichment_cross_comparison.pdf"
+
+MULTIQC_FASTQC = OUT + "/reports/multiqc/multiqc_fastqc.html"
 
 TARGETS = []
 TARGETS.extend(FINAL_BAM)
 TARGETS.extend(FINAL_BAI)
 TARGETS.extend(BED)
-TARGETS.extend(BEDGRAPH)
 TARGETS.extend(BIGWIG)
-TARGETS.extend(DEEPTOOLS_BW)
 TARGETS.extend(PEAKS)
 TARGETS.extend(FRAG_SIZES)
+TARGETS.extend(FRAG_SIZE_PERSAMPLE)
+TARGETS.append(FRAG_SIZE_GROUPS)
 TARGETS.extend(UNIQUE_FRAGS)
 TARGETS.extend(LIB_COMPLEX)
 TARGETS.extend(META_PLOTS)
+TARGETS.extend(HK_PROM_META)
+TARGETS.append(MULTIQC_FASTQC)
+
+if _ENRICHMENT_AVAILABLE and SAMPLES:
+    TARGETS.extend(ENRICHMENT_PLOTS)
+    TARGETS.append(ENRICHMENT_COMPARISON)
+    TARGETS.append(OUT + "/qc/qc_summary.tsv")
+    TARGETS.append(OUT + "/reports/qc/qc_distributions.pdf")
+    # Cross-comparison with external GSM cohort (only if external BED dir exists)
+    _EXT_BED_DIR = config.get('external_bed_dir', '/date/gcb/gcb_MZ/Analysis/BED/H3K27ac')
+    if os.path.isdir(_EXT_BED_DIR):
+        TARGETS.append(ENRICHMENT_CROSS_COMP)
 
 if config.get('read_method', 'PE') == 'PE':
     TARGETS.extend(MOTIFS)

@@ -1,0 +1,15 @@
+name: ms_cfchipmaps_r
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - r-base=4.3
+  - bioconductor-ruvseq>=1.36    # RUVg
+  - bioconductor-edaseq>=2.36    # EDASeq (RUVSeq dependency)
+  - r-glmmtmb>=1.1               # ZINB sensitivity
+  - r-ggplot2>=3.4
+  - r-reshape2>=1.4
+  - r-dplyr>=1.1
+  - r-data.table>=1.14
+  - r-optparse>=1.7

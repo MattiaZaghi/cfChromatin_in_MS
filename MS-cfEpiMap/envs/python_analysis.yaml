@@ -1,0 +1,23 @@
+name: ms_cfchipmaps_py
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.11
+  - pandas>=2.0
+  - numpy>=1.24
+  - scipy>=1.11
+  - matplotlib>=3.7
+  - seaborn>=0.13
+  - scikit-learn>=1.3
+  - xgboost>=2.0
+  - optuna>=3.3
+  - shap>=0.43
+  - gseapy>=1.1
+  - pydeseq2>=0.4
+  - deeptools>=3.5          # bamCoverage for bigWig generation
+  - bedtools>=2.31
+  - pip
+  - pip:
+      - pydeseq2>=0.4

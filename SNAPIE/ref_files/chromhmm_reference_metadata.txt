@@ -1,0 +1,13 @@
+mark=H3K27ac
+chromhmm_model=15-state Roadmap Epigenomics core marks
+n_samples=127
+active_states=1_TssA,2_TssAFlnk,6_EnhG,7_Enh
+ontarget_fraction_threshold=0.0
+offtarget_flank_exclusion_bp=10000
+min_region_bp=1000
+blacklist=/home/mattia/Genomes/hg19/hg19-blacklist.v2.bed
+chrom_sizes=/home/mattia/Genomes/hg19/hg19.chrom.sizes
+ontarget_n_regions=276339
+ontarget_total_bp=1182478200
+offtarget_n_regions=6412
+offtarget_total_bp=54090800

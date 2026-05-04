@@ -3,7 +3,7 @@ rule sort_bam:
     input:
            bam=config['outputFolder'] + "/align/raw/{sample}.bam"
     output:
-           sorted=config['outputFolder'] + "/align/sorted/{sample}.sorted.bam"
+           sorted=temp(config['outputFolder'] + "/align/sorted/{sample}.sorted.bam")
     params:
         dirname=config['outputFolder'] + "/align/"
     threads: 10
@@ -22,7 +22,7 @@ rule sort_readname_bam:
             config['outputFolder'] + f"/align/dedup/{wildcards.sample}.dedup.unique.sorted.bam"
         )
     output:
-        bam=config['outputFolder'] + "/align/namesorted/{sample}.n_sorted.bam"
+        bam=temp(config['outputFolder'] + "/align/namesorted/{sample}.n_sorted.bam")
     params:
         read_method=config.get('read_method', 'PE')
     threads: 10

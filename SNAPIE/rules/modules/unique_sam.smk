@@ -3,7 +3,7 @@ rule unique_sam:
     input:
         bam=config['outputFolder'] + "/align/pp/{sample}.pp.sorted.bam"
     output:
-        bam=config['outputFolder'] + "/align/unique/{sample}.unique.sorted.bam"
+        bam=temp(config['outputFolder'] + "/align/unique/{sample}.unique.sorted.bam")
     threads: 4
     shell:
         """

@@ -1,0 +1,120 @@
+# MS-cfEpiMap — H3K27ac cfChIP-seq analysis pipeline
+#
+# ── Output root ───────────────────────────────────────────────────────────────
+# Change this ONE path to redirect all pipeline output (reference/, results/)
+# to a different location. Every relative path in every rule file resolves
+# under this directory via Snakemake's workdir directive in the Snakefile.
+outdir: /date/gcb/gcb_MZ/MS-cfEpiMap
+
+# ── Input data (SNAPIE preprocessed outputs) ──────────────────────────────────
+# These are absolute paths to preprocessing outputs — unaffected by outdir.
+data:
+  frags_dir:    /date/gcb/gcb_MZ/SNAPIE/frags
+  bam_dir:      /date/gcb/gcb_MZ/SNAPIE/align/dac
+  bam_suffix:   .dac_filtered.dedup.unique.sorted.bam
+  peaks_dir:    /date/gcb/gcb_MZ/SNAPIE/peaks
+  peaks_suffix: _peaks.narrowPeak
+
+# ── Sample metadata ───────────────────────────────────────────────────────────
+# Absolute path — this is a repo file in the code directory, not under outdir.
+sample_metadata: /home/mattia/cfChromatin_in_MS/MS-cfEpiMap/config/sample_metadata.tsv
+
+# ── Genome reference ──────────────────────────────────────────────────────────
+genome:
+  assembly:    hg19
+  chrom_sizes: /home/mattia/Genomes/hg19/hg19.chrom.sizes
+  dac_regions: /home/mattia/Genomes/hg19/hg19-blacklist.v2.bed
+
+# ── Reference RRE files (produced by Module 1, written under outdir) ──────────
+rre:
+  universe_bed:      reference/rre/ms_rre_universe.bed
+  cns_bed:           reference/rre/cns_rre.bed
+  immune_bed:        reference/rre/immune_rre.bed
+  bcell_bed:         reference/rre/bcell_rre.bed
+  gwas_proximal_bed: reference/rre/gwas_proximal_rre.bed
+  merge_distance_bp: 200
+  min_size_bp:       100
+  max_size_bp:       10000
+  # Per-cell-type CNS subsets (only list cell types whose BED is non-empty)
+  cns_cell_types:
+    - oligodendrocyte
+    - neuron
+    - astrocyte
+    - microglia
+  cns_celltype_beds:
+    oligodendrocyte: reference/rre/oligodendrocyte_rre.bed
+    neuron:          reference/rre/neuron_rre.bed
+    astrocyte:       reference/rre/astrocyte_rre.bed
+    microglia:       reference/rre/microglia_rre.bed
+  # opc and gwas_proximal BEDs are currently empty — re-add when data is available
+
+# ── Normalization (Module 2) ──────────────────────────────────────────────────
+normalization:
+  constitutive_anchors_bed: reference/rre/constitutive_anchors.bed
+  # housekeeping_seed is a static repo file — absolute path so workdir does not affect it
+  housekeeping_seed:    /home/mattia/cfChromatin_in_MS/MS-cfEpiMap/reference/rre/housekeeping_seed.bed
+  min_anchor_celltypes: 0.8     # fraction of downloaded cell types that must be active (≥80%); auto-scales to however many were downloaded
+  flag_sf_sd_threshold: 3.0     # flag samples >N SD from mean SF
+
+# ── Bins (Module 6) ───────────────────────────────────────────────────────────
+bins:
+  size_bp:         5000
+  min_mean_count:  5
+  restrict_to_rre: true
+
+# ── B Cell Index (Module 3) ───────────────────────────────────────────────────
+bcell:
+  flag_above_ctrl_fold: 1.5
+  min_bcell_rre:        500
+
+# ── Batch correction / RUVg (Module 7b) ──────────────────────────────────────
+batch:
+  column: batch
+  ruv:
+    n_factors: 2
+
+# ── DESeq2 (Module 7c) ────────────────────────────────────────────────────────
+# The design formula is built dynamically at runtime based on which covariates
+# are actually present and non-NA in sample_metadata.tsv.
+# Covariates are added in order: always-on first, then optional ones checked at
+# runtime. Add a covariate here when the metadata column becomes available —
+# no code changes needed elsewhere.
+deseq2:
+  fdr: 0.05
+  lfc: 1.0
+  min_mean_count: 5  # pre-filter: drop features with row mean < this before DESeq2
+  # Always-on covariates (included regardless of metadata completeness)
+  design_always:   ["W_1", "W_2", "rituximab_treated", "group"]
+  # Optional covariates — included only when the metadata column is non-NA
+  # in at least 80% of samples. Add to this list as data arrives.
+  design_optional: ["sex", "age_group", "bci_scaled", "batch",
+                    "disease_duration_yrs", "edss", "nfl"]
+  ref_level:      [group, Ctrl]
+  contrasts:
+    - [MS-Rituximab-Progressive, MS-Rituximab-Stable]
+    - [NEW, Ctrl]
+    - [MS-Rituximab-Stable, NEW]
+    - [MS-Rituximab-Progressive, Ctrl]
+
+# ── glmmTMB (Module 7d — bins only) ──────────────────────────────────────────
+glmmtmb:
+  family:             nbinom2
+  ziformula:          "~1"
+  zinb_confirmed_fdr: 0.05
+
+# ── TF activity (Module 8) ────────────────────────────────────────────────────
+tf_activity:
+  min_sites:    100
+  # tf_sites_dir is a static repo directory — absolute path so workdir does not affect it
+  tf_sites_dir: /home/mattia/cfChromatin_in_MS/MS-cfEpiMap/reference/tf_sites
+
+# ── Machine learning (Module 10) ─────────────────────────────────────────────
+ml:
+  random_seed:     42
+  n_optuna_trials: 100
+  cv_strategy:     loocv
+  cv_folds:        5
+  max_features:    200
+
+# ── Compute resources ─────────────────────────────────────────────────────────
+threads: 8

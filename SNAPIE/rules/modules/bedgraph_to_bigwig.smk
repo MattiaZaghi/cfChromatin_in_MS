@@ -1,21 +1,11 @@
-rule bedgraph_to_bigwig:
-    conda: "envs/align.yaml"
-    input:
-        bedgraph=config['outputFolder'] + "/bedgraph/{sample}.bedgraph",
-        chromsizes=config.get('chrom_sizes', '')
-    output:
-        bw=config['outputFolder'] + "/bigwig/{sample}.bw"
-    params:
-        dirname=config['outputFolder'] + "/bigwig/"
-    shell:
-        """
-        mkdir -p {params.dirname};
-        bedGraphToBigWig {input.bedgraph} {input.chromsizes} {output.bw} || true
-        """
+# deeptools bamCoverage — the only bigWig generation step in the pipeline.
+# The bedgraph → bedGraphToBigWig path has been removed; deeptools handles
+# normalisation, binning, and smoothing in a single step directly from the BAM.
+
 rule coverage_deeptools:
     conda: "envs/common.yaml"
     input:
-        dedup=lambda wildcards: (
+        bam=lambda wildcards: (
             config['outputFolder'] + f"/align/dac/{wildcards.sample}.dac_filtered.dedup.unique.sorted.bam"
             if config.get('exclude_dac_regions', False) else
             config['outputFolder'] + f"/align/dedup/{wildcards.sample}.dedup.unique.sorted.bam"
@@ -26,15 +16,20 @@ rule coverage_deeptools:
             config['outputFolder'] + f"/align/dedup/{wildcards.sample}.dedup.unique.sorted.bam.bai"
         )
     output:
-        bw_deeptools=config['outputFolder'] + "/bigwig/deeptools/{sample}.bw"
+        bw=config['outputFolder'] + "/bigwig/{sample}.bw"
     params:
-        dirname=config['outputFolder'] + "/bigwig/deeptools/",
-        mapping_qual_bw = config['binsize'],
-        norm= config['norm_method'],
-        smooth= config['smooth_length']
+        binsize=config.get('binsize', '10'),
+        norm=config.get('norm_method', 'RPKM'),
+        smooth=config.get('smooth_length', '300')
     threads: 20
     shell:
         """
-        mkdir -p {params.dirname};
-        bamCoverage -b {input.dedup} --outFileName {output.bw_deeptools} --normalizeUsing {params.norm} --binSize {params.mapping_qual_bw} --smoothLength {params.smooth} --numberOfProcessors {threads} --exactScaling   || true
+        mkdir -p $(dirname {output.bw})
+        bamCoverage -b {input.bam} \
+            --outFileName {output.bw} \
+            --normalizeUsing {params.norm} \
+            --binSize {params.binsize} \
+            --smoothLength {params.smooth} \
+            --numberOfProcessors {threads} \
+            --exactScaling || true
         """

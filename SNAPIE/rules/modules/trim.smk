@@ -42,8 +42,8 @@ rule trim_galore:
         r1=lambda w: reads_from_samplesheet(w)['r1'],
         r2=lambda w: reads_from_samplesheet(w)['r2']
     output:
-        r1_trim=config['outputFolder'] + "/trim/{sample}_R1_trimmed.fq.gz",
-        r2_trim=config['outputFolder'] + "/trim/{sample}_R2_trimmed.fq.gz",
+        r1_trim=temp(config['outputFolder'] + "/trim/{sample}_R1_trimmed.fq.gz"),
+        r2_trim=temp(config['outputFolder'] + "/trim/{sample}_R2_trimmed.fq.gz"),
         report=config['outputFolder'] + "/trim/{sample}_trim_report.txt"
     params:
         threads=4,
@@ -61,8 +61,8 @@ rule trim_fastp:
         r1=lambda w: reads_from_samplesheet(w)['r1'],
         r2=lambda w: reads_from_samplesheet(w)['r2']
     output:
-        r1_trim=config['outputFolder'] + "/trim/{sample}_R1_trimmed.fq.gz",
-        r2_trim=config['outputFolder'] + "/trim/{sample}_R2_trimmed.fq.gz",
+        r1_trim=temp(config['outputFolder'] + "/trim/{sample}_R1_trimmed.fq.gz"),
+        r2_trim=temp(config['outputFolder'] + "/trim/{sample}_R2_trimmed.fq.gz"),
         json=config['outputFolder'] + "/trim/{sample}_fastp.json",
         html=config['outputFolder'] + "/trim/{sample}_fastp.html"
     params:

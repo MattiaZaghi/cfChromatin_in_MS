@@ -1,0 +1,14 @@
+# Snakemake default profile for SNAPIE
+#
+# rerun-triggers: only re-run jobs when output files are missing or older than
+# their inputs (mtime) or when new input files appear (input).
+# Software-env and code changes do NOT automatically trigger reruns.
+#
+# Rationale: this is a long-running pipeline on a cluster. Env hash changes from
+# adding packages to a YAML should never force a full restart. Enforce
+# reproducibility by creating NEW env files rather than modifying existing ones.
+# If you genuinely want to rerun with updated software, use --forcerun <rule>.
+
+rerun-triggers:
+  - mtime
+  - input

@@ -3,7 +3,7 @@ rule filter_properly_paired:
     input:
         bam=config['outputFolder'] + "/align/sorted/{sample}.sorted.bam"
     output:
-        bam=config['outputFolder'] + "/align/pp/{sample}.pp.sorted.bam"
+        bam=temp(config['outputFolder'] + "/align/pp/{sample}.pp.sorted.bam")
     params:
         read_method=config.get('read_method', 'PE')
     threads: 4

@@ -1,0 +1,9 @@
+name: tf_jaspar
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.10
+  - numpy
+  - requests
+  - bedtools

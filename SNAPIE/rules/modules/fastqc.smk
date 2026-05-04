@@ -1,39 +1,52 @@
-rule fastqc:
-    conda: "envs/qc.yaml"
-    input:
-        reads1=lambda w: __reads_for_fastqc(w)['reads1'],
-        reads2=lambda w: __reads_for_fastqc(w)['reads2']
-    output:
-        html=config['outputFolder'] + "/fastqc/{sample}/{sample}_fastqc.html",
-        zip=config['outputFolder'] + "/fastqc/{sample}/{sample}_fastqc.zip"
-    params:
-        threads=2
-    shell:
-        """
-        mkdir -p $(dirname {output.html});
-        fastqc --threads {params.threads} {input.reads1} {input.reads2} || true
-        """
+# ── FastQC on raw reads ────────────────────────────────────────────────────────
+#
+# FastQC names its output files after the *input fastq basename*, not the
+# sample name, and produces one HTML + one ZIP per fastq file (so 2 pairs for
+# PE data).  Because the fastq filenames are read dynamically from the
+# samplesheet we cannot predict the exact output filenames at DAG-build time.
+#
+# Solution: direct FastQC output into a per-sample directory with -o, then
+# touch a sentinel file (.done) when it finishes.  MultiQC reads the whole
+# fastqc/ tree recursively, so it picks up all per-sample directories
+# regardless of the individual filenames inside.
 
-def __reads_for_fastqc(wildcards):
-    # Reuse samplesheet lookup from trim module if available, otherwise fallback
-    import csv, os
+import csv, os
+
+def _fastqc_reads(wildcards):
+    """Return (r1, r2) paths for a given sample from the samplesheet."""
     ss = config.get('samplesheet', '')
     if ss and os.path.exists(ss):
         with open(ss) as fh:
-            reader = csv.DictReader(fh)
-            for row in reader:
+            for row in csv.DictReader(fh):
                 sid = row.get('sampleId') or row.get('sample') or row.get('sample_id')
                 if sid == wildcards.sample:
                     r1 = row.get('read1') or row.get('read1_path') or row.get('Read1')
                     r2 = row.get('read2') or row.get('read2_path') or row.get('Read2')
                     if r1 and r2:
-                        return dict(reads1=r1, reads2=r2)
+                        return r1, r2
+    # Fallback: conventional filename pattern in reads_dir
     reads_dir = config.get('reads_dir', 'reads')
     r1 = os.path.join(reads_dir, f"{wildcards.sample}_R1_001.fastq.gz")
     r2 = os.path.join(reads_dir, f"{wildcards.sample}_R2_001.fastq.gz")
-    # prefer existing files
-    if not os.path.exists(r1):
-        r1 = os.path.join(reads_dir, f"{wildcards.sample}_R1.fastq.gz")
-    if not os.path.exists(r2):
-        r2 = os.path.join(reads_dir, f"{wildcards.sample}_R2.fastq.gz")
-    return dict(reads1=r1, reads2=r2)
+    return r1, r2
+
+
+rule fastqc:
+    """Run FastQC on both R1 and R2 for a single sample.
+
+    Output is a sentinel file; the actual HTML/ZIP reports land in the same
+    directory and are collected by MultiQC in the next step.
+    """
+    conda: "envs/qc.yaml"
+    input:
+        reads=lambda w: list(_fastqc_reads(w))
+    output:
+        done=touch(config['outputFolder'] + "/fastqc/{sample}/.done")
+    params:
+        outdir=config['outputFolder'] + "/fastqc/{sample}",
+        threads=config.get('threads', 4)
+    shell:
+        """
+        mkdir -p {params.outdir}
+        fastqc --threads {params.threads} -o {params.outdir} {input.reads}
+        """

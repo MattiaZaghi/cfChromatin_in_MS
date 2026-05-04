@@ -3,7 +3,7 @@ rule dedup_bam:
     input:
         bam=config['outputFolder'] + "/align/filtered/{sample}.filtered.unique.sorted.bam"
     output:
-        RG=config['outputFolder'] + "/align/dedup/{sample}.dedup.RG.bam",
+        RG=temp(config['outputFolder'] + "/align/dedup/{sample}.dedup.RG.bam"),
         dedup=config['outputFolder'] + "/align/dedup/{sample}.dedup.unique.sorted.bam",
         metrics=config['outputFolder'] + "/align/dedup/{sample}-MarkDuplicates.metrics.txt"
     params:
@@ -14,10 +14,12 @@ rule dedup_bam:
         """
         mkdir -p {params.dirname};
 
+        export _JAVA_OPTIONS="-Xmx16g -Xms2g"
+
         picard AddOrReplaceReadGroups I={input.bam} O={output.RG} RGID=1 RGLB=lib1 RGPL=illumina RGPU=unit1 RGSM=sample1
 
-        picard MarkDuplicates I={output.RG} O={output.dedup} REMOVE_DUPLICATES=true ASSUME_SORT_ORDER=coordinate VALIDATION_STRINGENCY=LENIENT METRICS_FILE={output.metrics} || true
+        picard MarkDuplicates I={output.RG} O={output.dedup} REMOVE_DUPLICATES=true ASSUME_SORT_ORDER=coordinate VALIDATION_STRINGENCY=LENIENT METRICS_FILE={output.metrics}
 
-        samtools index {output.dedup} || true
-            
+        samtools index {output.dedup}
+
         """
