@@ -1244,7 +1244,7 @@ def _ws_contrib(grp: pd.DataFrame) -> pd.DataFrame:
     exc   = grp["excess"].clip(lower=0).fillna(0)
     total = exc.sum()
     grp = grp.copy()
-    grp["contribution"] = (exc / total).where(total > 0, 0.0)
+    grp["contribution"] = (exc / total) if total > 0 else 0.0
     return grp
 
 
