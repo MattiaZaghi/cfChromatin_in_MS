@@ -19,8 +19,9 @@ rule compute_deconvolution:
         ),
         rre_universe = config["rre"]["universe_bed"],
         anchors      = config["normalization"]["constitutive_anchors_bed"],
-        sf           = "results/normalization/constitutive_scaling_factors.tsv",
-        meta         = config["sample_metadata"],
+        sf             = "results/normalization/constitutive_scaling_factors.tsv",
+        anchor_matrix  = "results/normalization/anchor_counts.tsv",
+        meta           = config["sample_metadata"],
     output:
         scores       = "results/deconvolution/signature_scores.tsv",
         composite    = "results/deconvolution/composite_indices.tsv",
