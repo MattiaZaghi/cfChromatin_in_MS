@@ -27,9 +27,16 @@ rule compute_deconvolution:
         composite    = "results/deconvolution/composite_indices.tsv",
         heatmap      = "results/deconvolution/deconvolution_heatmap.pdf",
         violin       = "results/deconvolution/deconvolution_violin.pdf",
+        within_sample_scores       = "results/deconvolution/scores_within_sample.tsv",
+        within_sample_qc           = "results/deconvolution/qc_within_sample.tsv",
+        within_sample_log2fe       = "results/deconvolution/fig_within_sample_log2FE.pdf",
+        within_sample_contribution = "results/deconvolution/fig_within_sample_contribution.pdf",
+        within_sample_qc_png       = "results/deconvolution/qc_within_sample.png",
     params:
         samples   = SAMPLES,
         frags_dir = config["data"]["frags_dir"],
+        genome_fasta = config["genome"].get("fasta", ""),
+        chrom_sizes  = config["genome"]["chrom_sizes"],
     conda:  "../../envs/python_analysis.yaml"
     threads: config["threads"]
     script: "../../scripts/module4_deconvolution.py"

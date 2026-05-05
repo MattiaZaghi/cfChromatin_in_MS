@@ -24,6 +24,7 @@ genome:
   assembly:    hg19
   chrom_sizes: /home/mattia/Genomes/hg19/hg19.chrom.sizes
   dac_regions: /home/mattia/Genomes/hg19/hg19-blacklist.v2.bed
+  fasta: /home/mattia/Genomes/hg19/fa/hg19.fa
 
 # ── Reference RRE files (produced by Module 1, written under outdir) ──────────
 rre:
