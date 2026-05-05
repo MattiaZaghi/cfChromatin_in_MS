@@ -19,6 +19,7 @@ rule compute_deconvolution:
         ),
         rre_universe = config["rre"]["universe_bed"],
         anchors      = config["normalization"]["constitutive_anchors_bed"],
+        dac_regions  = config["genome"]["dac_regions"],
         sf             = "results/normalization/constitutive_scaling_factors.tsv",
         anchor_matrix  = "results/normalization/anchor_counts.tsv",
         meta           = config["sample_metadata"],
@@ -32,6 +33,7 @@ rule compute_deconvolution:
         within_sample_log2fe       = "results/deconvolution/fig_within_sample_log2FE.pdf",
         within_sample_contribution = "results/deconvolution/fig_within_sample_contribution.pdf",
         within_sample_qc_png       = "results/deconvolution/qc_within_sample.png",
+        within_sample_windows_bed  = "results/deconvolution/background_signal_windows.bed.gz",
     params:
         samples   = SAMPLES,
         frags_dir = config["data"]["frags_dir"],
