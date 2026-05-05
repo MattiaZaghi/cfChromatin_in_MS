@@ -886,15 +886,22 @@ _ws_chrom_sizes = snakemake.params.chrom_sizes
 _ws_dac         = snakemake.input.dac_regions
 _ws_rre_bed     = snakemake.input.rre_universe
 
-# Autosomal chrom.sizes for bedtools complement
-_ws_t_auto = tempfile.NamedTemporaryFile(suffix=".txt", delete=False, mode="w")
+# Autosomal chrom.sizes sorted lexicographically (same order as `sort -k1,1`
+# used on the merged BED — bedtools complement requires matching sort orders).
+_ws_t_auto_unsorted = tempfile.NamedTemporaryFile(
+    suffix=".txt", delete=False, mode="w")
 with open(_ws_chrom_sizes) as _fh_cs:
     for _line_cs in _fh_cs:
         _p_cs = _line_cs.split()
         if _p_cs and _p_cs[0].startswith("chr") and _p_cs[0][3:].isdigit():
-            _ws_t_auto.write(_line_cs)
-_ws_t_auto.close()
-_ws_auto_sizes = _ws_t_auto.name
+            _ws_t_auto_unsorted.write(_line_cs)
+_ws_t_auto_unsorted.close()
+_ws_auto_sizes = tempfile.NamedTemporaryFile(
+    suffix=".txt", delete=False).name
+subprocess.run(
+    f"sort -k1,1 {_ws_t_auto_unsorted.name} > {_ws_auto_sizes}",
+    shell=True, check=True)
+os.remove(_ws_t_auto_unsorted.name)
 
 _ws_t_merged = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
 _ws_t_compl  = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
