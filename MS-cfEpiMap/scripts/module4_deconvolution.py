@@ -908,19 +908,25 @@ _ws_t_compl  = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
 _ws_t_tiled  = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
 _ws_t_bg     = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
 
-# a. Merge RRE + DAC on autosomes
+# a. Merge RRE + DAC on autosomes; clip to chrom boundaries so complement
+#    never produces negative-width intervals (RRE/DAC may extend beyond
+#    the chromosome end listed in the genome file).
 subprocess.run(
     f"cat {_ws_rre_bed} {_ws_dac}"
     f" | grep -P '^chr[0-9]+\\t'"
     f" | cut -f1-3"
     f" | sort -k1,1 -k2,2n"
     f" | bedtools merge"
+    f" | bedtools intersect -a - -b <(awk 'BEGIN{{OFS=\"\\t\"}}{{print $1,0,$2}}'"
+    f" {_ws_auto_sizes}) -u"
     f" > {_ws_t_merged}",
-    shell=True, check=True)
+    shell=True, check=True, executable="/bin/bash")
 
-# b. Complement on autosomes → safe non-signal genome
+# b. Complement on autosomes; filter degenerate intervals (start >= end)
+#    that can arise when a merged region touches the chromosome boundary.
 subprocess.run(
     f"bedtools complement -i {_ws_t_merged} -g {_ws_auto_sizes}"
+    f" | awk '$3 > $2'"
     f" > {_ws_t_compl}",
     shell=True, check=True)
 
