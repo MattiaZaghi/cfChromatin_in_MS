@@ -320,7 +320,7 @@ os.remove(raw_combined.name)
 
 # ─── Step 4: Count midpoints per sample in parallel ───────────────────────────
 print(f"\n[Module 4] Counting for {len(samples)} samples "
-      f"using {n_cpus} parallel workers ...")
+      f"using {len(samples)} parallel workers ...")
 
 args_list = [
     (sid, f"{frags_dir}/{sid}.bed", sorted_combined)
@@ -328,7 +328,7 @@ args_list = [
 ]
 
 sig_counts: dict[str, dict[str, int]] = defaultdict(dict)
-with ProcessPoolExecutor(max_workers=n_cpus) as pool:
+with ProcessPoolExecutor(max_workers=len(samples)) as pool:
     for sid, ct_cnts in pool.map(_count_one_sample, args_list):
         for ct in CELL_TYPES:
             sig_counts[ct][sid] = ct_cnts.get(ct, 0)
@@ -1087,10 +1087,10 @@ print(f"[Module 4]   {len(_ws_sig_rows):,} signal + {len(_ws_bg_rows):,} bg rows
       f"→ {snakemake.output.within_sample_windows_bed}")
 
 # ── WS-E: parallel fragment counting ─────────────────────────────────────────
-print(f"[Module 4] Per-region counting ({len(samples)} samples, {n_cpus} workers) ...")
+print(f"[Module 4] Per-region counting ({len(samples)} samples, {len(samples)} workers) ...")
 _ws_count_args = [(sid, f"{frags_dir}/{sid}.bed", _ws_combined) for sid in samples]
 _ws_sample_counts: dict[str, dict[str, int]] = {}
-with ProcessPoolExecutor(max_workers=n_cpus) as _ws_pool:
+with ProcessPoolExecutor(max_workers=len(samples)) as _ws_pool:
     for _sid_ws, _cnts_ws in _ws_pool.map(_count_per_region_sample, _ws_count_args):
         _ws_sample_counts[_sid_ws] = _cnts_ws
         print(f"  done: {_sid_ws}")
