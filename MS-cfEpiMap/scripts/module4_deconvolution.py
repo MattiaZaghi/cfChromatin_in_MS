@@ -862,12 +862,22 @@ with pdf_backend.PdfPages(snakemake.output.violin) as _pp:
 
 # === within-sample enrichment (group-agnostic) — Sadeh local background ===
 #
-# Background = 5 kb tiles from the complement of (RRE ∪ DAC) on autosomes.
-# Every tile is guaranteed non-overlapping with signal regions and the non-RRE
-# genome is covered contiguously (bedtools complement + makewindows -s = -w).
-# Per-sample expected density fitted at three levels (genome → chr → 2 Mb),
-# mirroring Sadeh 2021 Background.R buildBackground().
-# Each sample is scored independently — no cohort statistic is needed.
+# PRIMARY TEST (the only "enriched" call that matters):
+#   NB GLM with the Sadeh local-rate as expected-count offset.
+#   α estimated per sample from background-tile variance (Option B).
+#   One-sided p-value (upper tail) → BH FDR within each sample.
+#   enriched = q_one < 0.05.
+#
+# The Step-5 Poisson/NB z-score in scores_df (earlier in this file) answers
+# a cohort-level question (z relative to Ctrl mean).  It is retained for
+# downstream differential analysis but is NOT the enrichment call.
+#
+# Background: 5 kb tiles from complement(RRE ∪ DAC) on autosomes.
+# Per-sample rate: 3-level Sadeh hierarchy (genome → chr → 2 Mb).
+# GC matching: signature and background regions binned by GC × length decile;
+#   background tiles sampled within matching bin.
+# Permuted-signature null: fake signatures are GC+length-matched random tiles,
+#   reusing the full pipeline — tests for systematic GC/length bias.
 
 # ── WS-A: constants ───────────────────────────────────────────────────────────
 _WS_BG_WIN   = 5_000        # bp — background tile size
@@ -875,9 +885,11 @@ _WS_REGION   = 2_000_000    # bp — neighbourhood for local rate fitting
 _WS_BG_TRIM  = 0.95         # Sadeh fitNoise percentile trim
 _WS_MIN_BG   = 20           # min windows to fit a regional rate
 _WS_MIN_SIG  = 50           # min signature windows for NB GLM
-_WS_N_PERM   = 200          # permuted-null iterations
+_WS_N_PERM   = 200          # permuted-signature null iterations
 _WS_PERM_THR = 0.2          # |median_perm_log2FE| flag threshold
 _WS_EPS      = 1.0          # log2FE pseudocount
+_WS_GC_BINS  = 5            # GC decile bins for matched sampling
+_WS_LEN_BINS = 5            # length decile bins for matched sampling
 
 # ── WS-B: build background windows (complement of RRE+DAC, tiled at 5 kb) ────
 print("[Module 4] Within-sample enrichment: building background windows ...")
@@ -963,10 +975,47 @@ if len(_ws_bg_df) < 2000:
         "Check RRE universe, DAC, and chrom sizes.")
 print(f"[Module 4]   {len(_ws_bg_df):,} background windows.")
 
+# Compute GC content for background tiles (used for matched sampling)
+_ws_bg_df["gc"] = _ws_compute_gc(_ws_bg_df, "region_id")
+print("[Module 4] GC content computed for background tiles.")
+
 
 # ── WS-C: per-cell-type signal region metadata ────────────────────────────────
 # ct_regions[ct] has integer column keys: 0=chr, 1=start, 2=end
 # Signal region_id: "sig|{ct}|{chr}:{start}-{end}"
+
+_ws_fasta = getattr(snakemake.params, "genome_fasta", "")
+
+
+def _ws_compute_gc(bed_df: pd.DataFrame, rid_col: str) -> np.ndarray:
+    """Return GC fraction array for rows in bed_df using bedtools nuc.
+    Falls back to 0.5 if FASTA unavailable or call fails."""
+    if not _ws_fasta or not Path(_ws_fasta).exists():
+        return np.full(len(bed_df), 0.5)
+    _tmp = tempfile.NamedTemporaryFile(suffix=".bed", delete=False, mode="w")
+    for _, r in bed_df.iterrows():
+        _tmp.write(f"{r['chr']}\t{int(r['start'])}\t{int(r['end'])}\t{r[rid_col]}\n")
+    _tmp.close()
+    try:
+        res = subprocess.run(
+            f"bedtools nuc -fi {_ws_fasta} -bed {_tmp.name}",
+            shell=True, capture_output=True, text=True, check=True)
+        gc_map: dict[str, float] = {}
+        for line in res.stdout.splitlines():
+            if line.startswith("#"):
+                continue
+            parts = line.split("\t")
+            if len(parts) > 5:
+                try:
+                    gc_map[parts[3]] = float(parts[5])
+                except (ValueError, IndexError):
+                    pass
+        return np.array([gc_map.get(r, 0.5) for r in bed_df[rid_col]], dtype=float)
+    except Exception:
+        return np.full(len(bed_df), 0.5)
+    finally:
+        os.remove(_tmp.name)
+
 
 _ws_ct_sig: dict[str, pd.DataFrame] = {}
 for _ct_ws in CELL_TYPES:
@@ -982,9 +1031,13 @@ for _ct_ws in CELL_TYPES:
     _df_ct["length_kb"]  = (_df_ct[2] - _df_ct[1]).astype(float) / 1000.0
     _df_ct["chr"]        = _df_ct[0].astype(str)
     _df_ct["start"]      = _df_ct[1].astype(int)
+    _df_ct["end"]        = _df_ct[2].astype(int)
     _df_ct["region_2mb"] = (_df_ct["chr"] + ":"
                              + (_df_ct["start"] // _WS_REGION).astype(str))
+    _df_ct["gc"]         = _ws_compute_gc(_df_ct, "region_id")
     _ws_ct_sig[_ct_ws] = _df_ct
+
+print("[Module 4] GC content computed for signature regions.")
 
 # ── WS-D: build combined counting BED and save gzipped copy ──────────────────
 print("[Module 4] Building combined counting BED ...")
@@ -1034,6 +1087,7 @@ _ws_bg_len_kb = _ws_bg_df["length_kb"].values
 _ws_bg_chr    = _ws_bg_df["chr"].values
 _ws_bg_start  = _ws_bg_df["start"].values
 _ws_bg_reg2mb = _ws_bg_df["region_2mb"].values
+_ws_bg_gc     = _ws_bg_df["gc"].values
 
 
 def _ws_fit_noise(densities: np.ndarray) -> float:
@@ -1046,6 +1100,7 @@ def _ws_fit_noise(densities: np.ndarray) -> float:
 
 
 def _ws_build_bg_model(sid: str) -> dict:
+    """Build 3-level Sadeh background rate model.  Also returns per-tile α."""
     cnts    = _ws_sample_counts[sid]
     counts  = np.array([cnts.get(r, 0) for r in _ws_bg_rids], dtype=float)
     density = counts / _ws_bg_len_kb
@@ -1060,7 +1115,13 @@ def _ws_build_bg_model(sid: str) -> dict:
         _ch = _rk.rsplit(":", 1)[0]
         _fb = rate_chr.get(_ch, rate_g)
         rate_reg[_rk] = _r if np.isfinite(_r) else _fb
-    return {"genome": rate_g, "chr": rate_chr, "region": rate_reg}
+    # Per-sample α from background tile variance (Option B from review)
+    mu_bg    = density[density >= 0]
+    _var     = float(np.var(mu_bg, ddof=1)) if len(mu_bg) > 1 else 1.0
+    _mean    = float(np.mean(mu_bg)) if len(mu_bg) > 0 else 1.0
+    alpha_s  = max((_var - _mean) / (_mean ** 2 + 1e-9), 1e-6)
+    return {"genome": rate_g, "chr": rate_chr, "region": rate_reg,
+            "alpha": alpha_s}
 
 
 def _ws_expected_density(chrom: str, start: int, model: dict) -> float:
@@ -1077,25 +1138,78 @@ print("[Module 4] Fitting per-sample background models ...")
 _ws_bg_models = {sid: _ws_build_bg_model(sid)
                  for sid in samples if sid in _ws_sample_counts}
 
-_ws_bg_chr_idx: dict[str, np.ndarray] = {
-    _ch: np.where(_ws_bg_chr == _ch)[0]
-    for _ch in np.unique(_ws_bg_chr)
-}
+# ── WS-G: GC×length-matched background sampling ──────────────────────────────
+# For each cell-type signature, pre-compute which background tiles match each
+# signature region in GC decile and length decile.  Sampling is done at
+# enrichment-loop time by drawing from the matched pool.
 
-# ── WS-G: NB GLM helper ───────────────────────────────────────────────────────
-def _ws_nb_glm(sig_cnt, bg_cnt, sig_len_kb, bg_len_kb):
-    counts  = np.r_[sig_cnt, bg_cnt].astype(float)
-    lengths = np.maximum(np.r_[sig_len_kb, bg_len_kb], 1e-3)
-    is_sig  = np.r_[np.ones(len(sig_cnt)), np.zeros(len(bg_cnt))]
+def _ws_gc_len_bins(gc: np.ndarray, length_kb: np.ndarray,
+                    gc_bins: int = _WS_GC_BINS,
+                    len_bins: int = _WS_LEN_BINS) -> np.ndarray:
+    """Return integer bin keys (gc_bin * len_bins + len_bin) for each region."""
+    gc_q   = np.clip(np.searchsorted(
+        np.percentile(gc, np.linspace(0, 100, gc_bins + 1)[1:-1]), gc), 0, gc_bins - 1)
+    len_q  = np.clip(np.searchsorted(
+        np.percentile(length_kb, np.linspace(0, 100, len_bins + 1)[1:-1]),
+        length_kb), 0, len_bins - 1)
+    return gc_q * len_bins + len_q
+
+
+_ws_bg_bins = _ws_gc_len_bins(_ws_bg_gc, _ws_bg_len_kb)
+_ws_bin_to_idx: dict[int, np.ndarray] = {}
+for _bk_u in np.unique(_ws_bg_bins):
+    _ws_bin_to_idx[int(_bk_u)] = np.where(_ws_bg_bins == _bk_u)[0]
+_ws_all_bg_idx = np.arange(len(_ws_bg_rids))
+
+
+def _ws_matched_bg_idx(sig_gc: np.ndarray, sig_len: np.ndarray,
+                        n_per: int, rng: np.random.Generator) -> np.ndarray:
+    """For each signature region, sample n_per background tiles from its
+    GC×length bin (fall back to all tiles if the bin is empty)."""
+    sig_bins  = _ws_gc_len_bins(sig_gc, sig_len)
+    chosen: list[int] = []
+    for _bk in sig_bins:
+        _pool = _ws_bin_to_idx.get(int(_bk), _ws_all_bg_idx)
+        chosen.extend(rng.choice(_pool,
+                                 size=min(n_per, len(_pool)),
+                                 replace=len(_pool) < n_per).tolist())
+    return np.array(chosen, dtype=int)
+
+
+# ── WS-H: NB GLM with local-rate offset and estimated α ──────────────────────
+# Fix #1: α estimated per sample from bg tile variance (not default α=1).
+# Fix #2: GLM offset = log(local_expected_count), not log(length).
+#         β1 is the additional log-rate enrichment above the local prediction.
+# Fix #3: one-sided p (upper tail) before BH correction.
+
+def _ws_nb_glm_local(sig_cnt, bg_cnt,
+                     sig_exp_count, bg_exp_count,
+                     alpha_s: float):
+    """
+    NB GLM with per-region Sadeh expected-count as offset.
+    offset = log(expected_count)  so β0 captures residual background rate
+    and β1 is the additional enrichment of signature regions.
+    α is estimated from the background tiles for this sample.
+    Returns (beta1, p_one_sided_upper).
+    """
+    counts   = np.r_[sig_cnt, bg_cnt].astype(float)
+    exp_cnt  = np.maximum(np.r_[sig_exp_count, bg_exp_count], 1e-9)
+    is_sig   = np.r_[np.ones(len(sig_cnt)), np.zeros(len(bg_cnt))]
     X = sm.add_constant(is_sig, has_constant="add")
     try:
-        fit = sm.GLM(counts, X, family=sm.families.NegativeBinomial(),
-                     offset=np.log(lengths)).fit(disp=False, maxiter=100)
-        return float(fit.params[1]), float(fit.pvalues[1])
+        fit = sm.GLM(counts, X,
+                     family=sm.families.NegativeBinomial(alpha=alpha_s),
+                     offset=np.log(exp_cnt)).fit(disp=False, maxiter=150)
+        beta   = float(fit.params[1])
+        p_two  = float(fit.pvalues[1])
+        # Convert to one-sided upper-tail p
+        p_one  = p_two / 2.0 if beta > 0 else 1.0 - p_two / 2.0
+        return beta, p_one
     except Exception:
         return float("nan"), float("nan")
 
-# ── WS-H: main enrichment loop ────────────────────────────────────────────────
+
+# ── WS-H2: main enrichment loop ───────────────────────────────────────────────
 print("[Module 4] Computing within-sample enrichment scores ...")
 _ws_rng   = np.random.default_rng(42)
 _ws_rows: list[dict] = []
@@ -1105,6 +1219,7 @@ for sid in samples:
         continue
     _cnts_s  = _ws_sample_counts[sid]
     _model_s = _ws_bg_models[sid]
+    _alpha_s = _model_s["alpha"]
 
     for _ct_ws, _df_ct in _ws_ct_sig.items():
         if len(_df_ct) == 0:
@@ -1113,10 +1228,13 @@ for sid in samples:
         _sig_cnt = np.array([_cnts_s.get(_rid, 0)
                               for _rid in _df_ct["region_id"]], dtype=float)
         _sig_len = _df_ct["length_kb"].values
+        _sig_gc  = _df_ct["gc"].values
 
+        # Per-region Sadeh expected density → expected count
         _exp_dens = np.array(
             [_ws_expected_density(_r["chr"], _r["start"], _model_s)
              for _, _r in _df_ct.iterrows()], dtype=float)
+        _sig_exp_count = _exp_dens * np.maximum(_sig_len, 1e-3)
 
         _sig_dens = _sig_cnt / np.maximum(_sig_len, 1e-3)
         _med_sig  = float(np.median(_sig_dens))
@@ -1128,20 +1246,20 @@ for sid in samples:
         _low_n   = len(_df_ct) < _WS_MIN_SIG
         _beta_nb = _p_nb = float("nan")
         if not _low_n:
-            _bg_idx = np.concatenate(
-                [_ws_bg_chr_idx.get(_ch, np.array([], int))
-                 for _ch in _df_ct["chr"].unique()])
+            _bg_idx = _ws_matched_bg_idx(_sig_gc, _sig_len,
+                                         n_per=10, rng=_ws_rng)
             if len(_bg_idx) > 0:
-                _chosen = _ws_rng.choice(
-                    _bg_idx,
-                    size=min(len(_bg_idx), len(_df_ct) * 10),
-                    replace=False)
-                _beta_nb, _p_nb = _ws_nb_glm(
-                    _sig_cnt,
-                    np.array([_cnts_s.get(_ws_bg_rids[i], 0)
-                               for i in _chosen], float),
-                    _sig_len,
-                    _ws_bg_len_kb[_chosen])
+                _bg_cnt_arr = np.array(
+                    [_cnts_s.get(_ws_bg_rids[i], 0) for i in _bg_idx], float)
+                _bg_exp_arr = np.array(
+                    [_ws_expected_density(_ws_bg_chr[i],
+                                          int(_ws_bg_start[i]), _model_s)
+                     * _ws_bg_len_kb[i]
+                     for i in _bg_idx], float)
+                _beta_nb, _p_nb = _ws_nb_glm_local(
+                    _sig_cnt, _bg_cnt_arr,
+                    _sig_exp_count, _bg_exp_arr,
+                    _alpha_s)
 
         _ws_rows.append({
             "sample": sid, "cell_type": _ct_ws,
@@ -1155,6 +1273,7 @@ ws_df_out = pd.DataFrame(_ws_rows)
 
 
 def _ws_bh_fdr(grp: pd.DataFrame) -> pd.DataFrame:
+    """BH-correct one-sided p_nb within each sample; enriched = q < 0.05."""
     from statsmodels.stats.multitest import multipletests as _mtest
     pvals = grp["p_nb"].values
     valid = np.isfinite(pvals)
@@ -1164,7 +1283,7 @@ def _ws_bh_fdr(grp: pd.DataFrame) -> pd.DataFrame:
         q[valid] = q_vals
     grp = grp.copy()
     grp["q_nb"]     = q
-    grp["enriched"] = (q < 0.05) & (grp["beta_nb"].values > 0)
+    grp["enriched"] = q < 0.05   # p_nb is already one-sided upper-tail
     return grp
 
 
@@ -1181,9 +1300,20 @@ def _ws_contrib(grp: pd.DataFrame) -> pd.DataFrame:
 
 ws_df_out = ws_df_out.groupby("sample", group_keys=False).apply(_ws_contrib)
 
-# ── WS-I: sanity checks ───────────────────────────────────────────────────────
-print("[Module 4] Running sanity checks ...")
-_ws_perm_size = max(50, len(_ws_bg_rids) // 20)
+# ── WS-I: permuted-signature null (real test for GC/length bias) ──────────────
+# For each sample, generate N_PERM fake signatures by sampling background tiles
+# matched on GC×length to the LARGEST cell-type signature in that sample.
+# Compute log2FE for each fake sig vs the local rate.
+# If |median(fake_log2FE)| > PERM_THR → systematic bias, flag sample.
+# This is the only check that would catch GC-driven inflation.
+print("[Module 4] Running permuted-signature sanity checks ...")
+
+_ws_ref_ct = max(_ws_ct_sig,
+                 key=lambda c: len(_ws_ct_sig[c]),
+                 default=None)
+_ws_ref_df = _ws_ct_sig.get(_ws_ref_ct, pd.DataFrame())
+_ws_ref_n  = len(_ws_ref_df)
+
 _ws_qc_rows: list[dict] = []
 
 for sid in samples:
@@ -1192,21 +1322,28 @@ for sid in samples:
     _cnts_s  = _ws_sample_counts[sid]
     _model_s = _ws_bg_models[sid]
 
-    # Permuted null: random background windows treated as fake signal
+    # Permuted-signature null: fake sigs matched on GC×length to reference CT
     _perm_fes: list[float] = []
-    for _ in range(_WS_N_PERM):
-        _idx_p  = _ws_rng.integers(0, len(_ws_bg_rids), size=_ws_perm_size)
-        _p_cnt  = np.array([_cnts_s.get(_ws_bg_rids[i], 0)
-                             for i in _idx_p], float)
-        _p_dens = _p_cnt / _ws_bg_len_kb[_idx_p]
-        _p_exp  = np.array(
-            [_ws_expected_density(_ws_bg_chr[i], int(_ws_bg_start[i]), _model_s)
-             for i in _idx_p], float)
-        _perm_fes.append(float(np.log2(
-            (np.median(_p_dens) + _WS_EPS) / (np.median(_p_exp) + _WS_EPS))))
-    _med_perm = float(np.median(_perm_fes))
+    if _ws_ref_n >= _WS_MIN_SIG:
+        _ref_gc  = _ws_ref_df["gc"].values
+        _ref_len = _ws_ref_df["length_kb"].values
+        for _ in range(_WS_N_PERM):
+            _fake_idx  = _ws_matched_bg_idx(_ref_gc, _ref_len,
+                                             n_per=1, rng=_ws_rng)
+            _fake_cnt  = np.array(
+                [_cnts_s.get(_ws_bg_rids[i], 0) for i in _fake_idx], float)
+            _fake_len  = _ws_bg_len_kb[_fake_idx]
+            _fake_dens = _fake_cnt / np.maximum(_fake_len, 1e-3)
+            _fake_exp  = np.array(
+                [_ws_expected_density(_ws_bg_chr[i], int(_ws_bg_start[i]),
+                                      _model_s)
+                 for i in _fake_idx], float)
+            _perm_fes.append(float(np.log2(
+                (np.median(_fake_dens) + _WS_EPS)
+                / (np.median(_fake_exp)  + _WS_EPS))))
+    _med_perm = float(np.median(_perm_fes)) if _perm_fes else float("nan")
 
-    # Anti-signal: separate random set of background windows
+    # Anti-signal: fixed random set of background windows
     _anti_idx    = _ws_rng.integers(0, len(_ws_bg_rids),
                                     size=min(500, len(_ws_bg_rids)))
     _a_dens      = (np.array([_cnts_s.get(_ws_bg_rids[i], 0)
@@ -1218,24 +1355,27 @@ for sid in samples:
     _anti_log2fe = float(np.log2(
         (np.median(_a_dens) + _WS_EPS) / (np.median(_a_exp) + _WS_EPS)))
 
+    _perm_flag = (abs(_med_perm) > _WS_PERM_THR
+                  if np.isfinite(_med_perm) else False)
     _n_enr = int(((ws_df_out["sample"] == sid) & ws_df_out["enriched"]).sum())
     _ws_qc_rows.append({
         "sample": sid,
         "median_perm_log2FE":    _med_perm,
         "neg_ctrl_log2FE":       _anti_log2fe,
         "n_signatures_enriched": _n_enr,
-        "perm_flag":             abs(_med_perm) > _WS_PERM_THR,
+        "perm_flag":             _perm_flag,
     })
 
 qc_ws_df = pd.DataFrame(_ws_qc_rows)
 _n_perm_flagged = int(qc_ws_df["perm_flag"].sum())
 if _n_perm_flagged > 0:
     print(f"[Module 4] WARNING: {_n_perm_flagged}/{len(qc_ws_df)} samples "
-          f"flagged by permuted null (|median_perm_log2FE| > {_WS_PERM_THR}).")
+          f"flagged by permuted-signature null — possible GC/length bias.")
 if _n_perm_flagged == len(samples) and len(samples) > 0:
     raise RuntimeError(
-        "[Module 4] ABORT: permuted-signature null fails for every sample. "
-        "Check RRE/DAC filters and chrom sizes.")
+        "[Module 4] ABORT: permuted-signature null fails for all samples. "
+        "Likely systematic GC or length bias. "
+        "Check RRE/DAC filters and genome FASTA.")
 
 # ── WS-J: write TSV outputs ───────────────────────────────────────────────────
 _ws_out_dir = Path(snakemake.output.within_sample_scores).parent
@@ -1253,27 +1393,37 @@ print(f"[Module 4] Scores → {snakemake.output.within_sample_scores}")
 _ws_ct_order = list(CELL_TYPES.keys())
 
 # Fig log2FE: group-agnostic boxplot (page 1) + group-coloured scatter (page 2)
+# low_n cell types marked with hatching on the boxplot
 _ws_box_data = [
     ws_df_out.loc[ws_df_out["cell_type"] == ct, "log2FE"].dropna().values
     for ct in _ws_ct_order
 ]
+_ws_low_n_cts = {
+    ct for ct, df in _ws_ct_sig.items() if len(df) < _WS_MIN_SIG
+}
 _fig_log2fe_ws, _ax_log2fe = plt.subplots(
     figsize=(max(8, len(_ws_ct_order) * 0.7), 5))
-_ax_log2fe.boxplot(
+_bp = _ax_log2fe.boxplot(
     _ws_box_data, labels=_ws_ct_order,
     patch_artist=True, notch=False, sym=".",
     medianprops={"color": "black", "linewidth": 1.5},
     boxprops={"facecolor": "#AECDE8", "alpha": 0.8},
 )
+for _i_ct, _ct_lbl in enumerate(_ws_ct_order):
+    if _ct_lbl in _ws_low_n_cts:
+        _bp["boxes"][_i_ct].set(hatch="//", facecolor="#DDDDDD", alpha=0.6)
 _ax_log2fe.axhline(0, ls="--", lw=0.8, color="grey")
-_ax_log2fe.set_ylabel("log₂ Fold Enrichment (vs Sadeh local background)")
-_ax_log2fe.set_title("Within-sample tissue enrichment (group-agnostic)")
+_ax_log2fe.set_ylabel("log₂ FE vs Sadeh local background")
+_ax_log2fe.set_title(
+    "Within-sample tissue enrichment (group-agnostic)\n"
+    "hatched = low-n (<50 sig. regions), GLM skipped")
 _ax_log2fe.set_xticklabels(_ws_ct_order, rotation=45, ha="right", fontsize=8)
 plt.tight_layout()
 
-# Group-coloured variant (page 2 — downstream reference)
+# Group-coloured variant (page 2 — downstream reference only)
 _ws_grp_df = ws_df_out.merge(
-    meta[["sample_id", "group"]], left_on="sample", right_on="sample_id", how="left")
+    meta[["sample_id", "group"]], left_on="sample", right_on="sample_id",
+    how="left")
 _n_ct_ws = len(_ws_ct_order)
 _fig_grp_ws, _axes_grp = plt.subplots(
     1, _n_ct_ws, figsize=(max(12, _n_ct_ws * 1.1), 5), sharey=True)
@@ -1286,21 +1436,24 @@ for _ax_g, _ct_g in zip(_axes_grp, _ws_ct_order):
         _vals_g = _ct_sub.loc[_ct_sub["group"] == _grp_g, "log2FE"].dropna()
         if len(_vals_g) > 0:
             _jx = _ws_jitter_rng.uniform(-0.15, 0.15, size=len(_vals_g))
-            _ax_g.scatter(_jx, _vals_g, color=_col_g, s=12, alpha=0.7, label=_grp_g)
+            _ax_g.scatter(_jx, _vals_g, color=_col_g, s=12, alpha=0.7,
+                          label=_grp_g)
     _ax_g.axhline(0, ls="--", lw=0.6, color="grey")
-    _ax_g.set_title(_ct_g, fontsize=7, rotation=45, ha="right")
+    _ct_title = _ct_g + ("*" if _ct_g in _ws_low_n_cts else "")
+    _ax_g.set_title(_ct_title, fontsize=7, rotation=45, ha="right")
     _ax_g.set_xticks([])
 _handles_grp = [
     plt.Line2D([0], [0], marker="o", color=c, lw=0, label=g)
     for g, c in group_palette.items()
 ]
 _fig_grp_ws.legend(handles=_handles_grp, loc="upper right", fontsize=7)
-_fig_grp_ws.suptitle("Within-sample log2FE by group (Sadeh local background)")
+_fig_grp_ws.suptitle(
+    "Within-sample log2FE by group (* = low-n, log2FE only)")
 plt.tight_layout()
 
 with pdf_backend.PdfPages(snakemake.output.within_sample_log2fe) as _pp_ws:
     _pp_ws.savefig(_fig_log2fe_ws)  # page 1: group-agnostic
-    _pp_ws.savefig(_fig_grp_ws)     # page 2: group-coloured variant
+    _pp_ws.savefig(_fig_grp_ws)     # page 2: group-coloured (downstream ref)
 plt.close(_fig_log2fe_ws)
 plt.close(_fig_grp_ws)
 
@@ -1308,7 +1461,8 @@ plt.close(_fig_grp_ws)
 _ws_ct_colors = sns.color_palette("tab20", n_colors=len(_ws_ct_order))
 _ws_cmap      = dict(zip(_ws_ct_order, _ws_ct_colors))
 _ws_contrib_piv = (ws_df_out
-                   .pivot(index="sample", columns="cell_type", values="contribution")
+                   .pivot(index="sample", columns="cell_type",
+                          values="contribution")
                    .fillna(0).sort_index())
 
 _fig_contrib_ws, _ax_contrib = plt.subplots(
@@ -1319,7 +1473,8 @@ for _ct_cb in _ws_ct_order:
         continue
     _vals_cb = _ws_contrib_piv[_ct_cb].values
     _ax_contrib.bar(range(len(_ws_contrib_piv)), _vals_cb, bottom=_ws_bottom,
-                    color=_ws_cmap[_ct_cb], label=_ct_cb, width=1.0, edgecolor="none")
+                    color=_ws_cmap[_ct_cb], label=_ct_cb,
+                    width=1.0, edgecolor="none")
     _ws_bottom += _vals_cb
 _ax_contrib.set_xlim(-0.5, len(_ws_contrib_piv) - 0.5)
 _ax_contrib.set_ylim(0, 1)
@@ -1333,17 +1488,29 @@ with pdf_backend.PdfPages(snakemake.output.within_sample_contribution) as _pp_cb
     _pp_cb.savefig(_fig_contrib_ws)
 plt.close(_fig_contrib_ws)
 
-# QC scatter: permuted null vs anti-signal log2FE per sample
-_fig_qc_ws, _ax_qc = plt.subplots(figsize=(6, 5))
-_ax_qc.scatter(qc_ws_df["median_perm_log2FE"], qc_ws_df["neg_ctrl_log2FE"],
-               s=30, alpha=0.7, edgecolors="black", lw=0.4)
-_ax_qc.axhline(0, ls="--", lw=0.8, color="grey")
-_ax_qc.axvline(0, ls="--", lw=0.8, color="grey")
-_ax_qc.axhspan(-_WS_PERM_THR, _WS_PERM_THR, alpha=0.05, color="green")
-_ax_qc.axvspan(-_WS_PERM_THR, _WS_PERM_THR, alpha=0.05, color="green")
-_ax_qc.set_xlabel("Median permuted log2FE (expected ≈ 0)")
-_ax_qc.set_ylabel("Anti-signal log2FE (expected ≈ 0)")
-_ax_qc.set_title("Within-sample enrichment sanity checks")
+# QC panel: permuted-signature null + anti-signal scatter
+_fig_qc_ws, _axes_qc = plt.subplots(1, 2, figsize=(12, 5))
+
+_axes_qc[0].hist(qc_ws_df["median_perm_log2FE"].dropna(), bins=25,
+                 color="steelblue", edgecolor="white")
+for _v in [_WS_PERM_THR, -_WS_PERM_THR]:
+    _axes_qc[0].axvline(_v, color="red", ls="--", lw=1.2)
+_axes_qc[0].set_xlabel("Median permuted-signature log2FE")
+_axes_qc[0].set_title(
+    "Permuted-signature null\n(expect |x| < 0.2; tests GC/length bias)")
+
+_axes_qc[1].scatter(qc_ws_df["median_perm_log2FE"],
+                    qc_ws_df["neg_ctrl_log2FE"],
+                    s=30, alpha=0.7, edgecolors="black", lw=0.4,
+                    c=qc_ws_df["perm_flag"].map({True: "tomato",
+                                                  False: "steelblue"}))
+_axes_qc[1].axhline(0, ls="--", lw=0.8, color="grey")
+_axes_qc[1].axvline(0, ls="--", lw=0.8, color="grey")
+_axes_qc[1].axhspan(-_WS_PERM_THR, _WS_PERM_THR, alpha=0.05, color="green")
+_axes_qc[1].axvspan(-_WS_PERM_THR, _WS_PERM_THR, alpha=0.05, color="green")
+_axes_qc[1].set_xlabel("Permuted-sig log2FE (expected ≈ 0)")
+_axes_qc[1].set_ylabel("Anti-signal log2FE (expected ≈ 0)")
+_axes_qc[1].set_title("QC scatter (red = flagged samples)")
 plt.tight_layout()
 _fig_qc_ws.savefig(snakemake.output.within_sample_qc_png, dpi=150)
 plt.close(_fig_qc_ws)
