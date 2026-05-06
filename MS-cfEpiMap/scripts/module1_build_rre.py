@@ -46,83 +46,75 @@ from pathlib import Path
 # hg38ToHg19.over.chain before being placed here.
 # ─────────────────────────────────────────────────────────────────────────────
 REFERENCE_DATA = {
-    # ── BLUEPRINT (hg19 native) ───────────────────────────────────────────
-    "B_naive":        {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E032-H3K27ac.narrowPeak.gz",
-                       "tags": ["bcell", "immune"]},
-    "B_memory":       {"url": "TODO_BLUEPRINT_B_memory_H3K27ac_peaks.bed.gz",
-                       "tags": ["bcell", "immune"]},
-    "CD4_Th1":        {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E041-H3K27ac.narrowPeak.gz",
-                       "tags": ["immune"]},
-    "CD4_Th17":       {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E042-H3K27ac.narrowPeak.gz",
-                       "tags": ["immune"]},
-    "CD4_Treg":       {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E044-H3K27ac.narrowPeak.gz",
-                       "tags": ["immune"]},
-    "CD8_T_naive":    {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E047-H3K27ac.narrowPeak.gz",
-                       "tags": ["immune"]},
-    "CD8_T_memory":   {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E048-H3K27ac.narrowPeak.gz",
-                       "tags": ["immune"]},                   
-    "Monocyte_CD14":  {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E029-H3K27ac.narrowPeak.gz",
-                       "tags": ["immune"]},
-    "Monocyte_CD16":  {"url": "TODO_BLUEPRINT_CD16mono_H3K27ac_peaks.bed.gz",
-                       "tags": ["immune"]},
-    "NK":             {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E046-H3K27ac.narrowPeak.gz",
-                       "tags": ["immune"]},
-    "Neutrophil":     {"url": "TODO_BLUEPRINT_Neutrophil_H3K27ac_peaks.bed.gz",
-                       "tags": ["immune"]},
-    "Megakaryocyte":  {"url": "TODO_BLUEPRINT_Megakaryocyte_H3K27ac_peaks.bed.gz",
-                       "tags": ["other"]},
-    "PBMC;Leukocytes": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E062-H3K27ac.narrowPeak.gz",
-                        "tags": ["immune"]},
-    "T-Cells;Lymphocytes;Leukocytes;Leukocytes": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E047-H3K27ac.narrowPeak.gz",
-                                                  "tags": ["immune"]},
-    "Treg-Cells;T-Cells;Lymphocytes;Leukocytes;Leukocytes": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E044-H3K27ac.narrowPeak.gz",
-                                                             "tags": ["immune"]},
-    "T-Helper-Cells;T-Cells;Lymphocytes;Leukocytes;Leukocytes": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E038-H3K27ac.narrowPeak.gz",
-                                                                 "tags": ["immune"]},
-    "T-Helper-Cells;T-Memory-Cells;T-Cells;Lymphocytes;Leukocytes;Leukocytes": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E037-H3K27ac.narrowPeak.gz",
-                                                                                 "tags": ["immune"]},
-    "T-Memory-Cells;T-Cells;Lymphocytes;Leukocytes;Leukocytes": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E048-H3K27ac.narrowPeak.gz",
-                                                                  "tags": ["immune"]},
-    "Monocytes;Leukocytes": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E029-H3K27ac.narrowPeak.gz",
-                              "tags": ["immune"]},
-    "B-Cells;Lymphocytes;Leukocytes;Leukocytes": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E032-H3K27ac.narrowPeak.gz",
-                                                   "tags": ["immune"]},
-    "NK;Lymphocytes;Leukocytes;Leukocytes": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E046-H3K27ac.narrowPeak.gz",
-                                               "tags": ["immune"]},
-    "Adipose": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E063-H3K27ac.narrowPeak.gz",
-                "tags": ["other"]},
-    "Atrium;Heart": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E104-H3K27ac.narrowPeak.gz",
-                      "tags": ["other"]},
-    "Ventricle;Heart": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E105-H3K27ac.narrowPeak.gz",
-                         "tags": ["other"]},
-    "Aorta;Heart": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E065-H3K27ac.narrowPeak.gz",
-                     "tags": ["other"]},
-    "GI Sm. Muscle": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E111-H3K27ac.narrowPeak.gz",
-                       "tags": ["other"]},
-    "Colon;Digestive": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E106-H3K27ac.narrowPeak.gz",
-                         "tags": ["other"]},
-    "Rectum;GI Mucosa;Digestive": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E102-H3K27ac.narrowPeak.gz",
-                                    "tags": ["other"]},
-    "Stomach;Digestive": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E094-H3K27ac.narrowPeak.gz",
-                           "tags": ["other"]},
-    "Placenta": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E091-H3K27ac.narrowPeak.gz",
-                 "tags": ["other"]},
-    "Ovary": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E097-H3K27ac.narrowPeak.gz",
-              "tags": ["other"]},
-    "Pancreas Islet;Pancreas": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E087-H3K27ac.narrowPeak.gz",
-                                "tags": ["other"]},
-    "Liver": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E066-H3K27ac.narrowPeak.gz",
-              "tags": ["other"]},
-    "Pancreas": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E098-H3K27ac.narrowPeak.gz",
-                 "tags": ["other"]},
-    "Lung": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E128-H3K27ac.narrowPeak.gz",
-             "tags": ["other"]},
-    "Epithelial": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E119-H3K27ac.narrowPeak.gz",
-                    "tags": ["other"]},
-    "Vasculary": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E122-H3K27ac.narrowPeak.gz",
-                   "tags": ["other"]},
-    "Skin": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E127-H3K27ac.narrowPeak.gz",
-             "tags": ["other"]},
+    # ── Roadmap Epigenomics — immune cells (hg19 native) ─────────────────
+    # Tags derived from the Groups column of Supplemental Table 12
+    # (41587_2020_775_MOESM14_ESM.xlsx). EID listed as comment after the URL.
+    "B_naive":         {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E032-H3K27ac.narrowPeak.gz",   # E032 BLD.CD19.PPC
+                        "tags": ["B-Cells", "Lymphocytes", "Leukocytes"]},
+    "CD4_Th1":         {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E041-H3K27ac.narrowPeak.gz",   # E041 BLD.CD4.CD25M.IL17M.PL.TPC
+                        "tags": ["T-Helper-Cells", "T-Cells", "Lymphocytes", "Leukocytes"]},
+    "CD4_Th17":        {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E042-H3K27ac.narrowPeak.gz",   # E042 BLD.CD4.CD25M.IL17P.PL.TPC
+                        "tags": ["T-Helper-Cells", "T-Cells", "Lymphocytes", "Leukocytes"]},
+    "CD4_Treg":        {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E044-H3K27ac.narrowPeak.gz",   # E044 BLD.CD4.CD25.CD127M.TREGPC
+                        "tags": ["Treg-Cells", "T-Cells", "Lymphocytes", "Leukocytes"]},
+    "CD4_T_naive":     {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E038-H3K27ac.narrowPeak.gz",   # E038 BLD.CD4.NPC
+                        "tags": ["T-Helper-Cells", "T-Cells", "Lymphocytes", "Leukocytes"]},
+    "CD4_T_memory":    {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E037-H3K27ac.narrowPeak.gz",   # E037 BLD.CD4.MPC
+                        "tags": ["T-Helper-Cells", "T-Memory-Cells", "T-Cells", "Lymphocytes", "Leukocytes"]},
+    "CD8_T_naive":     {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E047-H3K27ac.narrowPeak.gz",   # E047 BLD.CD8.NPC
+                        "tags": ["T-Cells", "Lymphocytes", "Leukocytes"]},
+    "CD8_T_memory":    {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E048-H3K27ac.narrowPeak.gz",   # E048 BLD.CD8.MPC
+                        "tags": ["T-Memory-Cells", "T-Cells", "Lymphocytes", "Leukocytes"]},
+    "Monocyte_CD14":   {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E029-H3K27ac.narrowPeak.gz",   # E029 BLD.CD14.PC
+                        "tags": ["Monocytes", "Leukocytes"]},
+    "NK":              {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E046-H3K27ac.narrowPeak.gz",   # E046 BLD.CD56.PC
+                        "tags": ["NK", "Lymphocytes", "Leukocytes"]},
+    "PBMC":            {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E062-H3K27ac.narrowPeak.gz",   # E062 BLD.PER.MONUC.PC
+                        "tags": ["PBMC", "Leukocytes"]},
+    # ── Roadmap Epigenomics — TODO placeholders (BLUEPRINT replacements) ──
+    "B_memory":        {"url": "TODO_BLUEPRINT_B_memory_H3K27ac_peaks.bed.gz",
+                        "tags": ["B-Cells", "Lymphocytes", "Leukocytes"]},
+    "Monocyte_CD16":   {"url": "TODO_BLUEPRINT_CD16mono_H3K27ac_peaks.bed.gz",
+                        "tags": ["Monocytes", "Leukocytes"]},
+    "Neutrophil":      {"url": "TODO_BLUEPRINT_Neutrophil_H3K27ac_peaks.bed.gz",
+                        "tags": ["Neutrophils", "Leukocytes"]},
+    "Megakaryocyte":   {"url": "TODO_BLUEPRINT_Megakaryocyte_H3K27ac_peaks.bed.gz",
+                        "tags": ["Megakaryocytes"]},
+    # ── Roadmap Epigenomics — non-immune tissues (hg19 native) ───────────
+    "Adipose":         {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E063-H3K27ac.narrowPeak.gz",   # E063 FAT.ADIP.NUC
+                        "tags": ["Adipose"]},
+    "Atrium_Heart":    {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E104-H3K27ac.narrowPeak.gz",   # E104 HRT.ATR.R
+                        "tags": ["Atrium", "Heart"]},
+    "Ventricle_Heart": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E105-H3K27ac.narrowPeak.gz",   # E105 HRT.VNT.R
+                        "tags": ["Ventricle", "Heart"]},
+    "Aorta_Heart":     {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E065-H3K27ac.narrowPeak.gz",   # E065 VAS.AOR
+                        "tags": ["Aorta", "Heart"]},
+    "GI_Smooth_Muscle":{"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E111-H3K27ac.narrowPeak.gz",   # E111 GI.STMC.MUS
+                        "tags": ["GI Sm. Muscle"]},
+    "Colon_Digestive": {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E106-H3K27ac.narrowPeak.gz",   # E106 GI.CLN.SIG
+                        "tags": ["Colon", "Digestive"]},
+    "Rectum_GI_Mucosa":{"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E102-H3K27ac.narrowPeak.gz",   # E102 GI.RECT.MUC.31
+                        "tags": ["Rectum", "GI Mucosa", "Digestive"]},
+    "Stomach_Digestive":{"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E094-H3K27ac.narrowPeak.gz",  # E094 GI.STMC.GAST
+                        "tags": ["Stomach", "Digestive"]},
+    "Placenta":        {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E091-H3K27ac.narrowPeak.gz",   # E091 PLCNT.FET
+                        "tags": ["Placenta"]},
+    "Ovary":           {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E097-H3K27ac.narrowPeak.gz",   # E097 OVRY
+                        "tags": ["Ovary"]},
+    "Pancreas_Islet":  {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E087-H3K27ac.narrowPeak.gz",   # E087 PANC.ISLT
+                        "tags": ["Pancreas Islet", "Pancreas"]},
+    "Liver":           {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E066-H3K27ac.narrowPeak.gz",   # E066 LIV.ADLT
+                        "tags": ["Liver"]},
+    "Pancreas":        {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E098-H3K27ac.narrowPeak.gz",   # E098 PANC
+                        "tags": ["Pancreas"]},
+    "Lung":            {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E128-H3K27ac.narrowPeak.gz",   # E128 LNG.NHLF
+                        "tags": ["Lung"]},
+    "Epithelial":      {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E119-H3K27ac.narrowPeak.gz",   # E119 BRST.HMEC
+                        "tags": ["Epithelial"]},
+    "Vasculary":       {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E122-H3K27ac.narrowPeak.gz",   # E122 VAS.HUVEC
+                        "tags": ["Vasculary"]},
+    "Skin":            {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E127-H3K27ac.narrowPeak.gz",   # E127 SKIN.NHEK
+                        "tags": ["Skin"]},
     # ── Anita single-cell (CNS) ───────────────────────────────────────────────
     "Astrocyte":{"url": "/Users/gcblab/Anita/all_markers/AST.bed",
                        "tags": ["cns"]},
