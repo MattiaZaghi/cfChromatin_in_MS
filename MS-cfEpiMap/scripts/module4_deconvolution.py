@@ -891,6 +891,57 @@ _WS_EPS      = 1.0          # log2FE pseudocount
 _WS_GC_BINS  = 5            # GC decile bins for matched sampling
 _WS_LEN_BINS = 5            # length decile bins for matched sampling
 
+# ── WS-A2: genome FASTA and GC helper ────────────────────────────────────────
+# Must be defined here — _ws_compute_gc is called in WS-B (background tiles)
+# and WS-C (signal regions) before the counting loop begins.
+_ws_fasta = getattr(snakemake.params, "genome_fasta", "")
+if not _ws_fasta or not Path(_ws_fasta).exists():
+    import warnings as _ws_warnings
+    _ws_warnings.warn(
+        "[Module 4] WARNING: genome_fasta not set or file not found "
+        f"(got: {_ws_fasta!r}). GC matching is DISABLED — every region will "
+        "receive GC=0.5, collapsing GC×length matching to length-only. "
+        "Set params.genome_fasta in the Snakemake rule to enable full matching.",
+        RuntimeWarning, stacklevel=2)
+    _ws_fasta = ""
+
+
+def _ws_compute_gc(bed_df: pd.DataFrame, rid_col: str) -> np.ndarray:
+    """Return GC fraction array for rows in bed_df using bedtools nuc.
+    Requires _ws_fasta to point to an indexed FASTA.  Returns 0.5 for all
+    rows only if _ws_fasta is absent (already warned above).
+    """
+    if not _ws_fasta:
+        return np.full(len(bed_df), 0.5)
+    _tmp = tempfile.NamedTemporaryFile(suffix=".bed", delete=False, mode="w")
+    for _, r in bed_df.iterrows():
+        _tmp.write(f"{r['chr']}\t{int(r['start'])}\t{int(r['end'])}\t{r[rid_col]}\n")
+    _tmp.close()
+    try:
+        res = subprocess.run(
+            f"bedtools nuc -fi {_ws_fasta} -bed {_tmp.name}",
+            shell=True, capture_output=True, text=True, check=True)
+        gc_map: dict[str, float] = {}
+        for line in res.stdout.splitlines():
+            if line.startswith("#"):
+                continue
+            parts = line.split("\t")
+            if len(parts) > 5:
+                try:
+                    gc_map[parts[3]] = float(parts[5])
+                except (ValueError, IndexError):
+                    pass
+        return np.array([gc_map.get(r, 0.5) for r in bed_df[rid_col]], dtype=float)
+    except Exception as _gc_exc:
+        import warnings as _ws_warnings2
+        _ws_warnings2.warn(
+            f"[Module 4] bedtools nuc failed ({_gc_exc}); GC fallback to 0.5",
+            RuntimeWarning, stacklevel=2)
+        return np.full(len(bed_df), 0.5)
+    finally:
+        os.remove(_tmp.name)
+
+
 # ── WS-B: build background windows (complement of RRE+DAC, tiled at 5 kb) ────
 print("[Module 4] Within-sample enrichment: building background windows ...")
 
@@ -983,39 +1034,6 @@ print("[Module 4] GC content computed for background tiles.")
 # ── WS-C: per-cell-type signal region metadata ────────────────────────────────
 # ct_regions[ct] has integer column keys: 0=chr, 1=start, 2=end
 # Signal region_id: "sig|{ct}|{chr}:{start}-{end}"
-
-_ws_fasta = getattr(snakemake.params, "genome_fasta", "")
-
-
-def _ws_compute_gc(bed_df: pd.DataFrame, rid_col: str) -> np.ndarray:
-    """Return GC fraction array for rows in bed_df using bedtools nuc.
-    Falls back to 0.5 if FASTA unavailable or call fails."""
-    if not _ws_fasta or not Path(_ws_fasta).exists():
-        return np.full(len(bed_df), 0.5)
-    _tmp = tempfile.NamedTemporaryFile(suffix=".bed", delete=False, mode="w")
-    for _, r in bed_df.iterrows():
-        _tmp.write(f"{r['chr']}\t{int(r['start'])}\t{int(r['end'])}\t{r[rid_col]}\n")
-    _tmp.close()
-    try:
-        res = subprocess.run(
-            f"bedtools nuc -fi {_ws_fasta} -bed {_tmp.name}",
-            shell=True, capture_output=True, text=True, check=True)
-        gc_map: dict[str, float] = {}
-        for line in res.stdout.splitlines():
-            if line.startswith("#"):
-                continue
-            parts = line.split("\t")
-            if len(parts) > 5:
-                try:
-                    gc_map[parts[3]] = float(parts[5])
-                except (ValueError, IndexError):
-                    pass
-        return np.array([gc_map.get(r, 0.5) for r in bed_df[rid_col]], dtype=float)
-    except Exception:
-        return np.full(len(bed_df), 0.5)
-    finally:
-        os.remove(_tmp.name)
-
 
 _ws_ct_sig: dict[str, pd.DataFrame] = {}
 for _ct_ws in CELL_TYPES:
@@ -1115,11 +1133,15 @@ def _ws_build_bg_model(sid: str) -> dict:
         _ch = _rk.rsplit(":", 1)[0]
         _fb = rate_chr.get(_ch, rate_g)
         rate_reg[_rk] = _r if np.isfinite(_r) else _fb
-    # Per-sample α from background tile variance (Option B from review)
-    mu_bg    = density[density >= 0]
-    _var     = float(np.var(mu_bg, ddof=1)) if len(mu_bg) > 1 else 1.0
-    _mean    = float(np.mean(mu_bg)) if len(mu_bg) > 0 else 1.0
-    alpha_s  = max((_var - _mean) / (_mean ** 2 + 1e-9), 1e-6)
+    # Per-sample α from background tile raw-count variance (Option B from review).
+    # NB variance identity Var(count) = μ + α·μ² holds on the count scale, not
+    # on density.  Estimating on density introduces a downward bias of
+    # ~(1 - 1/L)/μ_d per tile (≈−0.16 at typical 5 kb tile counts), which
+    # pushes α toward the floor and silently collapses the NB back to Poisson.
+    counts_bg = counts[counts >= 0]   # raw counts, same scale as the GLM
+    _var      = float(np.var(counts_bg, ddof=1)) if len(counts_bg) > 1 else 1.0
+    _mean     = float(np.mean(counts_bg)) if len(counts_bg) > 0 else 1.0
+    alpha_s   = max((_var - _mean) / (_mean ** 2 + 1e-9), 1e-6)
     return {"genome": rate_g, "chr": rate_chr, "region": rate_reg,
             "alpha": alpha_s}
 
