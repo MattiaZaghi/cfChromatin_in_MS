@@ -943,6 +943,9 @@ def _ws_compute_gc(bed_df: pd.DataFrame, rid_col: str) -> np.ndarray:
 
 
 # ── WS-B: build background windows (complement of RRE+DAC, tiled at 5 kb) ────
+# Non-overlapping 5 kb tiles; partial tiles at interval ends are kept so that
+# every non-RRE base is represented.  Density = counts/length_kb normalises
+# correctly for variable-width end tiles in both the Sadeh rate model and GLM.
 print("[Module 4] Within-sample enrichment: building background windows ...")
 
 _ws_chrom_sizes = snakemake.params.chrom_sizes
@@ -968,7 +971,6 @@ os.remove(_ws_t_auto_unsorted.name)
 
 _ws_t_merged = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
 _ws_t_compl  = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
-_ws_t_tiled  = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
 _ws_t_bg     = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
 
 # a. Merge RRE + DAC on autosomes; clip to chrom boundaries so complement
@@ -985,27 +987,23 @@ subprocess.run(
     f" > {_ws_t_merged}",
     shell=True, check=True, executable="/bin/bash")
 
-# b. Complement on autosomes; filter degenerate intervals (start >= end)
-#    that can arise when a merged region touches the chromosome boundary.
+# b. Complement on autosomes; filter degenerate intervals (start >= end).
 subprocess.run(
     f"bedtools complement -i {_ws_t_merged} -g {_ws_auto_sizes}"
     f" | awk '$3 > $2'"
     f" > {_ws_t_compl}",
     shell=True, check=True)
 
-# c. Tile with no overlap (step = window → non-overlapping, contiguous)
+# c. Tile at 5 kb, non-overlapping.  Partial end-of-interval tiles are kept
+#    so every non-RRE base is covered; density normalisation handles the
+#    variable widths.
 subprocess.run(
     f"bedtools makewindows -b {_ws_t_compl}"
     f" -w {_WS_BG_WIN} -s {_WS_BG_WIN}"
-    f" > {_ws_t_tiled}",
+    f" > {_ws_t_bg}",
     shell=True, check=True)
 
-# d. Drop partial end-of-interval tiles
-subprocess.run(
-    f"awk '$3-$2=={_WS_BG_WIN}' {_ws_t_tiled} > {_ws_t_bg}",
-    shell=True, check=True)
-
-for _f_tmp in [_ws_t_merged, _ws_t_compl, _ws_t_tiled, _ws_auto_sizes]:
+for _f_tmp in [_ws_t_merged, _ws_t_compl, _ws_auto_sizes]:
     if os.path.exists(_f_tmp):
         os.remove(_f_tmp)
 
