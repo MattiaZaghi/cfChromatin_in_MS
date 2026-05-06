@@ -25,19 +25,28 @@ rule build_rre_universe:
         constitutive      = config["normalization"]["constitutive_anchors_bed"],
         sources_log       = "reference/rre/SOURCES.md",
         # Per-cell-type CNS BEDs — empty placeholders for cell types not yet downloaded
-        cns_celltypes     = expand(
+        cns_celltypes      = expand(
             "reference/rre/{ct}_rre.bed",
             ct=config["rre"]["cns_cell_types"],
         ),
+        # Per-cell-type B cell BEDs — exclusive signature regions per B cell type
+        bcell_celltypes    = expand(
+            "reference/rre/{ct}_rre.bed",
+            ct=config["rre"]["bcell_cell_types"],
+        ),
         # ChIPseeker-style annotation TSVs (inspection only, not used downstream)
-        ann_universe      = "reference/rre/ms_rre_universe_annotated.tsv",
-        ann_cns           = "reference/rre/cns_rre_annotated.tsv",
-        ann_immune        = "reference/rre/immune_rre_annotated.tsv",
-        ann_bcell         = "reference/rre/bcell_rre_annotated.tsv",
-        ann_gwas          = "reference/rre/gwas_proximal_rre_annotated.tsv",
-        ann_cns_celltypes = expand(
+        ann_universe       = "reference/rre/ms_rre_universe_annotated.tsv",
+        ann_cns            = "reference/rre/cns_rre_annotated.tsv",
+        ann_immune         = "reference/rre/immune_rre_annotated.tsv",
+        ann_bcell          = "reference/rre/bcell_rre_annotated.tsv",
+        ann_gwas           = "reference/rre/gwas_proximal_rre_annotated.tsv",
+        ann_cns_celltypes  = expand(
             "reference/rre/{ct}_rre_annotated.tsv",
             ct=config["rre"]["cns_cell_types"],
+        ),
+        ann_bcell_celltypes = expand(
+            "reference/rre/{ct}_rre_annotated.tsv",
+            ct=config["rre"]["bcell_cell_types"],
         ),
     params:
         merge_dist  = config["rre"]["merge_distance_bp"],

@@ -47,6 +47,11 @@ rre:
     neuron:          reference/rre/neuron_rre.bed
     astrocyte:       reference/rre/astrocyte_rre.bed
     microglia:       reference/rre/microglia_rre.bed
+  # Per-cell-type B cell subsets (exclusive signature regions for each B cell type)
+  bcell_cell_types:
+    - b_naive
+  bcell_celltype_beds:
+    b_naive: reference/rre/b_naive_rre.bed
   # opc and gwas_proximal BEDs are currently empty — re-add when data is available
 
 # ── Normalization (Module 2) ──────────────────────────────────────────────────

@@ -459,6 +459,24 @@ def main():
             dest.write_text("")
             print(f"  {ct}: 0 regions (no data downloaded) → {dest}")
 
+    # ── Step 4c: Per-cell-type B cell subsets ────────────────────────────────
+    # Mirrors Step 4b for B cell types.  Each file contains regions active
+    # exclusively in that B cell type — absent from all other downloaded cell
+    # types (both other immune and CNS).  These are the signature regions used
+    # by module4 deconvolution for B-cell-specific enrichment scoring.
+    print("\n[Module 1] Building per-cell-type B cell subsets …")
+    all_bcell_cts = [ct for ct, info in REFERENCE_DATA.items()
+                     if "bcell" in info.get("tags", [])]
+
+    for ct in all_bcell_cts:
+        dest = outdir / f"{ct.lower()}_rre.bed"
+        if ct in downloaded_names:
+            all_others = [other for other in downloaded_names if other != ct]
+            extract_exclusive_subset(ct, all_others, str(dest))
+        else:
+            dest.write_text("")
+            print(f"  {ct}: 0 regions (no data downloaded) → {dest}")
+
     # GWAS-proximal subset: RREs within 50 kb of MS GWAS SNPs (IMSGC)
     # bedtools window with -w 50000 extends each SNP by 50 kb on both sides
     # and -u returns each RRE at most once if it overlaps any window.
@@ -542,9 +560,10 @@ def main():
             (outdir / "bcell_rre.bed",        outdir / "bcell_rre_annotated.tsv"),
             (outdir / "gwas_proximal_rre.bed",outdir / "gwas_proximal_rre_annotated.tsv"),
         ]
-        # Per-cell-type CNS subsets
+        # Per-cell-type CNS and B cell subsets
         for ct in [ct for ct, info in REFERENCE_DATA.items()
-                   if "cns" in info.get("tags", [])]:
+                   if "cns" in info.get("tags", [])
+                   or "bcell" in info.get("tags", [])]:
             beds_to_annotate.append((
                 outdir / f"{ct.lower()}_rre.bed",
                 outdir / f"{ct.lower()}_rre_annotated.tsv",
