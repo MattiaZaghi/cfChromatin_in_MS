@@ -29,6 +29,7 @@ COUNT our cfChIP-seq fragments against, giving robust integer matrices for DESeq
 """
 
 import argparse
+import gzip
 import os
 import subprocess
 import tempfile
@@ -47,39 +48,41 @@ from pathlib import Path
 # ─────────────────────────────────────────────────────────────────────────────
 REFERENCE_DATA = {
     # ── Roadmap Epigenomics — immune cells (hg19 native) ─────────────────
-    # Tags derived from the Groups column of Supplemental Table 12
-    # (41587_2020_775_MOESM14_ESM.xlsx). EID listed as comment after the URL.
+    # Functional tags ("immune", "bcell") must appear first — they drive the
+    # extract_exclusive_subset grep logic in Step 4.
+    # Descriptive tags from Supplemental Table 12 Groups column follow.
+    # EID listed as comment after the URL.
     "B_naive":         {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E032-H3K27ac.narrowPeak.gz",   # E032 BLD.CD19.PPC
-                        "tags": ["B-Cells", "Lymphocytes", "Leukocytes"]},
+                        "tags": ["bcell", "immune", "B-Cells", "Lymphocytes", "Leukocytes"]},
     "CD4_Th1":         {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E041-H3K27ac.narrowPeak.gz",   # E041 BLD.CD4.CD25M.IL17M.PL.TPC
-                        "tags": ["T-Helper-Cells", "T-Cells", "Lymphocytes", "Leukocytes"]},
+                        "tags": ["immune", "T-Helper-Cells", "T-Cells", "Lymphocytes", "Leukocytes"]},
     "CD4_Th17":        {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E042-H3K27ac.narrowPeak.gz",   # E042 BLD.CD4.CD25M.IL17P.PL.TPC
-                        "tags": ["T-Helper-Cells", "T-Cells", "Lymphocytes", "Leukocytes"]},
+                        "tags": ["immune", "T-Helper-Cells", "T-Cells", "Lymphocytes", "Leukocytes"]},
     "CD4_Treg":        {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E044-H3K27ac.narrowPeak.gz",   # E044 BLD.CD4.CD25.CD127M.TREGPC
-                        "tags": ["Treg-Cells", "T-Cells", "Lymphocytes", "Leukocytes"]},
+                        "tags": ["immune", "Treg-Cells", "T-Cells", "Lymphocytes", "Leukocytes"]},
     "CD4_T_naive":     {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E038-H3K27ac.narrowPeak.gz",   # E038 BLD.CD4.NPC
-                        "tags": ["T-Helper-Cells", "T-Cells", "Lymphocytes", "Leukocytes"]},
+                        "tags": ["immune", "T-Helper-Cells", "T-Cells", "Lymphocytes", "Leukocytes"]},
     "CD4_T_memory":    {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E037-H3K27ac.narrowPeak.gz",   # E037 BLD.CD4.MPC
-                        "tags": ["T-Helper-Cells", "T-Memory-Cells", "T-Cells", "Lymphocytes", "Leukocytes"]},
+                        "tags": ["immune", "T-Helper-Cells", "T-Memory-Cells", "T-Cells", "Lymphocytes", "Leukocytes"]},
     "CD8_T_naive":     {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E047-H3K27ac.narrowPeak.gz",   # E047 BLD.CD8.NPC
-                        "tags": ["T-Cells", "Lymphocytes", "Leukocytes"]},
+                        "tags": ["immune", "T-Cells", "Lymphocytes", "Leukocytes"]},
     "CD8_T_memory":    {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E048-H3K27ac.narrowPeak.gz",   # E048 BLD.CD8.MPC
-                        "tags": ["T-Memory-Cells", "T-Cells", "Lymphocytes", "Leukocytes"]},
+                        "tags": ["immune", "T-Memory-Cells", "T-Cells", "Lymphocytes", "Leukocytes"]},
     "Monocyte_CD14":   {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E029-H3K27ac.narrowPeak.gz",   # E029 BLD.CD14.PC
-                        "tags": ["Monocytes", "Leukocytes"]},
+                        "tags": ["immune", "Monocytes", "Leukocytes"]},
     "NK":              {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E046-H3K27ac.narrowPeak.gz",   # E046 BLD.CD56.PC
-                        "tags": ["NK", "Lymphocytes", "Leukocytes"]},
+                        "tags": ["immune", "NK", "Lymphocytes", "Leukocytes"]},
     "PBMC":            {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E062-H3K27ac.narrowPeak.gz",   # E062 BLD.PER.MONUC.PC
-                        "tags": ["PBMC", "Leukocytes"]},
+                        "tags": ["immune", "PBMC", "Leukocytes"]},
     # ── Roadmap Epigenomics — TODO placeholders (BLUEPRINT replacements) ──
     "B_memory":        {"url": "TODO_BLUEPRINT_B_memory_H3K27ac_peaks.bed.gz",
-                        "tags": ["B-Cells", "Lymphocytes", "Leukocytes"]},
+                        "tags": ["bcell", "immune", "B-Cells", "Lymphocytes", "Leukocytes"]},
     "Monocyte_CD16":   {"url": "TODO_BLUEPRINT_CD16mono_H3K27ac_peaks.bed.gz",
-                        "tags": ["Monocytes", "Leukocytes"]},
+                        "tags": ["immune", "Monocytes", "Leukocytes"]},
     "Neutrophil":      {"url": "TODO_BLUEPRINT_Neutrophil_H3K27ac_peaks.bed.gz",
-                        "tags": ["Neutrophils", "Leukocytes"]},
+                        "tags": ["immune", "Neutrophils", "Leukocytes"]},
     "Megakaryocyte":   {"url": "TODO_BLUEPRINT_Megakaryocyte_H3K27ac_peaks.bed.gz",
-                        "tags": ["Megakaryocytes"]},
+                        "tags": ["immune", "Megakaryocytes"]},
     # ── Roadmap Epigenomics — non-immune tissues (hg19 native) ───────────
     "Adipose":         {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E063-H3K27ac.narrowPeak.gz",   # E063 FAT.ADIP.NUC
                         "tags": ["Adipose"]},
@@ -116,19 +119,17 @@ REFERENCE_DATA = {
     "Skin":            {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E127-H3K27ac.narrowPeak.gz",   # E127 SKIN.NHEK
                         "tags": ["Skin"]},
     # ── Anita single-cell (CNS) ───────────────────────────────────────────────
-    "Astrocyte":{"url": "/Users/gcblab/Anita/all_markers/AST.bed",
+    "Astrocyte":{"url": "/date/gcb/gcb_MZ/MS-cfEpiMap/all_markers/AST.bed.gz",
                        "tags": ["cns"]},
-    "FIB":            {"url": "/Users/gcblab/Anita/all_markers/FIB.bed",
+    "Microglia":         {"url": "/date/gcb/gcb_MZ/MS-cfEpiMap/all_markers/MIGL-PVM.bed.gz",
                        "tags": ["cns"]},
-    "Microglia":         {"url": "/Users/gcblab/Anita/all_markers/MIGL-PVM.bed",
+    "Oligodendrocyte":      {"url": "/date/gcb/gcb_MZ/MS-cfEpiMap/all_markers/MOL.bed.gz",
                        "tags": ["cns"]},
-    "Oligodendrocyte":      {"url": "/Users/gcblab/Anita/all_markers/MOL.bed",
+    "Neuron":      {"url": "/date/gcb/gcb_MZ/MS-cfEpiMap/all_markers/NEU.bed.gz",
                        "tags": ["cns"]},
-    "Neuron":      {"url": "/Users/gcblab/Anita/all_markers/NEU.bed",
+    "OPC":      {"url": "/date/gcb/gcb_MZ/MS-cfEpiMap/all_markers/OPC.bed.gz",
                        "tags": ["cns"]},
-    "OPC":      {"url": "/Users/gcblab/Anita/all_markers/OPC.bed",
-                       "tags": ["cns"]},
-    "VLMC":      {"url": "/Users/gcblab/Anita/all_markers/VLMC.bed",
+    "VLMC":      {"url": "/date/gcb/gcb_MZ/MS-cfEpiMap/all_markers/VLMC.bed.gz",
                        "tags": ["cns"]}
 }
 # ─────────────────────────────────────────────────────────────────────────────
@@ -162,6 +163,135 @@ def download_peaks(url: str, dest: str) -> bool:
     print(f"  Downloading {url}")
     urllib.request.urlretrieve(url, dest)
     return True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Annotation helpers — ChIPseeker-style gene annotation without R
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _build_refgene_beds(raw_dir: Path, outdir: Path):
+    """Download UCSC refGene.txt.gz for hg19 and build sorted TSS/body/exon BEDs.
+    Returns (tss_bed, body_bed, exon_bed) Path objects."""
+    url  = "https://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/refGene.txt.gz"
+    dest = raw_dir / "refGene.txt.gz"
+    if not dest.exists():
+        print("  Downloading UCSC refGene.txt.gz (hg19) for annotation ...")
+        urllib.request.urlretrieve(url, str(dest))
+
+    tss_lines, body_lines, exon_lines = [], [], []
+    with gzip.open(str(dest), "rt") as fh:
+        for line in fh:
+            f = line.split("\t")
+            if len(f) < 13:
+                continue
+            chrom, strand = f[2], f[3]
+            if not chrom.startswith("chr") or "_" in chrom:
+                continue
+            tx_s, tx_e = int(f[4]), int(f[5])
+            gene = f[12].strip()
+            tss  = tx_s if strand == "+" else tx_e
+            tss_lines.append(f"{chrom}\t{max(0, tss - 1)}\t{tss + 1}\t{gene}\t0\t{strand}")
+            body_lines.append(f"{chrom}\t{tx_s}\t{tx_e}\t{gene}\t0\t{strand}")
+            starts = f[9].rstrip(",").split(",")
+            ends   = f[10].rstrip(",").split(",")
+            for s, e in zip(starts, ends):
+                if s and e:
+                    exon_lines.append(f"{chrom}\t{s}\t{e}\t{gene}\t0\t{strand}")
+
+    def _write_sorted(lines, path):
+        tmp = str(path) + ".unsorted"
+        with open(tmp, "w") as fh:
+            fh.write("\n".join(lines) + "\n")
+        run(f"bedtools sort -i {tmp} > {path}")
+        os.remove(tmp)
+
+    tss_bed  = outdir / "_ann_tss.bed"
+    body_bed = outdir / "_ann_body.bed"
+    exon_bed = outdir / "_ann_exon.bed"
+    _write_sorted(tss_lines,  tss_bed)
+    _write_sorted(body_lines, body_bed)
+    _write_sorted(exon_lines, exon_bed)
+    return tss_bed, body_bed, exon_bed
+
+
+def _annotate_bed(bed_path: Path, tss_bed: Path, body_bed: Path,
+                  exon_bed: Path, out_tsv: Path):
+    """Write a ChIPseeker-style TSV alongside bed_path.
+    Columns: chr, start, end, width, cell_types, nearest_gene, dist_to_tss, feature.
+    The source BED file is NOT modified."""
+    import pandas as pd
+
+    empty = pd.DataFrame(columns=[
+        "chr", "start", "end", "width", "cell_types",
+        "nearest_gene", "dist_to_tss", "feature"])
+    if not bed_path.exists() or bed_path.stat().st_size == 0:
+        empty.to_csv(out_tsv, sep="\t", index=False)
+        return
+
+    # bedtools closest: nearest TSS, first hit, report signed distance (-D b)
+    res = subprocess.run(
+        f"bedtools closest -a {bed_path} -b {tss_bed} -D b -t first",
+        shell=True, capture_output=True, text=True, check=True)
+
+    rows = []
+    for line in res.stdout.splitlines():
+        f = line.split("\t")
+        if len(f) < 4:
+            continue
+        # BED cols: 0=chr,1=start,2=end,3=cell_types (may be absent in 3-col BED)
+        n_bed = 4 if len(f) >= 11 else 3
+        chr_, s, e = f[0], int(f[1]), int(f[2])
+        cell_types  = f[3] if n_bed == 4 else "."
+        nearest     = f[n_bed + 3] if len(f) > n_bed + 3 else "."
+        dist        = int(f[-1]) if f[-1] not in (".", "") else 0
+        rows.append({"chr": chr_, "start": s, "end": e,
+                     "width": e - s, "cell_types": cell_types,
+                     "nearest_gene": nearest, "dist_to_tss": dist})
+
+    if not rows:
+        empty.to_csv(out_tsv, sep="\t", index=False)
+        return
+
+    df = pd.DataFrame(rows)
+
+    # bedtools intersect flags (query written to temp BED)
+    tmp_q = tempfile.NamedTemporaryFile(suffix=".bed", delete=False, mode="w")
+    for _, r in df.iterrows():
+        tmp_q.write(f"{r.chr}\t{r.start}\t{r.end}\n")
+    tmp_q.close()
+
+    def _hit_set(ref_bed):
+        r2 = subprocess.run(
+            f"bedtools intersect -a {tmp_q.name} -b {ref_bed} -u",
+            shell=True, capture_output=True, text=True)
+        hits = set()
+        for ln in r2.stdout.splitlines():
+            p = ln.split("\t")
+            if len(p) >= 3:
+                hits.add((p[0], int(p[1]), int(p[2])))
+        return hits
+
+    in_body = _hit_set(body_bed)
+    in_exon = _hit_set(exon_bed)
+    os.remove(tmp_q.name)
+
+    def _feature(row):
+        d = abs(row.dist_to_tss)
+        if d <= 2000:
+            return "Promoter (<=2kb)"
+        if d <= 5000:
+            return "Promoter (2-5kb)"
+        key = (row.chr, row.start, row.end)
+        if key in in_exon:
+            return "Exon"
+        if key in in_body:
+            return "Intron"
+        return "Intergenic"
+
+    df["feature"] = df.apply(_feature, axis=1)
+    df.to_csv(out_tsv, sep="\t", index=False)
+    fc = df["feature"].value_counts().to_dict()
+    print(f"    {len(df):,} regions  {fc}")
 
 
 def main():
@@ -396,6 +526,42 @@ def main():
         for ct, info in REFERENCE_DATA.items():
             fh.write(f"| {ct} | {','.join(info['tags'])} | {info['url']} |\n")
         fh.write(f"\nGenerated: {__import__('datetime').date.today()}\n")
+
+    # ── Step 7: ChIPseeker-style annotation ──────────────────────────────────
+    # For each subset BED, produce a *_annotated.tsv with nearest gene,
+    # distance to TSS, and feature classification (Promoter/Exon/Intron/Intergenic).
+    # The source BED files are never modified — annotation is for inspection only.
+    print("\n[Module 1] Annotating RRE subsets (downloading UCSC refGene if needed) …")
+    try:
+        tss_bed, body_bed, exon_bed = _build_refgene_beds(raw_dir, outdir)
+
+        beds_to_annotate = [
+            (outdir / "ms_rre_universe.bed",  outdir / "ms_rre_universe_annotated.tsv"),
+            (outdir / "cns_rre.bed",          outdir / "cns_rre_annotated.tsv"),
+            (outdir / "immune_rre.bed",       outdir / "immune_rre_annotated.tsv"),
+            (outdir / "bcell_rre.bed",        outdir / "bcell_rre_annotated.tsv"),
+            (outdir / "gwas_proximal_rre.bed",outdir / "gwas_proximal_rre_annotated.tsv"),
+        ]
+        # Per-cell-type CNS subsets
+        for ct in [ct for ct, info in REFERENCE_DATA.items()
+                   if "cns" in info.get("tags", [])]:
+            beds_to_annotate.append((
+                outdir / f"{ct.lower()}_rre.bed",
+                outdir / f"{ct.lower()}_rre_annotated.tsv",
+            ))
+
+        for bed, tsv in beds_to_annotate:
+            print(f"  {bed.name} →")
+            _annotate_bed(bed, tss_bed, body_bed, exon_bed, tsv)
+
+        for tmp in [tss_bed, body_bed, exon_bed]:
+            if tmp.exists():
+                tmp.unlink()
+
+        print("  Annotation complete.")
+    except Exception as exc:
+        print(f"  WARNING: annotation step failed ({exc}). "
+              "BED files are unaffected; TSVs may be incomplete.")
 
     print("\n[Module 1] Done. Outputs in reference/rre/")
 
