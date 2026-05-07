@@ -593,7 +593,19 @@ def main():
             (outdir / "immune_rre.bed",       outdir / "immune_rre_annotated.tsv"),
             (outdir / "bcell_rre.bed",        outdir / "bcell_rre_annotated.tsv"),
             (outdir / "gwas_proximal_rre.bed",outdir / "gwas_proximal_rre_annotated.tsv"),
-        ]
+            (outdir / "Liver_rre.bed",       outdir / "liver_rre_annotated.tsv"),
+            (outdir / "Pancreas_rre.bed",    outdir / "pancreas_rre_annotated.tsv"),
+            (outdir / "Lung_rre.bed",         outdir / "lung_rre_annotated.tsv"),
+            (outdir / "Epithelial_rre.bed",   outdir / "epithelial_rre_annotated.tsv"),
+            (outdir / "Vasculary_rre.bed",    outdir / "vasculary_rre_annotated.tsv"),
+            (outdir / "Skin_rre.bed",         outdir / "skin_rre_annotated.tsv"),
+            (outdir / "Adipose_rre.bed",      outdir / "adipose_rre_annotated.tsv"),
+            (outdir / "Heart_rre.bed",        outdir / "heart_rre_annotated.tsv"),
+            (outdir / "GI_Sm_Muscle_rre.bed", outdir / "gi_smooth_muscle_rre_annotated.tsv"),
+            (outdir / "Digestive_rre.bed",    outdir / "digestive_rre_annotated.tsv"),
+            (outdir / "Placenta_rre.bed",    outdir / "placenta_rre_annotated.tsv"),
+            (outdir / "Ovary_rre.bed",       outdir / "ovary_rre_annotated.tsv"),
+            ]
         # Per-cell-type CNS and B cell subsets
         for ct in [ct for ct, info in REFERENCE_DATA.items()
                    if "cns" in info.get("tags", [])
