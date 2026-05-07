@@ -410,19 +410,41 @@ def main():
     # groups (e.g. active in both CNS and immune cell types) are dropped from
     # both subsets — they carry mixed signal and would confound deconvolution.
     # They are still present in the full ms_rre_universe.bed.
-    def extract_exclusive_subset(include_tag, exclude_tags, dest):
-        """
-        Keep regions with include_tag that have none of the exclude_tags.
-        Piped grep -v calls act as sequential exclusion filters.
-        """
-        cmd = f"grep '{include_tag}' {universe}"
-        for ex_tag in exclude_tags:
-            cmd += f" | grep -v '{ex_tag}'"
-        cmd += f" > {dest}"
-        run(cmd, check=False)   # grep exits 1 when no lines match — that is fine
-        n = sum(1 for _ in open(dest))
-        excl_str = ", ".join(exclude_tags) if exclude_tags else "none"
-        print(f"  {include_tag} (excluding: {excl_str}): {n} regions → {dest}")
+    def extract_exclusive_subset(include_tag, exclude_tags, dest, max_bp_overlap=0):
+   
+       import subprocess, tempfile
+
+    # 1. Extract all peaks containing the include_tag
+       tmp = tempfile.NamedTemporaryFile(delete=False).name
+       cmd = f"grep '{include_tag}' {universe} > {tmp}"
+       subprocess.run(cmd, shell=True)
+
+    # 2. For each excluded tag, remove peaks that overlap too much
+       for ex_tag in exclude_tags:
+        # Extract peaks for the excluded tag
+           other = tempfile.NamedTemporaryFile(delete=False).name
+           cmd = f"grep '{ex_tag}' {universe} > {other}"
+           subprocess.run(cmd, shell=True)
+
+        # Find overlaps >= max_bp_overlap
+           shared = tempfile.NamedTemporaryFile(delete=False).name
+           cmd = (
+               f"bedtools intersect -a {tmp} -b {other} -wo "
+               f"| awk '$NF >= {max_bp_overlap}' > {shared}"
+            )
+           subprocess.run(cmd, shell=True)
+
+        # Subtract shared peaks from tmp
+           filtered = tempfile.NamedTemporaryFile(delete=False).name
+           cmd = f"bedtools subtract -a {tmp} -b {shared} > {filtered}"
+           subprocess.run(cmd, shell=True)
+
+           tmp = filtered  # update for next iteration
+
+    # 3. Save final result
+       subprocess.run(f"cp {tmp} {dest}", shell=True)
+       print(f"  {include_tag} (excluding: {exclude_tags}, allowing <{max_bp_overlap} bp overlap): → {dest}")
+
 
     # CNS-specific: active in ≥1 CNS type, not active in any immune type
     extract_exclusive_subset("cns",    ["immune"],  str(outdir / "cns_rre.bed"))
@@ -433,6 +455,18 @@ def main():
     # B cell-specific: active in B naive/memory, not active in any CNS type
     # (bcell regions can overlap with other immune types — that is expected)
     extract_exclusive_subset("bcell",  ["cns"],     str(outdir / "bcell_rre.bed"))
+    
+    # Other tissues: for each tissue type, active in that tissue but not in any immune or CNS type
+    other_tissues = ["Adipose", "Heart", "GI_Sm_Muscle",
+                   "Digestive", "Placenta",
+                   "Ovary", "Liver", "Pancreas", "Lung", "Epithelial",
+                   "Vasculary", "Skin", "immune", "cns"]
+    filtered_tissues = [t for t in other_tissues if t not in ["immune", "cns"]]
+
+    for tissue in filtered_tissues:
+        exclude = [t for t in other_tissues if t != tissue]
+        outfile = outdir / f"{tissue.lower().replace(' ', '_')}_rre.bed"
+        extract_exclusive_subset(tissue, exclude, str(outfile)) 
 
     # ── Step 4b: Per-cell-type CNS subsets ───────────────────────────────────
     # For each CNS cell type defined in REFERENCE_DATA, produce a dedicated BED
