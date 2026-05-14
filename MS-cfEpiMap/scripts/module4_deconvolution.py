@@ -880,16 +880,19 @@ with pdf_backend.PdfPages(snakemake.output.violin) as _pp:
 #   reusing the full pipeline — tests for systematic GC/length bias.
 
 # ── WS-A: constants ───────────────────────────────────────────────────────────
-_WS_BG_WIN   = 5_000        # bp — background tile size
-_WS_REGION   = 2_000_000    # bp — neighbourhood for local rate fitting
-_WS_BG_TRIM  = 0.95         # Sadeh fitNoise percentile trim
-_WS_MIN_BG   = 20           # min windows to fit a regional rate
-_WS_MIN_SIG  = 50           # min signature windows for NB GLM
-_WS_N_PERM   = 200          # permuted-signature null iterations
-_WS_PERM_THR = 0.2          # |median_perm_log2FE| flag threshold
-_WS_EPS      = 1.0          # log2FE pseudocount
-_WS_GC_BINS  = 5            # GC decile bins for matched sampling
-_WS_LEN_BINS = 5            # length decile bins for matched sampling
+_WS_BG_WIN       = 5_000        # bp — background tile size
+_WS_REGION       = 2_000_000    # bp — neighbourhood for local rate fitting
+_WS_BG_TRIM      = 0.95         # Sadeh fitNoise percentile trim
+_WS_MIN_BG       = 20           # min windows to fit a regional rate
+_WS_MIN_SIG      = 50           # min signature windows for NB GLM
+_WS_N_PERM       = 200          # permuted-signature null iterations
+_WS_PERM_THR     = 0.2          # |median_perm_log2FE| flag threshold
+_WS_EPS          = 1.0          # log2FE pseudocount
+_WS_GC_BINS      = 5            # GC decile bins for matched sampling
+_WS_LEN_BINS     = 5            # length decile bins for matched sampling
+_WS_BG_HIERARCHY = "regional"   # one of: "regional", "chromosome", "global"
+                                # See diagnostic block after model fitting
+                                # for guidance on choosing this value.
 
 # ── WS-A2: genome FASTA and GC helper ────────────────────────────────────────
 # Must be defined here — _ws_compute_gc is called in WS-B (background tiles)
@@ -1160,43 +1163,72 @@ print("[Module 4] Fitting per-sample background models ...")
 _ws_bg_models = {sid: _ws_build_bg_model(sid)
                  for sid in samples if sid in _ws_sample_counts}
 
-# ── WS-G: GC×length-matched background sampling ──────────────────────────────
-# For each cell-type signature, pre-compute which background tiles match each
-# signature region in GC decile and length decile.  Sampling is done at
-# enrichment-loop time by drawing from the matched pool.
+# ── Hierarchy diagnostic: aggregate across samples ────────────────────────────
+# Reports, across all samples, what fraction of 2 Mb bins and chromosomes
+# actually received a non-fallback local rate.  This is the empirical basis
+# for choosing _WS_BG_HIERARCHY.  Read this output the first time you run
+# with a new off-target BED; once you've picked a level it's stable.
+#
+# Rule of thumb:
+#   median regional-fit fraction ≥ 50%  → "regional" is supported.
+#   median regional-fit fraction  < 50%  → "chromosome" is functionally equivalent.
+#   median chromosome-fit fraction < 50% → "global" is the honest choice.
+if _WS_BG_HIERARCHY == "regional":
+    _hier_rows = []
+    for sid, _m in _ws_bg_models.items():
+        # regional bins that got a genuine local fit (not chr/genome fallback)
+        n_reg_tot = len(_m["region"])
+        n_reg_loc = sum(
+            1 for _rk, _v in _m["region"].items()
+            if np.isfinite(_v)
+            and not np.isclose(
+                _v,
+                _m["chr"].get(_rk.rsplit(":", 1)[0], _m["genome"]),
+            )
+        )
+        # chromosomes that got a genuine local fit (not genome fallback)
+        n_chr_tot = len(_m["chr"])
+        n_chr_loc = sum(
+            1 for _c, _v in _m["chr"].items()
+            if np.isfinite(_v) and not np.isclose(_v, _m["genome"])
+        )
+        _hier_rows.append({
+            "sample":          sid,
+            "regional_fit":    f"{n_reg_loc}/{n_reg_tot}",
+            "regional_frac":   n_reg_loc / n_reg_tot if n_reg_tot else 0.0,
+            "chromosome_fit":  f"{n_chr_loc}/{n_chr_tot}",
+            "chromosome_frac": n_chr_loc / n_chr_tot if n_chr_tot else 0.0,
+        })
+    _hier_df = pd.DataFrame(_hier_rows)
+    _med_reg = float(_hier_df["regional_frac"].median())
+    _med_chr = float(_hier_df["chromosome_frac"].median())
+    _min_reg = float(_hier_df["regional_frac"].min())
+    _min_chr = float(_hier_df["chromosome_frac"].min())
 
-def _ws_gc_len_bins(gc: np.ndarray, length_kb: np.ndarray,
-                    gc_bins: int = _WS_GC_BINS,
-                    len_bins: int = _WS_LEN_BINS) -> np.ndarray:
-    """Return integer bin keys (gc_bin * len_bins + len_bin) for each region."""
-    gc_q   = np.clip(np.searchsorted(
-        np.percentile(gc, np.linspace(0, 100, gc_bins + 1)[1:-1]), gc), 0, gc_bins - 1)
-    len_q  = np.clip(np.searchsorted(
-        np.percentile(length_kb, np.linspace(0, 100, len_bins + 1)[1:-1]),
-        length_kb), 0, len_bins - 1)
-    return gc_q * len_bins + len_q
+    print(f"\n[Module 4] Hierarchy diagnostic (n={len(_hier_df)} samples):")
+    print(f"  Regional:   median {_med_reg:.0%} of 2 Mb bins got a local fit "
+          f"(min {_min_reg:.0%}).")
+    print(f"  Chromosome: median {_med_chr:.0%} of chromosomes got a local fit "
+          f"(min {_min_chr:.0%}).")
+    if   _med_reg >= 0.50:
+        print('  → "regional" is supported by the data; keep current setting.')
+    elif _med_chr >= 0.50:
+        print('  → Regional level is sparse. Switch to '
+              '_WS_BG_HIERARCHY="chromosome".')
+    else:
+        print('  → Both regional and chromosome levels are sparse. Switch to '
+              '_WS_BG_HIERARCHY="global".')
 
-
-_ws_bg_bins = _ws_gc_len_bins(_ws_bg_gc, _ws_bg_len_kb)
-_ws_bin_to_idx: dict[int, np.ndarray] = {}
-for _bk_u in np.unique(_ws_bg_bins):
-    _ws_bin_to_idx[int(_bk_u)] = np.where(_ws_bg_bins == _bk_u)[0]
-_ws_all_bg_idx = np.arange(len(_ws_bg_rids))
-
-
-def _ws_matched_bg_idx(sig_gc: np.ndarray, sig_len: np.ndarray,
-                        n_per: int, rng: np.random.Generator) -> np.ndarray:
-    """For each signature region, sample n_per background tiles from its
-    GC×length bin (fall back to all tiles if the bin is empty)."""
-    sig_bins  = _ws_gc_len_bins(sig_gc, sig_len)
-    chosen: list[int] = []
-    for _bk in sig_bins:
-        _pool = _ws_bin_to_idx.get(int(_bk), _ws_all_bg_idx)
-        chosen.extend(rng.choice(_pool,
-                                 size=min(n_per, len(_pool)),
-                                 replace=len(_pool) < n_per).tolist())
-    return np.array(chosen, dtype=int)
-
+    # Save the per-sample table for the record.  Lives next to the other
+    # within-sample outputs; no Snakefile change needed because we write to
+    # a path derived from an existing output.
+    _hier_path = Path(snakemake.output.within_sample_qc).parent \
+                 / "qc_hierarchy_diagnostic.tsv"
+    _hier_df.to_csv(_hier_path, sep="\t", index=False)
+    print(f"  Saved per-sample diagnostic → {_hier_path}\n")
+else:
+    print(f"\n[Module 4] _WS_BG_HIERARCHY = '{_WS_BG_HIERARCHY}' "
+          f"(diagnostic skipped; set to 'regional' to re-evaluate).\n")
 
 # ── WS-H: NB GLM with local-rate offset and estimated α ──────────────────────
 # Fix #1: α estimated per sample from bg tile variance (not default α=1).
