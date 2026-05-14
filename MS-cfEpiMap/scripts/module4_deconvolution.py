@@ -1121,43 +1121,59 @@ def _ws_fit_noise(densities: np.ndarray) -> float:
 
 
 def _ws_build_bg_model(sid: str) -> dict:
-    """Build 3-level Sadeh background rate model.  Also returns per-tile α."""
+    """3-level Sadeh background-rate model with configurable depth.
+
+    Hierarchy is controlled by _WS_BG_HIERARCHY:
+      "regional"   — full genome→chr→2 Mb hierarchy (Sadeh default).
+      "chromosome" — genome→chr only.
+      "global"     — single genome-wide rate (SNAP-style).
+    """
     cnts    = _ws_sample_counts[sid]
     counts  = np.array([cnts.get(r, 0) for r in _ws_bg_rids], dtype=float)
     density = counts / _ws_bg_len_kb
     rate_g  = _ws_fit_noise(density)
+
     rate_chr: dict[str, float] = {}
-    for _ch in np.unique(_ws_bg_chr):
-        _r = _ws_fit_noise(density[_ws_bg_chr == _ch])
-        rate_chr[_ch] = _r if np.isfinite(_r) else rate_g
     rate_reg: dict[str, float] = {}
-    for _rk in np.unique(_ws_bg_reg2mb):
-        _r  = _ws_fit_noise(density[_ws_bg_reg2mb == _rk])
-        _ch = _rk.rsplit(":", 1)[0]
-        _fb = rate_chr.get(_ch, rate_g)
-        rate_reg[_rk] = _r if np.isfinite(_r) else _fb
-    # Per-sample α from background tile raw-count variance (Option B from review).
-    # NB variance identity Var(count) = μ + α·μ² holds on the count scale, not
-    # on density.  Estimating on density introduces a downward bias of
-    # ~(1 - 1/L)/μ_d per tile (≈−0.16 at typical 5 kb tile counts), which
-    # pushes α toward the floor and silently collapses the NB back to Poisson.
-    counts_bg = counts[counts >= 0]   # raw counts, same scale as the GLM
+
+    if _WS_BG_HIERARCHY in ("chromosome", "regional"):
+        for _ch in np.unique(_ws_bg_chr):
+            _r = _ws_fit_noise(density[_ws_bg_chr == _ch])
+            rate_chr[_ch] = _r if np.isfinite(_r) else rate_g
+
+    if _WS_BG_HIERARCHY == "regional":
+        for _rk in np.unique(_ws_bg_reg2mb):
+            _r  = _ws_fit_noise(density[_ws_bg_reg2mb == _rk])
+            _ch = _rk.rsplit(":", 1)[0]
+            _fb = rate_chr.get(_ch, rate_g)
+            rate_reg[_rk] = _r if np.isfinite(_r) else _fb
+
+    counts_bg = counts[counts >= 0]
     _var      = float(np.var(counts_bg, ddof=1)) if len(counts_bg) > 1 else 1.0
     _mean     = float(np.mean(counts_bg)) if len(counts_bg) > 0 else 1.0
     alpha_s   = max((_var - _mean) / (_mean ** 2 + 1e-9), 1e-6)
+
     return {"genome": rate_g, "chr": rate_chr, "region": rate_reg,
             "alpha": alpha_s}
 
 
 def _ws_expected_density(chrom: str, start: int, model: dict) -> float:
-    _rk = f"{chrom}:{start // _WS_REGION}"
-    _r  = model["region"].get(_rk)
-    if _r is None or not np.isfinite(_r):
-        _r = model["chr"].get(chrom)
-    if _r is None or not np.isfinite(_r):
-        _r = model["genome"]
-    return max(float(_r), 1e-6) if (_r is not None and np.isfinite(_r)) else 1e-6
+    """Return local background rate per kb at (chrom, start).
 
+    Lookup order depends on _WS_BG_HIERARCHY: regional → chromosome → global.
+    Missing levels are skipped so the function always returns a positive rate.
+    """
+    if _WS_BG_HIERARCHY == "regional":
+        _rk = f"{chrom}:{start // _WS_REGION}"
+        _r  = model["region"].get(_rk)
+        if _r is not None and np.isfinite(_r):
+            return max(float(_r), 1e-6)
+    if _WS_BG_HIERARCHY in ("regional", "chromosome"):
+        _r = model["chr"].get(chrom)
+        if _r is not None and np.isfinite(_r):
+            return max(float(_r), 1e-6)
+    _r = model["genome"]
+    return max(float(_r), 1e-6) if (_r is not None and np.isfinite(_r)) else 1e-6
 
 print("[Module 4] Fitting per-sample background models ...")
 _ws_bg_models = {sid: _ws_build_bg_model(sid)
@@ -1229,6 +1245,43 @@ if _WS_BG_HIERARCHY == "regional":
 else:
     print(f"\n[Module 4] _WS_BG_HIERARCHY = '{_WS_BG_HIERARCHY}' "
           f"(diagnostic skipped; set to 'regional' to re-evaluate).\n")
+
+# ── WS-G: GC×length-matched background sampling ──────────────────────────────
+# For each cell-type signature, pre-compute which background tiles match each
+# signature region in GC decile and length decile.  Sampling is done at
+# enrichment-loop time by drawing from the matched pool.
+
+def _ws_gc_len_bins(gc: np.ndarray, length_kb: np.ndarray,
+                    gc_bins: int = _WS_GC_BINS,
+                    len_bins: int = _WS_LEN_BINS) -> np.ndarray:
+    """Return integer bin keys (gc_bin * len_bins + len_bin) for each region."""
+    gc_q   = np.clip(np.searchsorted(
+        np.percentile(gc, np.linspace(0, 100, gc_bins + 1)[1:-1]), gc), 0, gc_bins - 1)
+    len_q  = np.clip(np.searchsorted(
+        np.percentile(length_kb, np.linspace(0, 100, len_bins + 1)[1:-1]),
+        length_kb), 0, len_bins - 1)
+    return gc_q * len_bins + len_q
+
+
+_ws_bg_bins = _ws_gc_len_bins(_ws_bg_gc, _ws_bg_len_kb)
+_ws_bin_to_idx: dict[int, np.ndarray] = {}
+for _bk_u in np.unique(_ws_bg_bins):
+    _ws_bin_to_idx[int(_bk_u)] = np.where(_ws_bg_bins == _bk_u)[0]
+_ws_all_bg_idx = np.arange(len(_ws_bg_rids))
+
+
+def _ws_matched_bg_idx(sig_gc: np.ndarray, sig_len: np.ndarray,
+                        n_per: int, rng: np.random.Generator) -> np.ndarray:
+    """For each signature region, sample n_per background tiles from its
+    GC×length bin (fall back to all tiles if the bin is empty)."""
+    sig_bins  = _ws_gc_len_bins(sig_gc, sig_len)
+    chosen: list[int] = []
+    for _bk in sig_bins:
+        _pool = _ws_bin_to_idx.get(int(_bk), _ws_all_bg_idx)
+        chosen.extend(rng.choice(_pool,
+                                 size=min(n_per, len(_pool)),
+                                 replace=len(_pool) < n_per).tolist())
+    return np.array(chosen, dtype=int)
 
 # ── WS-H: NB GLM with local-rate offset and estimated α ──────────────────────
 # Fix #1: α estimated per sample from bg tile variance (not default α=1).
