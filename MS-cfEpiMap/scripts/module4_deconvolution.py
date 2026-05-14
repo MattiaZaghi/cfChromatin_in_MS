@@ -945,27 +945,73 @@ def _ws_compute_gc(bed_df: pd.DataFrame, rid_col: str) -> np.ndarray:
 # ── WS-B (modified): load curated off-target regions ──────────────────────────
 # Source: SNAP cfChIP pipeline H3K27ac off-target BED.
 # Expected: 3-column BED (chr, start, end) on autosomes, sorted, merged.
+# Before tiling we subtract the union of all cell-type signature regions
+# so the background is provably disjoint from every signature.  Overlap
+# would otherwise double-count loci (signal and background simultaneously),
+# biasing β downward and triggering GLM convergence warnings.
 print("[Module 4] Within-sample enrichment: loading off-target regions ...")
 
-_ws_offtarget_bed = snakemake.input.off_target_bed  # add to Snakefile rule
-_ws_t_bg = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
+_ws_offtarget_bed = snakemake.input.off_target_bed
 
-# Optional but recommended: re-tile to 5 kb so GC×length matching and the
-# 2-Mb regional rate model both behave the same as in the original pipeline.
-# If your off-target regions are already short (e.g. 1–5 kb peak-flanks),
-# you can skip the makewindows step and load them directly.
-subprocess.run(
-    f"grep -P '^chr[0-9]+\\t' {_ws_offtarget_bed}"
-    f" | cut -f1-3"
-    f" | sort -k1,1 -k2,2n"
-    f" | bedtools merge"
-    f" | bedtools makewindows -b - -w {_WS_BG_WIN} -s {_WS_BG_WIN}"
-    f" > {_ws_t_bg}",
-    shell=True, check=True, executable="/bin/bash")
+_ws_t_sig_union  = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
+_ws_t_sig_merged = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
+_ws_t_off_clean  = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
+_ws_t_bg         = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
+try:
+    # 1. Build union of every cell-type signature.
+    with open(_ws_t_sig_union, "w") as _fh:
+        for _ct_ws, _df_ct in ct_regions.items():
+            for _, _r in _df_ct.iterrows():
+                _fh.write(f"{_r[0]}\t{int(_r[1])}\t{int(_r[2])}\n")
 
-_ws_bg_df = pd.read_csv(_ws_t_bg, sep="\t", header=None,
-                        names=["chr", "start", "end"])
-os.remove(_ws_t_bg)
+    subprocess.run(
+        f"sort -k1,1 -k2,2n {_ws_t_sig_union} | bedtools merge -i - "
+        f"> {_ws_t_sig_merged}",
+        shell=True, check=True, executable="/bin/bash")
+
+    # 2. Diagnostic: report how much of the off-target BED overlaps signatures.
+    _overlap_bp = subprocess.check_output(
+        f"bedtools intersect -a {_ws_offtarget_bed} -b {_ws_t_sig_merged}"
+        f" | awk '{{s += $3-$2}} END {{print s+0}}'",
+        shell=True, executable="/bin/bash").decode().strip()
+    _offtarget_bp = subprocess.check_output(
+        f"awk '{{s += $3-$2}} END {{print s+0}}' {_ws_offtarget_bed}",
+        shell=True, executable="/bin/bash").decode().strip()
+    _frac = (float(_overlap_bp) / float(_offtarget_bp)
+             if float(_offtarget_bp) > 0 else 0.0)
+    print(f"[Module 4]   off-target ∩ signature overlap: "
+          f"{int(_overlap_bp):,} bp / {int(_offtarget_bp):,} bp "
+          f"({_frac:.2%}) — will be removed.")
+    if _frac > 0.20:
+        import warnings as _ws_warn3
+        _ws_warn3.warn(
+            f"[Module 4] >20% of the off-target BED overlaps signature regions. "
+            "Check that the right off-target file is being used; the SNAP "
+            "H3K27ac off-target set should overlap RREs minimally.",
+            RuntimeWarning, stacklevel=2)
+
+    # 3. Subtract the merged signature union from the off-target BED.
+    subprocess.run(
+        f"bedtools subtract -a {_ws_offtarget_bed} -b {_ws_t_sig_merged}"
+        f" > {_ws_t_off_clean}",
+        shell=True, check=True, executable="/bin/bash")
+
+    # 4. Tile the cleaned off-target BED to 5 kb windows on autosomes.
+    subprocess.run(
+        f"grep -P '^chr[0-9]+\\t' {_ws_t_off_clean}"
+        f" | cut -f1-3"
+        f" | sort -k1,1 -k2,2n"
+        f" | bedtools merge -i -"
+        f" | bedtools makewindows -b - -w {_WS_BG_WIN} -s {_WS_BG_WIN}"
+        f" > {_ws_t_bg}",
+        shell=True, check=True, executable="/bin/bash")
+
+    _ws_bg_df = pd.read_csv(_ws_t_bg, sep="\t", header=None,
+                            names=["chr", "start", "end"])
+finally:
+    for _tmp in (_ws_t_sig_union, _ws_t_sig_merged, _ws_t_off_clean, _ws_t_bg):
+        if os.path.exists(_tmp):
+            os.remove(_tmp)
 
 _ws_bg_df["region_id"]  = ("bg|" + _ws_bg_df["chr"] + ":"
                             + _ws_bg_df["start"].astype(str) + "-"
@@ -976,9 +1022,10 @@ _ws_bg_df["region_2mb"] = (_ws_bg_df["chr"] + ":"
 
 if len(_ws_bg_df) < 2000:
     raise RuntimeError(
-        f"[Module 4] ABORT: only {len(_ws_bg_df)} off-target windows. "
-        "Increase the off-target set or lower the 2000 floor.")
-print(f"[Module 4]   {len(_ws_bg_df):,} off-target windows.")
+        f"[Module 4] ABORT: only {len(_ws_bg_df)} off-target windows after "
+        "signature subtraction. Increase the off-target set or lower the "
+        "2000 floor.")
+print(f"[Module 4]   {len(_ws_bg_df):,} off-target windows after subtraction.")
 
 _ws_bg_df["gc"] = _ws_compute_gc(_ws_bg_df, "region_id")
 print("[Module 4] GC content computed for off-target tiles.")
