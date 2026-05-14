@@ -61,6 +61,8 @@ normalization:
   housekeeping_seed:    /home/mattia/cfChromatin_in_MS/MS-cfEpiMap/reference/rre/housekeeping_seed.bed
   min_anchor_celltypes: 0.8     # fraction of downloaded cell types that must be active (≥80%); auto-scales to however many were downloaded
   flag_sf_sd_threshold: 3.0     # flag samples >N SD from mean SF
+deconvolution:
+  off_target_bed: /home/mattia/cfChromatin_in_MS/SNAPIE/ref_files/chromhmm_offtarget_H3K27ac.bed
 
 # ── Bins (Module 6) ───────────────────────────────────────────────────────────
 bins:
