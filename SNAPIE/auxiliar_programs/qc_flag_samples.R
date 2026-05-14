@@ -57,7 +57,7 @@ frags <- read.table(frag_tsv, header = TRUE, sep = "\t",
 dat <- merge(enrich, frags, by = "sample_id", all = TRUE)
 
 # ── Compute thresholds ────────────────────────────────────────────────────────
-enrich_thresh <- 1.5   # fixed: enriched above background; knee-point was biased by control-heavy distribution
+enrich_thresh <- 7  # fixed: enriched above background; knee-point was biased by control-heavy distribution
 frag_thresh   <- 1e6   # fixed at 1M fragments (hard floor for cfChIP-seq)
 
 message(sprintf("Enrichment score threshold (knee-point): %.4f", enrich_thresh))

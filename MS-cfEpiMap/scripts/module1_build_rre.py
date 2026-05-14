@@ -119,18 +119,18 @@ REFERENCE_DATA = {
     "Skin":            {"url": "https://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/E127-H3K27ac.narrowPeak.gz",   # E127 SKIN.NHEK
                         "tags": ["Skin"]},
     # ── Anita single-cell (CNS) ───────────────────────────────────────────────
-    "Astrocyte":{"url": "/date/gcb/gcb_MZ/MS-cfEpiMap/all_markers/AST.bed.gz",
+    "Astrocyte":{"url": "/date/gcb/gcb_MZ/MS-cfEpiMap/Nott-Ref/LHX2_optimal_peak.H3K27.bed.gz",
                        "tags": ["cns"]},
-    "Microglia":         {"url": "/date/gcb/gcb_MZ/MS-cfEpiMap/all_markers/MIGL-PVM.bed.gz",
+    "Microglia":         {"url": "/date/gcb/gcb_MZ/MS-cfEpiMap/Nott-Ref/PU1_optimal_peak.H3K27.bed.gz",
                        "tags": ["cns"]},
-    "Oligodendrocyte":      {"url": "/date/gcb/gcb_MZ/MS-cfEpiMap/all_markers/MOL.bed.gz",
+    "Oligodendrocyte":      {"url": "/date/gcb/gcb_MZ/MS-cfEpiMap/Nott-Ref/Olig2_optimal_peak.H3K27.bed.gz",
                        "tags": ["cns"]},
-    "Neuron":      {"url": "/date/gcb/gcb_MZ/MS-cfEpiMap/all_markers/NEU.bed.gz",
+    "Neuron":      {"url": "/date/gcb/gcb_MZ/MS-cfEpiMap/Nott-Ref/NeuN_optimal_peak.H3K27.bed.gz",
                        "tags": ["cns"]},
-    "OPC":      {"url": "/date/gcb/gcb_MZ/MS-cfEpiMap/all_markers/OPC.bed.gz",
-                       "tags": ["cns"]},
-    "VLMC":      {"url": "/date/gcb/gcb_MZ/MS-cfEpiMap/all_markers/VLMC.bed.gz",
-                       "tags": ["cns"]}
+    #"OPC":      {"url": "/date/gcb/gcb_MZ/MS-cfEpiMap/all_markers/OPC.bed.gz",
+                       #"tags": ["cns"]},
+    #"VLMC":      {"url": "/date/gcb/gcb_MZ/MS-cfEpiMap/all_markers/VLMC.bed.gz",
+                       #"tags": ["cns"]}
 }
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -510,23 +510,6 @@ def main():
         else:
             dest.write_text("")
             print(f"  {ct}: 0 regions (no data downloaded) → {dest}")
-            
-    # ── Step 4d: Per-cell-type immune cell subsets ────────────────────────────────
-    # Mirrors Step 4b for immune cell types.  Each file contains regions active
-    # exclusively in that immune cell type — absent from all other downloaded cell
-    # types (both other immune and CNS). 
-    print("\n[Module 1] Building per-cell-type immune cell subsets …")
-    all_immune_cts = [ct for ct, info in REFERENCE_DATA.items()
-                       if "immune" in info.get("tags", []) and "bcell" not in info.get("tags", [])]
-
-    for ct in all_immune_cts:
-        dest = outdir / f"{ct.lower()}_rre.bed"
-        if ct in downloaded_names:
-            all_others = [other for other in downloaded_names if other != ct]
-            extract_exclusive_subset(ct, all_others, str(dest))
-        else:
-            dest.write_text("")
-            print(f"  {ct}: 0 regions (no data downloaded) → {dest}")
 
     # GWAS-proximal subset: RREs within 50 kb of MS GWAS SNPs (IMSGC)
     # bedtools window with -w 50000 extends each SNP by 50 kb on both sides
@@ -623,10 +606,10 @@ def main():
             (outdir / "Placenta_rre.bed",    outdir / "placenta_rre_annotated.tsv"),
             (outdir / "Ovary_rre.bed",       outdir / "ovary_rre_annotated.tsv"),
             ]
-        # Per-cell-type CNS and immune cell subsets
+        # Per-cell-type CNS and B cell subsets
         for ct in [ct for ct, info in REFERENCE_DATA.items()
                    if "cns" in info.get("tags", [])
-                   or "immune" in info.get("tags", [])]:
+                   or "bcell" in info.get("tags", [])]:
             beds_to_annotate.append((
                 outdir / f"{ct.lower()}_rre.bed",
                 outdir / f"{ct.lower()}_rre_annotated.tsv",

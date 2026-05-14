@@ -942,70 +942,26 @@ def _ws_compute_gc(bed_df: pd.DataFrame, rid_col: str) -> np.ndarray:
         os.remove(_tmp.name)
 
 
-# ── WS-B: build background windows (complement of RRE+DAC, tiled at 5 kb) ────
-# Non-overlapping 5 kb tiles; partial tiles at interval ends are kept so that
-# every non-RRE base is represented.  Density = counts/length_kb normalises
-# correctly for variable-width end tiles in both the Sadeh rate model and GLM.
-print("[Module 4] Within-sample enrichment: building background windows ...")
+# ── WS-B (modified): load curated off-target regions ──────────────────────────
+# Source: SNAP cfChIP pipeline H3K27ac off-target BED.
+# Expected: 3-column BED (chr, start, end) on autosomes, sorted, merged.
+print("[Module 4] Within-sample enrichment: loading off-target regions ...")
 
-_ws_chrom_sizes = snakemake.params.chrom_sizes
-_ws_dac         = snakemake.input.dac_regions
-_ws_rre_bed     = snakemake.input.rre_universe
+_ws_offtarget_bed = snakemake.input.off_target_bed  # add to Snakefile rule
+_ws_t_bg = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
 
-# Autosomal chrom.sizes sorted lexicographically (same order as `sort -k1,1`
-# used on the merged BED — bedtools complement requires matching sort orders).
-_ws_t_auto_unsorted = tempfile.NamedTemporaryFile(
-    suffix=".txt", delete=False, mode="w")
-with open(_ws_chrom_sizes) as _fh_cs:
-    for _line_cs in _fh_cs:
-        _p_cs = _line_cs.split()
-        if _p_cs and _p_cs[0].startswith("chr") and _p_cs[0][3:].isdigit():
-            _ws_t_auto_unsorted.write(_line_cs)
-_ws_t_auto_unsorted.close()
-_ws_auto_sizes = tempfile.NamedTemporaryFile(
-    suffix=".txt", delete=False).name
+# Optional but recommended: re-tile to 5 kb so GC×length matching and the
+# 2-Mb regional rate model both behave the same as in the original pipeline.
+# If your off-target regions are already short (e.g. 1–5 kb peak-flanks),
+# you can skip the makewindows step and load them directly.
 subprocess.run(
-    f"sort -k1,1 {_ws_t_auto_unsorted.name} > {_ws_auto_sizes}",
-    shell=True, check=True)
-os.remove(_ws_t_auto_unsorted.name)
-
-_ws_t_merged = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
-_ws_t_compl  = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
-_ws_t_bg     = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
-
-# a. Merge RRE + DAC on autosomes; clip to chrom boundaries so complement
-#    never produces negative-width intervals (RRE/DAC may extend beyond
-#    the chromosome end listed in the genome file).
-subprocess.run(
-    f"cat {_ws_rre_bed} {_ws_dac}"
-    f" | grep -P '^chr[0-9]+\\t'"
+    f"grep -P '^chr[0-9]+\\t' {_ws_offtarget_bed}"
     f" | cut -f1-3"
     f" | sort -k1,1 -k2,2n"
     f" | bedtools merge"
-    f" | bedtools intersect -a - -b <(awk 'BEGIN{{OFS=\"\\t\"}}{{print $1,0,$2}}'"
-    f" {_ws_auto_sizes}) -u"
-    f" > {_ws_t_merged}",
-    shell=True, check=True, executable="/bin/bash")
-
-# b. Complement on autosomes; filter degenerate intervals (start >= end).
-subprocess.run(
-    f"bedtools complement -i {_ws_t_merged} -g {_ws_auto_sizes}"
-    f" | awk '$3 > $2'"
-    f" > {_ws_t_compl}",
-    shell=True, check=True)
-
-# c. Tile at 5 kb, non-overlapping.  Partial end-of-interval tiles are kept
-#    so every non-RRE base is covered; density normalisation handles the
-#    variable widths.
-subprocess.run(
-    f"bedtools makewindows -b {_ws_t_compl}"
-    f" -w {_WS_BG_WIN} -s {_WS_BG_WIN}"
+    f" | bedtools makewindows -b - -w {_WS_BG_WIN} -s {_WS_BG_WIN}"
     f" > {_ws_t_bg}",
-    shell=True, check=True)
-
-for _f_tmp in [_ws_t_merged, _ws_t_compl, _ws_auto_sizes]:
-    if os.path.exists(_f_tmp):
-        os.remove(_f_tmp)
+    shell=True, check=True, executable="/bin/bash")
 
 _ws_bg_df = pd.read_csv(_ws_t_bg, sep="\t", header=None,
                         names=["chr", "start", "end"])
@@ -1020,13 +976,12 @@ _ws_bg_df["region_2mb"] = (_ws_bg_df["chr"] + ":"
 
 if len(_ws_bg_df) < 2000:
     raise RuntimeError(
-        f"[Module 4] ABORT: only {len(_ws_bg_df)} background windows after filtering. "
-        "Check RRE universe, DAC, and chrom sizes.")
-print(f"[Module 4]   {len(_ws_bg_df):,} background windows.")
+        f"[Module 4] ABORT: only {len(_ws_bg_df)} off-target windows. "
+        "Increase the off-target set or lower the 2000 floor.")
+print(f"[Module 4]   {len(_ws_bg_df):,} off-target windows.")
 
-# Compute GC content for background tiles (used for matched sampling)
 _ws_bg_df["gc"] = _ws_compute_gc(_ws_bg_df, "region_id")
-print("[Module 4] GC content computed for background tiles.")
+print("[Module 4] GC content computed for off-target tiles.")
 
 
 # ── WS-C: per-cell-type signal region metadata ────────────────────────────────
