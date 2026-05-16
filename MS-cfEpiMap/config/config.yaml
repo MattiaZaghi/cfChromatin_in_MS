@@ -63,7 +63,7 @@ normalization:
   flag_sf_sd_threshold: 3.0     # flag samples >N SD from mean SF
 deconvolution:
   off_target_bed: /home/mattia/cfChromatin_in_MS/SNAPIE/ref_files/chromhmm_offtarget_H3K27ac.bed
-
+  gene_annotation_bed: /home/mattia/Genomes/hg19/gencode_v19_genes.bed   # 6-column BED
 # ── Bins (Module 6) ───────────────────────────────────────────────────────────
 bins:
   size_bp:         5000

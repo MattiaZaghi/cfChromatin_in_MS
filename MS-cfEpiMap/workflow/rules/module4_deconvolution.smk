@@ -36,10 +36,14 @@ rule compute_deconvolution:
         within_sample_contribution = "results/deconvolution/fig_within_sample_contribution.pdf",
         within_sample_qc_png       = "results/deconvolution/qc_within_sample.png",
         within_sample_windows_bed  = "results/deconvolution/background_signal_windows.bed.gz",
+        drivers_dir              = "results/deconvolution/drivers",
+        drivers_manifest         = "results/deconvolution/drivers_manifest.tsv",
+        drivers_enrichment_pdf   = "results/deconvolution/drivers_enrichment.pdf",
     params:
         samples      = SAMPLES,
         frags_dir    = config["data"]["frags_dir"],
         genome_fasta = config["genome"].get("fasta", ""),
+        gene_annotation_bed = config.get("gene_annotation_bed", ""),
     conda:   "../../envs/python_analysis.yaml"
     threads: config["threads"]
     script:  "../../scripts/module4_deconvolution.py"

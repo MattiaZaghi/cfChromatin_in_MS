@@ -1067,8 +1067,8 @@ _ws_sig_rows: list[str] = []
 for _ct_ws, _df_ct in _ws_ct_sig.items():
     for _, _row_ct in _df_ct.iterrows():
         _ws_sig_rows.append(
-            f"{_row_ct['chr']}\t{_row_ct['start']}\t"
-            f"{int(_row_ct[2])}\t{_row_ct['region_id']}")
+            f"{_row_ct['chr']}\t{int(_row_ct['start'])}\t"
+            f"{int(_row_ct['end'])}\t{_row_ct['region_id']}")
 
 _ws_bg_rows: list[str] = [
     f"{_r.chr}\t{_r.start}\t{_r.end}\t{_r.region_id}"
@@ -1321,6 +1321,10 @@ print("[Module 4] Computing within-sample enrichment scores ...")
 _ws_rng   = np.random.default_rng(42)
 _ws_rows: list[dict] = []
 
+# Per-region driver info keyed by (sample, cell_type).  Populated inside the
+# loop below; consumed by WS-L (top-100 driver regions per cell type).
+_ws_drivers: dict[tuple[str, str], dict] = {}
+
 for sid in samples:
     if sid not in _ws_sample_counts:
         continue
@@ -1347,8 +1351,26 @@ for sid in samples:
         _med_sig  = float(np.median(_sig_dens))
         _med_exp  = float(np.median(_exp_dens))
 
-        _log2fe = float(np.log2((_med_sig + _WS_EPS) / (_med_exp + _WS_EPS)))
-        _excess = max(0.0, _med_sig - _med_exp)
+        # Two effect-size estimators:
+        #   _log2fe_median — median(obs_density) vs median(exp_density).
+        #     Biased negative for short sparse regions because median(obs) ≈ 0
+        #     while median(exp) ≈ 0.1–0.5 reads/kb.  Kept for diagnostics only.
+        #   _log2fe_pool   — log2(sum(obs_count) / sum(exp_count)) at the
+        #     cell-type level.  Mean-based, agrees in direction with beta_nb,
+        #     and is the metric to use for visualisation and contribution.
+        _log2fe_median = float(np.log2((_med_sig + _WS_EPS) / (_med_exp + _WS_EPS)))
+        _sum_sig       = float(_sig_cnt.sum())
+        _sum_exp       = float(_sig_exp_count.sum())
+        _log2fe_pool   = float(np.log2((_sum_sig + _WS_EPS) / (_sum_exp + _WS_EPS)))
+        _log2fe        = _log2fe_pool          # canonical effect size
+
+        # Excess on the count scale — never collapses to 0 when there is any
+        # positive enrichment, so `contribution` produces sensible fractions.
+        _excess = max(0.0, _sum_sig - _sum_exp)
+
+        # Per-region driver score: how much each signature region contributes
+        # to the cell-type's excess in this sample.  Used by WS-L.
+        _per_region_excess = np.maximum(_sig_cnt - _sig_exp_count, 0.0)
 
         _low_n   = len(_df_ct) < _WS_MIN_SIG
         _beta_nb = _p_nb = float("nan")
@@ -1370,11 +1392,26 @@ for sid in samples:
 
         _ws_rows.append({
             "sample": sid, "cell_type": _ct_ws,
-            "log2FE": _log2fe, "beta_nb": _beta_nb, "p_nb": _p_nb,
+            "log2FE":         _log2fe,           # sum-based, canonical
+            "log2FE_median":  _log2fe_median,    # legacy, diagnostic only
+            "beta_nb": _beta_nb, "p_nb": _p_nb,
             "q_nb": float("nan"), "excess": _excess,
             "contribution": float("nan"), "enriched": False,
             "low_n": _low_n, "n_sig_windows": len(_df_ct),
         })
+
+        # Stash the per-region driver info for WS-L.  Indexed by (sample, ct).
+        # Must stay INSIDE the inner loop — this was the indentation bug that
+        # caused only the last (sample, cell_type) pair to be recorded.
+        _ws_drivers[(sid, _ct_ws)] = {
+            "region_id":      _df_ct["region_id"].values,
+            "chr":            _df_ct["chr"].values,
+            "start":          _df_ct["start"].values,
+            "end":            _df_ct["end"].values,
+            "obs":            _sig_cnt.copy(),
+            "exp":            _sig_exp_count.copy(),
+            "excess":         _per_region_excess,
+        }
 
 ws_df_out = pd.DataFrame(_ws_rows)
 
@@ -1489,12 +1526,259 @@ _ws_out_dir = Path(snakemake.output.within_sample_scores).parent
 _ws_out_dir.mkdir(parents=True, exist_ok=True)
 
 ws_df_out[[
-    "sample", "cell_type", "log2FE", "beta_nb", "p_nb", "q_nb",
-    "excess", "contribution", "enriched", "low_n", "n_sig_windows",
+    "sample", "cell_type", "log2FE", "log2FE_median", "beta_nb",
+    "p_nb", "q_nb", "excess", "contribution", "enriched",
+    "low_n", "n_sig_windows",
 ]].to_csv(snakemake.output.within_sample_scores, sep="\t", index=False)
 
 qc_ws_df.to_csv(snakemake.output.within_sample_qc, sep="\t", index=False)
 print(f"[Module 4] Scores → {snakemake.output.within_sample_scores}")
+
+# ── WS-L: top-100 driver regions per cell type ───────────────────────────────
+# For each cell type, we want the signature regions that are most responsible
+# for the enrichment seen across the samples in which that cell type is
+# enriched.  Logic:
+#   1. Filter to (sample, cell_type) pairs with enriched = True.
+#   2. For each region of that cell type, sum the per-region excess (obs-exp)
+#      across those enriched samples.
+#   3. Compute mean obs/exp fold and the number of enriched samples in which
+#      the region contributes positive excess.
+#   4. Take top 100 by aggregated excess, write a 7-column BED.
+#
+# Outputs are optional — if the Snakefile does not declare drivers_dir and
+# drivers_manifest, this section is skipped silently.
+
+_ws_drivers_dir_path = getattr(snakemake.output, "drivers_dir", None)
+_ws_drivers_manifest = getattr(snakemake.output, "drivers_manifest", None)
+_driver_manifest: list[dict] = []
+
+if _ws_drivers_dir_path is not None and _ws_drivers_manifest is not None:
+    print("[Module 4] Extracting top-100 driver regions per cell type ...")
+    _ws_drivers_dir = Path(_ws_drivers_dir_path)
+    _ws_drivers_dir.mkdir(parents=True, exist_ok=True)
+
+    # Build a quick lookup of (sample, ct) -> enriched flag
+    _enriched_lookup = {
+        (row["sample"], row["cell_type"]): bool(row["enriched"])
+        for _, row in ws_df_out.iterrows()
+    }
+
+    for _ct_ws in _ws_ct_sig:
+        _df_ct = _ws_ct_sig[_ct_ws]
+        if len(_df_ct) == 0:
+            continue
+        if "region_id" not in _df_ct.columns:
+            print(f"[Module 4] WARNING: {_ct_ws} missing 'region_id'; skipping.")
+            continue
+
+        _n_regions = len(_df_ct)
+        _agg_excess = np.zeros(_n_regions, dtype=float)
+        _agg_obs    = np.zeros(_n_regions, dtype=float)
+        _agg_exp    = np.zeros(_n_regions, dtype=float)
+        _n_pos      = np.zeros(_n_regions, dtype=int)
+        _n_enriched_samples = 0
+
+        for _sid_d in samples:
+            if not _enriched_lookup.get((_sid_d, _ct_ws), False):
+                continue
+            _d = _ws_drivers.get((_sid_d, _ct_ws))
+            if _d is None:
+                continue
+            _n_enriched_samples += 1
+            _agg_excess += _d["excess"]
+            _agg_obs    += _d["obs"]
+            _agg_exp    += _d["exp"]
+            _n_pos      += (_d["excess"] > 0).astype(int)
+
+        if _n_enriched_samples == 0:
+            print(f"  [Module 4]  {_ct_ws}: no enriched samples — skipping")
+            continue
+
+        # Mean fold per region across the enriched samples.  +1 pseudocount on
+        # both numerator and denominator keeps log2 well-defined when obs=0.
+        _mean_obs = _agg_obs / _n_enriched_samples
+        _mean_exp = _agg_exp / _n_enriched_samples
+        _log2_mean_fold = np.log2((_mean_obs + 1.0) / (_mean_exp + 1.0))
+
+        _rank   = np.argsort(-_agg_excess)
+        _top_n  = min(100, _n_regions)
+        _top_idx = _rank[:_top_n]
+
+        _top_df = pd.DataFrame({
+            "chr":    _df_ct["chr"].values[_top_idx],
+            "start":  _df_ct["start"].values[_top_idx].astype(int),
+            "end":    _df_ct["end"].values[_top_idx].astype(int),
+            "name":   _df_ct["region_id"].values[_top_idx],
+            "score":  np.round(_agg_excess[_top_idx], 2),
+            "log2FE": np.round(_log2_mean_fold[_top_idx], 3),
+            "n_samples_pos": _n_pos[_top_idx],
+        }).sort_values(["chr", "start"])
+
+        _bed_path = _ws_drivers_dir / f"{_ct_ws}_top{_top_n}_drivers.bed"
+        _top_df.to_csv(_bed_path, sep="\t", index=False, header=False)
+
+        _driver_manifest.append({
+            "cell_type":           _ct_ws,
+            "n_enriched_samples":  _n_enriched_samples,
+            "n_signature_regions": _n_regions,
+            "n_top_written":       _top_n,
+            "median_top_log2FE":   float(np.median(_log2_mean_fold[_top_idx])),
+            "median_top_excess":   float(np.median(_agg_excess[_top_idx])),
+            "bed_path":            str(_bed_path),
+        })
+        print(f"  [Module 4]  {_ct_ws}: {_n_enriched_samples} enriched samples "
+              f"→ {_bed_path.name} (median log2FE = "
+              f"{float(np.median(_log2_mean_fold[_top_idx])):+.2f})")
+
+    _driver_manifest_df = pd.DataFrame(_driver_manifest)
+    _driver_manifest_df.to_csv(_ws_drivers_manifest, sep="\t", index=False)
+    print(f"[Module 4] Driver manifest → {_ws_drivers_manifest}")
+else:
+    print("[Module 4] WS-L driver export skipped "
+          "(drivers_dir / drivers_manifest not declared in Snakefile).")
+
+# ── WS-M: functional enrichment of driver regions per cell type ──────────────
+# Annotate each cell type's top-100 drivers to nearest gene and run Enrichr
+# against GO_Biological_Process_2023, Reactome_2022, KEGG_2021_Human.
+# Top 10 terms per database appear in one multi-page PDF.
+#
+# Requires:
+#   - params.gene_annotation_bed (4+ column BED of gene coordinates)
+#   - gseapy installed
+#   - internet access to Enrichr
+# Missing any of these → an empty placeholder PDF (still satisfies Snakemake).
+
+_ws_enrich_pdf = getattr(snakemake.output, "drivers_enrichment_pdf", None)
+_ws_gene_bed   = getattr(snakemake.params, "gene_annotation_bed", "")
+
+def _ws_make_empty_pdf(path: str, msg: str) -> None:
+    with pdf_backend.PdfPages(path) as _pp:
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.axis("off")
+        ax.text(0.5, 0.5, msg, ha="center", va="center", wrap=True, fontsize=11)
+        _pp.savefig(fig); plt.close(fig)
+
+if _ws_enrich_pdf is None:
+    print("[Module 4] WS-M functional enrichment skipped "
+          "(drivers_enrichment_pdf not declared in Snakefile).")
+elif not _driver_manifest:
+    _ws_make_empty_pdf(_ws_enrich_pdf,
+        "Functional enrichment skipped:\nno enriched cell types in WS-L.")
+    print(f"[Module 4] Functional enrichment placeholder → {_ws_enrich_pdf}")
+elif not _ws_gene_bed or not Path(_ws_gene_bed).exists():
+    _ws_make_empty_pdf(
+        _ws_enrich_pdf,
+        "Functional enrichment skipped:\nparams.gene_annotation_bed not set "
+        "or file missing.\nProvide a gene BED to enable this analysis."
+    )
+    print("[Module 4] Functional enrichment skipped (no gene_annotation_bed).")
+else:
+    try:
+        import gseapy as gp
+    except ImportError:
+        gp = None
+        _ws_make_empty_pdf(_ws_enrich_pdf,
+            "Functional enrichment skipped:\ngseapy is not installed.")
+        print("[Module 4] Functional enrichment skipped (no gseapy).")
+
+    if gp is not None:
+        print("[Module 4] Running functional enrichment on driver regions ...")
+        _ws_enrichr_libs = [
+            "GO_Biological_Process_2023",
+            "Reactome_2022",
+            "KEGG_2021_Human",
+        ]
+        with pdf_backend.PdfPages(_ws_enrich_pdf) as _pp_enr:
+            for _row in _driver_manifest:
+                _ct_e  = _row["cell_type"]
+                _bed_e = _row["bed_path"]
+
+                # 1. Assign each driver to its nearest gene via bedtools closest.
+                _tmp_closest = tempfile.NamedTemporaryFile(
+                    suffix=".bed", delete=False).name
+                try:
+                    subprocess.run(
+                        f"sort -k1,1 -k2,2n {_bed_e}"
+                        f" | bedtools closest -a - -b {_ws_gene_bed} -t first"
+                        f" > {_tmp_closest}",
+                        shell=True, check=True, executable="/bin/bash")
+                    _closest = pd.read_csv(_tmp_closest, sep="\t", header=None)
+                    # Driver BED has 7 cols; gene BED has 4+ cols.
+                    # Gene name is the 4th column of the gene BED → output
+                    # index = 7 (driver) + 3 (0-indexed) = 10.
+                    _gene_col = 10 if _closest.shape[1] > 10 else _closest.shape[1] - 1
+                    _genes = (
+                        _closest.iloc[:, _gene_col]
+                        .dropna().astype(str)
+                        .str.split(";").str[0]
+                        .str.upper()
+                        .unique().tolist()
+                    )
+                except Exception as _cl_exc:
+                    print(f"  [Module 4]  {_ct_e}: bedtools closest failed "
+                          f"({_cl_exc})")
+                    _genes = []
+                finally:
+                    if os.path.exists(_tmp_closest):
+                        os.remove(_tmp_closest)
+
+                if len(_genes) < 5:
+                    fig, ax = plt.subplots(figsize=(8, 4))
+                    ax.axis("off")
+                    ax.text(0.5, 0.5,
+                            f"{_ct_e}: only {len(_genes)} genes after "
+                            "annotation — enrichment skipped.",
+                            ha="center", va="center", fontsize=11)
+                    _pp_enr.savefig(fig); plt.close(fig)
+                    continue
+
+                # 2. Query Enrichr for each library; concatenate top hits.
+                _enr_frames = []
+                for _lib in _ws_enrichr_libs:
+                    try:
+                        _r = gp.enrichr(
+                            gene_list=_genes, gene_sets=_lib,
+                            outdir=None, no_plot=True
+                        ).results
+                        _r = _r.head(10).copy()
+                        _r["library"] = _lib
+                        _enr_frames.append(_r)
+                    except Exception as _enr_exc:
+                        print(f"  [Module 4]  {_ct_e}/{_lib}: enrichr failed "
+                              f"({_enr_exc})")
+
+                if not _enr_frames:
+                    continue
+                _enr_df = pd.concat(_enr_frames, ignore_index=True)
+                _enr_df["-log10(q)"] = -np.log10(
+                    _enr_df["Adjusted P-value"].clip(lower=1e-300)
+                )
+
+                # 3. Horizontal bar plot, one panel per library.
+                fig, axes = plt.subplots(
+                    1, len(_ws_enrichr_libs),
+                    figsize=(5 * len(_ws_enrichr_libs), 6), sharey=False
+                )
+                if len(_ws_enrichr_libs) == 1:
+                    axes = [axes]
+                for _ax_e, _lib in zip(axes, _ws_enrichr_libs):
+                    _sub = _enr_df[_enr_df["library"] == _lib].head(10)
+                    if _sub.empty:
+                        _ax_e.axis("off"); _ax_e.set_title(_lib); continue
+                    _sub = _sub.sort_values("-log10(q)")
+                    _ax_e.barh(_sub["Term"].str.slice(0, 55),
+                               _sub["-log10(q)"], color="#4878CF",
+                               edgecolor="black", linewidth=0.4)
+                    _ax_e.set_xlabel("-log10(adj.P)")
+                    _ax_e.set_title(_lib, fontsize=10)
+                    _ax_e.tick_params(axis="y", labelsize=7)
+                fig.suptitle(
+                    f"{_ct_e} — functional enrichment of top "
+                    f"{_row['n_top_written']} driver regions "
+                    f"({len(_genes)} unique genes)", fontsize=12)
+                plt.tight_layout()
+                _pp_enr.savefig(fig); plt.close(fig)
+        print(f"[Module 4] Functional enrichment → {_ws_enrich_pdf}")
 
 # ── WS-K: figures ─────────────────────────────────────────────────────────────
 _ws_ct_order = list(CELL_TYPES.keys())
