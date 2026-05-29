@@ -21,5 +21,5 @@ index_bt2_hg: "/home/mattia/Genomes/hg38/fa/hg38"
 #downsample target
 target_reads: "5000000"
 # Path to a JSON file with samples and their corresponding FASTQ files.
-SAMPLES: '/home/mattia/cfChromatin_in_MS/snakemake/SRR.txt'
-SAMPLES_JSON: '/home/mattia/cfChromatin_in_MS/snakemake/samples_nanoCT_S3.json'
+SAMPLES: '/home/mattia/cfChromatin_in_MS/snakemake/samplesheets/SRR.txt'
+SAMPLES_JSON: '/home/mattia/cfChromatin_in_MS/snakemake/samplesheets/samples_nanoCT_S3.json'

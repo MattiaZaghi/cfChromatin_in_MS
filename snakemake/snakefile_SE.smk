@@ -1,5 +1,5 @@
 #config
-#configfile: "./snakemake/config_tagAlign.yaml"
+#configfile: "config/config_tagAlign.yml"
 
 
 FILES = json.load(open(config['SAMPLES_JSON']))

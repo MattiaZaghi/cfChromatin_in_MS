@@ -24,8 +24,8 @@ index_bwa_hg: "/home/mattia/Genomes/hg19/fa/bwa/hg19"
 #downsample target
 target_reads: "5000000"
 # Path to a JSON file with samples and their corresponding FASTQ files.
-SAMPLES: '/home/mattia/cfChromatin_in_MS/snakemake/SRR.txt'
-SAMPLES_JSON: '/home/mattia/cfChromatin_in_MS/snakemake/samples_ChIP_Takara.json'
+SAMPLES: '/home/mattia/cfChromatin_in_MS/snakemake/samplesheets/SRR.txt'
+SAMPLES_JSON: '/home/mattia/cfChromatin_in_MS/snakemake/samplesheets/samples_ChIP_Takara.json'
 
 chrom_sizes: "/home/mattia/Genomes/hg19/hg19.chrom.sizes"
 

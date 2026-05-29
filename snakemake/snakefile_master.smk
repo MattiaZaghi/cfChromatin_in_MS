@@ -2,7 +2,7 @@
 # This file can include all modules optionally - keep the core pipeline intact
 
 # Configuration
-configfile: "config_Cut_Tag.yaml"
+configfile: "config/config_Cut_Tag.yaml"
 
 import json
 import os

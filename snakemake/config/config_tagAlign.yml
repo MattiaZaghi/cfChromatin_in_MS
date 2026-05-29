@@ -27,5 +27,5 @@ binsize: "10"
 norm_method: "RPKM"
 smooth_length: "300"
 # Path to a JSON file with samples and their corresponding FASTQ files.
-SAMPLES: './snakemake/SRR.txt'
-SAMPLES_JSON: './snakemake/samples_tagAlign.json'
+SAMPLES: './snakemake/samplesheets/SRR.txt'
+SAMPLES_JSON: './snakemake/samplesheets/samples_tagAlign.json'

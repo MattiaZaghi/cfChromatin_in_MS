@@ -14,5 +14,5 @@ c_t: 'Cut-Tag'
 chip: 'ChIP'
 chip-se: 'ChIP-SE'
 # Path to a JSON file with samples and their corresponding FASTQ files.
-SAMPLES: './snakemake/SRR.txt'
-SAMPLES_JSON: '/home/mattia/cfChromatin_in_MS/snakemake/samples_multibam.json'
+SAMPLES: './snakemake/samplesheets/SRR.txt'
+SAMPLES_JSON: '/home/mattia/cfChromatin_in_MS/snakemake/samplesheets/samples_multibam.json'
