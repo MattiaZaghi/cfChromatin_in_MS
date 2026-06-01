@@ -112,8 +112,10 @@ if (!is.null(opt$metaplot_r) && file.exists(opt$metaplot_r)) {
                                  limits=xlim, expand=c(0, 0))
     p <- p + scale_y_continuous(name="", expand=c(0, 0), limits=ylim)
     p <- p + labs(title=main)
-    p <- p + theme(text=element_text(colour="black", size=8),
-                   axis.text=element_text(colour="black", size=8))
+    p <- p + theme(text=element_text(colour="black", size=20),
+                   axis.text=element_text(colour="black", size=18),
+                   legend.text=element_text(size=18),
+                   legend.key.height=unit(1.2, "lines"))
     p
   }
 
@@ -149,8 +151,8 @@ if (!is.null(opt$metaplot_r) && file.exists(opt$metaplot_r)) {
                                  limits=c(-ioff, n - ioff), expand=c(0, 0))
     p <- p + labs(x=xlab, y=ylab, fill=zlab, title=title)
     p <- p + theme_minimal()
-    p <- p + theme(text=element_text(colour="black", size=8),
-                   axis.text=element_text(colour="black", size=8))
+    p <- p + theme(text=element_text(colour="black", size=20),
+                   axis.text=element_text(colour="black", size=18))
     p
   }
 
@@ -280,7 +282,7 @@ dir.create(dirname(opt$output), showWarnings=FALSE, recursive=TRUE)
 p <- PlotMeta(Cov=Cov, PlotList=mp_list, WindowSize=opt$binsize, Norm=1)
 p <- p + ggtitle(opt$sample)
 
-pdf(opt$output, width=8 * length(mp_list), height=11)
+pdf(opt$output, width=14 * length(mp_list), height=18)
 print(p)
 dev.off()
 
