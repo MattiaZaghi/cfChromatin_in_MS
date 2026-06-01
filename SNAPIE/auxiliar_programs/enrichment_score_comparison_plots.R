@@ -97,12 +97,12 @@ dat$disease <- factor(dat$disease,
                        levels = dis_levs[dis_levs %in% unique(dat$disease)])
 
 # ── Shared theme ──────────────────────────────────────────────────────────────
-theme_box <- theme_bw(base_size = 11) +
+theme_box <- theme_bw(base_size = 22) +
   theme(
-    plot.title    = element_text(face = "bold", size = 11),
-    plot.subtitle = element_text(size = 8.5, color = "grey45"),
-    axis.title.y  = element_text(size = 9),
-    axis.text.x   = element_text(angle = 35, hjust = 1, size = 9),
+    plot.title    = element_text(face = "bold", size = 22),
+    plot.subtitle = element_text(size = 18, color = "grey45"),
+    axis.title.y  = element_text(size = 20),
+    axis.text.x   = element_text(angle = 35, hjust = 1, size = 18),
     legend.position  = "none",
     panel.grid.minor = element_blank()
   )
@@ -169,7 +169,7 @@ p3 <- ggplot(dat, aes(x = disease, y = enrichment_score, fill = disease)) +
 
 # ── Combine and save ──────────────────────────────────────────────────────────
 dir.create(dirname(out_pdf), recursive = TRUE, showWarnings = FALSE)
-pdf(out_pdf, width = 15, height = 5.5)
+pdf(out_pdf, width = 24, height = 10)
 print(plot_grid(p1, p2, p3, nrow = 1, align = "h", axis = "tb"))
 dev.off()
 message("Saved: ", out_pdf)

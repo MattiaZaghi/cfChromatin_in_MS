@@ -108,7 +108,7 @@ p_enrich <- ggplot(dat, aes(x = enrichment_score, fill = group, colour = group))
              linetype = "dashed") +
   annotate("text", x = enrich_thresh, y = Inf,
            label = sprintf(" threshold\n %.3f", enrich_thresh),
-           hjust = 0, vjust = 1.4, size = 3, fontface = "bold") +
+           hjust = 0, vjust = 1.4, size = 7, fontface = "bold") +
   scale_fill_manual(values   = group_pal[names(group_pal) %in% dat$group]) +
   scale_colour_manual(values = group_pal[names(group_pal) %in% dat$group]) +
   labs(
@@ -121,10 +121,12 @@ p_enrich <- ggplot(dat, aes(x = enrichment_score, fill = group, colour = group))
     y = "Number of samples",
     fill = "Group", colour = "Group"
   ) +
-  theme_bw(base_size = 11) +
+  theme_bw(base_size = 22) +
   theme(panel.grid.minor = element_blank(),
-        plot.title    = element_text(face = "bold", size = 10),
-        plot.subtitle = element_text(size = 8.5, colour = "grey40"))
+        plot.title    = element_text(face = "bold", size = 20),
+        plot.subtitle = element_text(size = 16, colour = "grey40"),
+        legend.title  = element_text(size = 18),
+        legend.text   = element_text(size = 16))
 
 # ── Plot 2: fragment count distribution with threshold ────────────────────────
 frag_M <- dat$n_fragments / 1e6   # display in millions
@@ -135,7 +137,7 @@ p_frags <- ggplot(dat, aes(x = frag_M, fill = group, colour = group)) +
              linetype = "dashed") +
   annotate("text", x = frag_thresh / 1e6, y = Inf,
            label = sprintf(" threshold\n %.1f M", frag_thresh / 1e6),
-           hjust = 0, vjust = 1.4, size = 3, fontface = "bold") +
+           hjust = 0, vjust = 1.4, size = 7, fontface = "bold") +
   scale_fill_manual(values   = group_pal[names(group_pal) %in% dat$group]) +
   scale_colour_manual(values = group_pal[names(group_pal) %in% dat$group]) +
   labs(
@@ -148,10 +150,12 @@ p_frags <- ggplot(dat, aes(x = frag_M, fill = group, colour = group)) +
     y = "Number of samples",
     fill = "Group", colour = "Group"
   ) +
-  theme_bw(base_size = 11) +
+  theme_bw(base_size = 22) +
   theme(panel.grid.minor = element_blank(),
-        plot.title    = element_text(face = "bold", size = 10),
-        plot.subtitle = element_text(size = 8.5, colour = "grey40"))
+        plot.title    = element_text(face = "bold", size = 20),
+        plot.subtitle = element_text(size = 16, colour = "grey40"),
+        legend.title  = element_text(size = 18),
+        legend.text   = element_text(size = 16))
 
 # ── Plot 3: scatter enrichment vs fragments, coloured by QC pass/fail ─────────
 dat$qc_label <- ifelse(dat$qc_pass, "PASS", "FAIL")
@@ -175,10 +179,12 @@ p_scatter <- ggplot(dat, aes(x = n_fragments / 1e6, y = enrichment_score,
     colour = "Group",
     shape  = "QC"
   ) +
-  theme_bw(base_size = 11) +
+  theme_bw(base_size = 22) +
   theme(panel.grid.minor = element_blank(),
-        plot.title    = element_text(face = "bold", size = 10),
-        plot.subtitle = element_text(size = 8.5, colour = "grey40"))
+        plot.title    = element_text(face = "bold", size = 20),
+        plot.subtitle = element_text(size = 16, colour = "grey40"),
+        legend.title  = element_text(size = 18),
+        legend.text   = element_text(size = 16))
 
 # ── Plot 4: QC pass/fail summary per disease group ────────────────────────────
 summary_df <- dat %>%
@@ -205,7 +211,7 @@ p_summary <- ggplot(summary_df,
   geom_col(width = 0.65, colour = "white", linewidth = 0.3) +
   geom_text(aes(label = sprintf("%d\n(%d%%)", n, pct)),
             position = position_stack(vjust = 0.5),
-            size = 3, fontface = "bold", colour = "white") +
+            size = 7, fontface = "bold", colour = "white") +
   scale_fill_manual(values = c("PASS" = "#388E3C", "FAIL" = "#C62828"),
                     name = "QC") +
   labs(
@@ -216,16 +222,18 @@ p_summary <- ggplot(summary_df,
     x = NULL,
     y = "Number of samples"
   ) +
-  theme_bw(base_size = 11) +
+  theme_bw(base_size = 22) +
   theme(panel.grid.minor  = element_blank(),
         panel.grid.major.x = element_blank(),
-        plot.title    = element_text(face = "bold", size = 10),
-        plot.subtitle = element_text(size = 8.5, colour = "grey40"),
-        axis.text.x   = element_text(size = 9))
+        plot.title    = element_text(face = "bold", size = 20),
+        plot.subtitle = element_text(size = 16, colour = "grey40"),
+        axis.text.x   = element_text(size = 18),
+        legend.title  = element_text(size = 18),
+        legend.text   = element_text(size = 16))
 
 # ── Save ──────────────────────────────────────────────────────────────────────
 dir.create(dirname(out_pdf), recursive = TRUE, showWarnings = FALSE)
-pdf(out_pdf, width = 10, height = 14)
+pdf(out_pdf, width = 16, height = 24)
 print(plot_grid(p_enrich, p_frags, p_scatter, p_summary,
                 ncol = 1, align = "v"))
 dev.off()

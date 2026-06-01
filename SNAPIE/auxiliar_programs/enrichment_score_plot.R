@@ -128,7 +128,7 @@ p <- ggplot(dat, aes(x = enrichment_score, y = fraction)) +
     fill   = "white",
     label.size = 0.3,
     hjust  = -0.05,
-    size   = 3.0,
+    size   = 7,
     fontface = "bold"
   ) +
 
@@ -137,11 +137,13 @@ p <- ggplot(dat, aes(x = enrichment_score, y = fraction)) +
     x       = "Enrichment Score  (on-target density / off-target density)",
     y       = "Cumulative fraction of samples"
   ) +
-  theme_bw(base_size = 12) +
+  theme_bw(base_size = 22) +
   theme(
-    plot.title    = element_text(face = "bold", size = 12),
+    plot.title    = element_text(face = "bold", size = 22),
     legend.position = c(0.82, 0.25),
-    legend.background = element_rect(fill = "white", color = "grey80")
+    legend.background = element_rect(fill = "white", color = "grey80"),
+    legend.title  = element_text(size = 20),
+    legend.text   = element_text(size = 18)
   )
 
 # Overlay current sample point + label
@@ -162,10 +164,10 @@ if (has_score) {
       fill   = "white",
       label.size = 0.3,
       hjust  = -0.1,
-      size   = 3.0
+      size   = 7
     )
 }
 
 dir.create(dirname(out_pdf), recursive = TRUE, showWarnings = FALSE)
-ggsave(out_pdf, p, width = 7, height = 5, device = "pdf")
+ggsave(out_pdf, p, width = 14, height = 10, device = "pdf")
 message(sprintf("Saved: %s", out_pdf))

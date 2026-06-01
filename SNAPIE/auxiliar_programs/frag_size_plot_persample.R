@@ -64,23 +64,23 @@ p <- ggplot(dat, aes(x = Size, y = Frequency)) +
              linetype = "dashed", color = "grey50", linewidth = 0.4) +
   annotate("text", x = nucl_lines$xint + 4, y = y_top * 0.97,
            label = nucl_lines$label,
-           hjust = 0, vjust = 1, size = 3, color = "grey40") +
+           hjust = 0, vjust = 1, size = 6, color = "grey40") +
   geom_vline(xintercept = median_size,
              color = "#E53935", linewidth = 0.7, linetype = "dotted") +
   annotate("text", x = median_size + 4, y = y_top * 0.82,
            label = sprintf("median = %d bp", median_size),
-           hjust = 0, size = 3.2, color = "#E53935") +
+           hjust = 0, size = 6.5, color = "#E53935") +
   scale_x_continuous(breaks = c(50, 147, 200, 294, 400, 441, 600, 800),
                      minor_breaks = NULL) +
   labs(title    = sample_name,
        subtitle = "Fragment length distribution",
        x = "Fragment size (bp)", y = "Normalized frequency") +
-  theme_bw(base_size = 11) +
+  theme_bw(base_size = 22) +
   theme(panel.grid.minor = element_blank(),
         axis.text.x      = element_text(angle = 45, hjust = 1),
         plot.title       = element_text(face = "bold"))
 
-pdf(out_pdf, width = 7, height = 5)
+pdf(out_pdf, width = 14, height = 10)
 print(p)
 dev.off()
 

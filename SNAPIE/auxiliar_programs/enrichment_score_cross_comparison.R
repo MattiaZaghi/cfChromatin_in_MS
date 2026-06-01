@@ -83,12 +83,12 @@ parse_external_cohort <- function(id) {
 ext_dat$cohort <- sapply(ext_dat$sample_id, parse_external_cohort)
 
 # ── Shared theme ──────────────────────────────────────────────────────────────
-theme_box <- theme_bw(base_size = 11) +
+theme_box <- theme_bw(base_size = 22) +
   theme(
-    plot.title       = element_text(face = "bold", size = 11),
-    plot.subtitle    = element_text(size = 8.5, color = "grey45"),
-    axis.title.y     = element_text(size = 9),
-    axis.text.x      = element_text(angle = 35, hjust = 1, size = 9),
+    plot.title       = element_text(face = "bold", size = 22),
+    plot.subtitle    = element_text(size = 18, color = "grey45"),
+    axis.title.y     = element_text(size = 20),
+    axis.text.x      = element_text(angle = 35, hjust = 1, size = 18),
     legend.position  = "none",
     panel.grid.minor = element_blank()
   )
@@ -167,7 +167,7 @@ p1 <- ggplot(proto_combined,
                size = 3, fill = "gold", color = "black", stroke = 0.5) +
   stat_summary(fun = mean, geom = "text",
                aes(label = sprintf("%.2f", after_stat(y))),
-               vjust = -1, size = 2.8, fontface = "bold", color = "black") +
+               vjust = -1, size = 6, fontface = "bold", color = "black") +
   scale_fill_manual(values = res1$pal) +
   labs(
     title    = "Enrichment score: internal protocols vs. Literature (Baca et al.)",
@@ -229,7 +229,7 @@ p2 <- ggplot(detail_combined,
                size = 2.5, fill = "gold", color = "black", stroke = 0.5) +
   stat_summary(fun = mean, geom = "text",
                aes(label = sprintf("%.2f", after_stat(y))),
-               vjust = -1, size = 2.5, fontface = "bold", color = "black") +
+               vjust = -1, size = 6, fontface = "bold", color = "black") +
   scale_fill_manual(values = res2$pal) +
   labs(
     title    = "Detailed breakdown: MS cohort vs. Baca et al. cohort subtypes",
@@ -239,7 +239,7 @@ p2 <- ggplot(detail_combined,
     y        = "Enrichment score  (on-target / off-target density)"
   ) +
   theme_box +
-  theme(axis.text.x = element_text(angle = 40, hjust = 1, size = 8.5))
+  theme(axis.text.x = element_text(angle = 40, hjust = 1, size = 18))
 
 # ── Legend strip (for panel 2) ────────────────────────────────────────────────
 legend_df <- data.frame(
@@ -249,7 +249,7 @@ legend_df <- data.frame(
 )
 p_legend <- ggplot(legend_df, aes(x = x, y = y, fill = label)) +
   geom_tile(width = 0.8, height = 0.6, color = "white", linewidth = 1) +
-  geom_text(aes(label = label), size = 3, fontface = "bold", color = "white") +
+  geom_text(aes(label = label), size = 6, fontface = "bold", color = "white") +
   scale_fill_manual(values = setNames(legend_df$fill, legend_df$label)) +
   scale_x_continuous(expand = c(0.3, 0.3)) +
   theme_void() + theme(legend.position = "none")
@@ -257,8 +257,8 @@ p_legend <- ggplot(legend_df, aes(x = x, y = y, fill = label)) +
 # ── Save ──────────────────────────────────────────────────────────────────────
 dir.create(dirname(out_pdf), recursive = TRUE, showWarnings = FALSE)
 pdf(out_pdf,
-    width  = max(14, length(all_groups) * 1.1),
-    height = 13)
+    width  = max(22, length(all_groups) * 1.6),
+    height = 20)
 print(plot_grid(
   p1,
   plot_grid(p2, p_legend, ncol = 1, rel_heights = c(10, 1)),

@@ -120,7 +120,7 @@ p <- ggplot(group_summary, aes(x = Size, color = group, fill = group)) +
              linetype = "dashed", color = "grey50", linewidth = 0.4) +
   annotate("text", x = nucl_lines$xint + 4, y = y_top * 0.97,
            label = nucl_lines$label,
-           hjust = 0, vjust = 1, size = 2.8, color = "grey40") +
+           hjust = 0, vjust = 1, size = 6, color = "grey40") +
   scale_color_manual(values = group_colors, name = "Group") +
   scale_fill_manual(values  = group_colors, name = "Group") +
   scale_x_continuous(breaks = c(50, 147, 200, 294, 400, 441, 600, 800),
@@ -130,13 +130,15 @@ p <- ggplot(group_summary, aes(x = Size, color = group, fill = group)) +
                           length(unique(all_data$sample)),
                           length(unique(all_data$group))),
        x = "Fragment size (bp)", y = "Normalized frequency") +
-  theme_bw(base_size = 12) +
+  theme_bw(base_size = 22) +
   theme(panel.grid.minor = element_blank(),
         axis.text.x      = element_text(angle = 45, hjust = 1),
         plot.title       = element_text(face = "bold"),
-        legend.position  = "right")
+        legend.position  = "right",
+        legend.title     = element_text(size = 20),
+        legend.text      = element_text(size = 18))
 
-pdf(out_pdf, width = 10, height = 6)
+pdf(out_pdf, width = 18, height = 11)
 print(p)
 dev.off()
 
