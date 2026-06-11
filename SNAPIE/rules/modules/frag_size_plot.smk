@@ -54,3 +54,31 @@ rule frag_size_plot_groups:
             2>&1 || true
         touch {output.pdf}
         """
+rule frag_size_plot_protocol:
+    """
+    Protocol fragment size distribution summary.
+    Plots mean ± 1 SD per condition (V1 / V2 / V3 / V4) with nucleosomal markers at 147, 294, 441 bp.
+    Output: reports/qc/fragment_size_by_protocol.pdf
+    """
+    conda: "envs/r_plots_dplyr.yaml"
+    input:
+        frag_sizes=expand(
+            config['outputFolder'] + "/frags/{sample}/{sample}.fragment_sizes.txt",
+            sample=config.get('_samples_', [])
+        ),
+        script="auxiliar_programs/frag_size_plot_protocol.R"
+    output:
+        pdf=config['outputFolder'] + "/reports/qc/fragment_size_by_protocol.pdf"
+    params:
+        frags_dir=config['outputFolder'] + "/frags",
+        samplesheet=config.get('samplesheet', '')
+    shell:
+        """
+        mkdir -p $(dirname {output.pdf})
+        Rscript {input.script} \
+            {params.frags_dir} \
+            {output.pdf} \
+            {params.samplesheet} \
+            2>&1 || true
+        touch {output.pdf}
+        """

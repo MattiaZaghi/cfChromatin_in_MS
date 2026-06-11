@@ -1856,8 +1856,11 @@ _ws_contrib_piv = (ws_df_out
                           values="contribution")
                    .fillna(0).sort_index())
 
+# Wider canvas so sample IDs fit under the bars (taller too, to leave room
+# for the rotated labels at the bottom).
 _fig_contrib_ws, _ax_contrib = plt.subplots(
-    figsize=(max(10, len(_ws_contrib_piv) * 0.15), 5))
+    figsize=(max(10, len(_ws_contrib_piv) * 0.35), 6))
+
 _ws_bottom = np.zeros(len(_ws_contrib_piv))
 for _ct_cb in _ws_ct_order:
     if _ct_cb not in _ws_contrib_piv.columns:
@@ -1867,14 +1870,38 @@ for _ct_cb in _ws_ct_order:
                     color=_ws_cmap[_ct_cb], label=_ct_cb,
                     width=1.0, edgecolor="none")
     _ws_bottom += _vals_cb
+
 _ax_contrib.set_xlim(-0.5, len(_ws_contrib_piv) - 0.5)
 _ax_contrib.set_ylim(0, 1)
 _ax_contrib.set_ylabel("Fractional contribution")
 _ax_contrib.set_title("Per-sample cell-type contributions (alphabetical order)")
-_ax_contrib.set_xticks([])
+
+# --- sample names under the bars ----------------------------------------
+_sample_labels = _ws_contrib_piv.index.tolist()
+_ax_contrib.set_xticks(range(len(_ws_contrib_piv)))
+_ax_contrib.set_xticklabels(_sample_labels, rotation=45, fontsize=6,
+                            ha="right", rotation_mode="anchor")
+
+# Optional: colour tick labels by group so the clinical reader can still
+# see Ctrl vs MS at a glance even without group-sorting. Comment out
+# the block below if you do not want this.
+_group_colors = {
+    "Ctrl":                      "#1f77b4",
+    "MS-Rituximab-Stable":       "#ff7f0e",
+    "MS-Rituximab-Progressive":  "#d62728",
+    "MS-New-RR":                 "#2ca02c",
+    "MS-New-PPMS":               "#9467bd",
+}
+for _tick, _sid in zip(_ax_contrib.get_xticklabels(), _sample_labels):
+    _grp = next((g for g in _group_colors if g in _sid), None)
+    if _grp:
+        _tick.set_color(_group_colors[_grp])
+
 _ax_contrib.set_xlabel("Samples (alphabetical, no group sorting)")
 _ax_contrib.legend(loc="upper right", fontsize=6, ncol=2)
-plt.tight_layout()
+
+plt.tight_layout()   # called AFTER set_xticklabels so the bottom margin
+                     # accommodates the rotated sample IDs
 with pdf_backend.PdfPages(snakemake.output.within_sample_contribution) as _pp_cb:
     _pp_cb.savefig(_fig_contrib_ws)
 plt.close(_fig_contrib_ws)

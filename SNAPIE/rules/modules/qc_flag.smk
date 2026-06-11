@@ -74,3 +74,30 @@ rule qc_flag_samples:
             2>&1 || true
         touch {output.tsv} {output.pdf}
         """
+
+rule qc_flag_protocol:
+    """
+    Data-driven QC flagging using knee-point thresholds on the user's own
+    distribution of enrichment scores and fragment counts.
+    Outputs qc_summary.tsv (sample_id, n_fragments, enrichment_score,
+    frag_pass, enrich_pass, qc_pass) and a diagnostic PDF.
+    """
+    conda: "envs/r_plots_dplyr.yaml"
+    input:
+        enrichment  = _OUT + "/reports/enrichment/all_enrichment_scores.tsv",
+        frag_counts = _OUT + "/qc/fragment_counts.tsv",
+        script      = "auxiliar_programs/qc_flag_protocol.R"
+    output:
+        tsv = _OUT + "/qc/qc_summary_protocol.tsv",
+        pdf = _OUT + "/reports/qc/qc_distributions_protocol.pdf"
+    shell:
+        """
+        mkdir -p $(dirname {output.tsv}) $(dirname {output.pdf})
+        Rscript {input.script} \
+            {input.enrichment} \
+            {input.frag_counts} \
+            {output.tsv} \
+            {output.pdf} \
+            2>&1 || true
+        touch {output.tsv} {output.pdf}
+        """
