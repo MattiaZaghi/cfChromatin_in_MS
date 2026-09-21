@@ -9,6 +9,7 @@ library(parallel)
 library(rtracklayer)
 library(preprocessCore)
 library(GenomeInfoDb)
+library(BSgenome.Hsapiens.UCSC.hg19)
 
 
 sessionInfo()
@@ -19,13 +20,13 @@ sessionInfo()
 
 #working_path <- "/media/sf_ubuntu_music/cfChromatin/"
 working_path <- "/date/gcb/gcb_MZ/"
-annotation_dir_path <- paste0(working_path, "roadmap_epigenomics_annotation/hg19/")
+annotation_dir_path <- paste0(working_path, "Chrom_HMM_hg19/")
 glossary_path <- paste0(annotation_dir_path, "Glossary.txt")
 
 core <- 20
 
 setwd(dir = working_path)
-source("/home/mattia/cfChromatin_in_MS/cfChromatin_func_new.R")
+source("/home/mattia/cfChromatin_in_MS/analysis/R/cfChromatin_func_new.R")
 
 #############################################################################################################################
 ###                                                    CATALOGUES CREATION                                                ###
@@ -89,7 +90,7 @@ genome(TSS_Enhancers_windows)                        # check it now reads "hg19"
 
 TSS_Enhancers_windows<-trim(TSS_Enhancers_windows)
 # Save files
-saveRDS(TSS_Enhancers_windows,"Analysis/cfChIP-seq/SetupFiles/H3K4me3_rodmap_hg19/Windows.rds")
+saveRDS(TSS_Enhancers_windows,"Analysis/cfChIP-seq/SetupFiles/H3K27ac/Windows.rds")
 write.table(df_windows, file="Analysis/cfChIP-seq/SetupFiles/H3K4me3_rodmap_hg19/Windows.csv", quote=F, sep=",", row.names=F, col.names=F)
 
 write_bed(TSS_Enhancers_windows,"Analysis/cfChIP-seq/SetupFiles/H3K4me3_rodmap_hg19/Windows.bed")
