@@ -49,7 +49,7 @@ DESEQ2_COUNT_FILES = {
     "bins":          "results/counts/bin_counts_5kb.tsv",
     # Per-cell-type CNS subsets — added dynamically so module7 runs DESeq2 on each
     **{f"cns_{ct}": f"results/counts/rre_cns_{ct}_counts.tsv"
-       for ct in config["rre"].get("cns_cell_types", [])},
+       for ct in CNS_CELL_TYPES},
 }
 
 rule run_deseq2:

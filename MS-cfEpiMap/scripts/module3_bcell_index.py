@@ -106,10 +106,19 @@ def count_midpoints_in_bed(frags_bed: str, regions_bed: str) -> int:
 
 # ─── Load Snakemake inputs and parameters ────────────────────────────────────
 samples   = snakemake.params.samples      # list of sample IDs to process
-frags_dir = snakemake.params.frags_dir   # directory containing {sample_id}.bed files
+sample_bed_map = snakemake.params.sample_bed_map   # sample_id -> fragment BED path (from sample_metadata.tsv)
 bcell_bed = snakemake.input.bcell_rre    # BED of B-cell-specific regulatory elements
 anchors   = snakemake.input.anchors      # constitutive anchor BED (denominator)
 flag_fold = float(snakemake.params.flag_fold)  # fold-threshold for flagging reconstitution
+
+# Group taxonomy from config/config.yaml — see the `groups:` block there.
+# `groups` is the in-house ordering (reference group first) used by every
+# per-group plot and test below; external cohorts are excluded by construction.
+_GROUP_CFG = snakemake.config["groups"]
+CTRL_GROUP = _GROUP_CFG["ctrl"]
+MS_GROUPS  = list(_GROUP_CFG["ms"])
+RTX_GROUPS = list(_GROUP_CFG["rituximab"])
+groups     = [CTRL_GROUP] + MS_GROUPS
 
 meta = pd.read_csv(snakemake.input.meta, sep="\t", comment="#")
 meta = meta[meta["sample_id"].isin(samples)].copy()
@@ -123,7 +132,7 @@ anchor_kb = kb_coverage(anchors)
 # anchor set, then form the density ratio.
 records = []
 for sid in samples:
-    frags = f"{frags_dir}/{sid}.bed"
+    frags = sample_bed_map[sid]
     b_cnt = count_midpoints_in_bed(frags, bcell_bed)    # B-cell-region midpoints
     a_cnt = count_midpoints_in_bed(frags, anchors)       # anchor-region midpoints
     # BCI = (B-cell density) / (anchor density)  [dimensionless ratio]
@@ -142,7 +151,7 @@ bci_df = pd.DataFrame(records)
 bci_df = bci_df.merge(meta[["sample_id", "group", "sample_type",
                              "cd19_count", "months_since_rtx"]], on="sample_id")
 
-ctrl_mean = bci_df.loc[bci_df["group"] == "Ctrl", "bci"].mean()
+ctrl_mean = bci_df.loc[bci_df["group"] == CTRL_GROUP, "bci"].mean()
 bci_df["bci_scaled"] = bci_df["bci"] / ctrl_mean
 
 # ─── Step 3: Flag treated samples with unexpectedly high B cell reconstitution ─
@@ -150,7 +159,7 @@ bci_df["bci_scaled"] = bci_df["bci"] / ctrl_mean
 # beyond the expected range. This is not necessarily exclusion-worthy — rapid
 # reconstitution may itself be biologically meaningful — but it warrants
 # manual cross-check with CD19+ count and months_since_rtx.
-treated = bci_df["group"].isin(["MS-Rituximab-Stable", "MS-Rituximab-Progressive"])
+treated = bci_df["group"].isin(RTX_GROUPS)
 bci_df["bci_flag"] = treated & (bci_df["bci"] > flag_fold * ctrl_mean)
 
 # ─── Step 4: Pairwise Mann-Whitney U tests between groups ────────────────────
@@ -158,7 +167,6 @@ bci_df["bci_flag"] = treated & (bci_df["bci"] > flag_fold * ctrl_mean)
 # The MS-Rituximab-Stable vs MS-Rituximab-Progressive comparison is the critical
 # one: higher BCI in Progressive patients would suggest that faster B cell
 # reconstitution is associated with non-response to Rituximab.
-groups    = ["Ctrl", "NEW", "MS-Rituximab-Stable", "MS-Rituximab-Progressive"]
 stat_rows = []
 for i, g1 in enumerate(groups):
     for g2 in groups[i + 1:]:
@@ -183,9 +191,9 @@ if len(cd19_df) > 5:
 # In treated patients, B cells reconstitute over months after each Rituximab
 # infusion. Correlating BCI with time since last infusion quantifies this
 # reconstitution trajectory from cfDNA rather than blood counts.
-rtx_df = bci_df[bci_df["group"].isin(
-    ["MS-Rituximab-Stable", "MS-Rituximab-Progressive"]
-)][["bci", "months_since_rtx"]].replace("NA", np.nan).dropna()
+rtx_df = bci_df[bci_df["group"].isin(RTX_GROUPS)][
+    ["bci", "months_since_rtx"]
+].replace("NA", np.nan).dropna()
 if len(rtx_df) > 5:
     r_rtx, p_rtx = stats.spearmanr(rtx_df["bci"], rtx_df["months_since_rtx"].astype(float))
     print(f"[Module 3] BCI vs months_since_rtx: r={r_rtx:.3f}, p={p_rtx:.4f}")
@@ -201,13 +209,24 @@ if not flagged.empty:
     print(f"[Module 3] {len(flagged)} treated samples flagged BCI > {flag_fold}× Ctrl mean")
 
 # ─── Step 8: Figures ─────────────────────────────────────────────────────────
-# Consistent colour palette used across all modules
-palette = {
-    "Ctrl":                      "#4878CF",
+# Consistent colour palette used across all modules. The four original groups
+# keep their established colours; any group added to config["groups"] since
+# then draws from Set2 so the figures never fail on an unknown label.
+_FIXED_COLORS = {
+    CTRL_GROUP:                  "#4878CF",
     "NEW":                       "#6ACC65",
     "MS-Rituximab-Stable":       "#D65F5F",
     "MS-Rituximab-Progressive":  "#B47CC7",
 }
+_auto_pal = sns.color_palette("Set2", max(len(groups), 8))
+palette   = {}
+_auto_idx = 0
+for _g in groups:
+    if _g in _FIXED_COLORS:
+        palette[_g] = _FIXED_COLORS[_g]
+    else:
+        palette[_g] = _auto_pal[_auto_idx % len(_auto_pal)]
+        _auto_idx += 1
 
 with pdf_backend.PdfPages(snakemake.output.plots) as pp:
 
@@ -252,9 +271,7 @@ with pdf_backend.PdfPages(snakemake.output.plots) as pp:
     # would confirm that BCI captures B-cell reconstitution dynamics in cfDNA.
     if len(rtx_df) > 5:
         fig, ax = plt.subplots(figsize=(5, 5))
-        tr = bci_df[bci_df["group"].isin(
-            ["MS-Rituximab-Stable", "MS-Rituximab-Progressive"]
-        )].copy()
+        tr = bci_df[bci_df["group"].isin(RTX_GROUPS)].copy()
         tr["months_since_rtx"] = pd.to_numeric(tr["months_since_rtx"], errors="coerce")
         tr = tr.dropna(subset=["bci", "months_since_rtx"])
         for grp, sub in tr.groupby("group"):

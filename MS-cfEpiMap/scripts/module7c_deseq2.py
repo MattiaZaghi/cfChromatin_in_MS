@@ -63,6 +63,14 @@ meta      = pd.read_csv(snakemake.input.meta,   sep="\t", comment="#")
 ruv       = pd.read_csv(snakemake.input.ruv,    sep="\t")
 bci       = pd.read_csv(snakemake.input.bci,    sep="\t")
 
+# Group taxonomy from config/config.yaml — see the `groups:` block there.
+# GROUP_LEVELS is the ordered factor-level list for the DESeq2 design:
+# reference group first, then each MS sub-group.
+_GROUP_CFG   = snakemake.config["groups"]
+CTRL_GROUP   = _GROUP_CFG["ctrl"]
+RTX_GROUPS   = list(_GROUP_CFG["rituximab"])
+GROUP_LEVELS = [CTRL_GROUP] + list(_GROUP_CFG["ms"])
+
 # ── Step 2: Build the clinical design frame ───────────────────────────────────
 # Start from QC-passing samples only, then merge RUVg factors and BCI scaled.
 meta = meta[meta["qc_include"].astype(str).str.upper() == "TRUE"].copy()
@@ -81,9 +89,7 @@ meta = meta.merge(
 # rituximab_treated: binary indicator (1 = either Rituximab group)
 # Used to partially capture the shared effect of Rituximab across both treated
 # groups before estimating the Stable vs Progressive difference.
-meta["rituximab_treated"] = meta["group"].isin(
-    ["MS-Rituximab-Stable", "MS-Rituximab-Progressive"]
-).astype(int)
+meta["rituximab_treated"] = meta["group"].isin(RTX_GROUPS).astype(int)
 
 # age_group: continuous age binned to 3 levels so DESeq2 can treat it as a
 # categorical covariate without assuming a linear effect.
@@ -172,12 +178,16 @@ for f in design_factors:
             meta[f] = meta[f].fillna(meta[f].mean())
 
 # ── Step 7: Set factor levels and types expected by pydeseq2 ─────────────────
-# group must be a pd.Categorical with Ctrl as the reference (leftmost) level.
+# group must be a pd.Categorical with the reference group as the leftmost
+# level.  Levels come from config["groups"] so a new MS arm enters the design
+# automatically; anything outside that taxonomy (external cohorts such as
+# Healthy or the cancer sets) becomes NaN here, as it always has.
 # sex and age_group must be string-typed for DESeq2's categorical encoding.
-meta["group"] = pd.Categorical(
-    meta["group"],
-    categories=["Ctrl", "NEW", "MS-Rituximab-Stable", "MS-Rituximab-Progressive"],
-)
+_dropped = sorted(set(meta["group"]) - set(GROUP_LEVELS))
+if _dropped:
+    print(f"[Module 7c] groups not in config['groups'], excluded from the "
+          f"design: {_dropped}")
+meta["group"] = pd.Categorical(meta["group"], categories=GROUP_LEVELS)
 meta["sex"]       = meta["sex"].astype(str)
 meta["age_group"] = meta["age_group"].astype(str)
 

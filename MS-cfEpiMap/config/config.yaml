@@ -4,12 +4,12 @@
 # Change this ONE path to redirect all pipeline output (reference/, results/)
 # to a different location. Every relative path in every rule file resolves
 # under this directory via Snakemake's workdir directive in the Snakefile.
-outdir: /date/gcb/gcb_MZ/MS-cfEpiMap
+outdir: /cfs/klemming/projects/supr/uppstore2017150/anita/cfchrom_frag
 
 # ── Input data (SNAPIE preprocessed outputs) ──────────────────────────────────
 # These are absolute paths to preprocessing outputs — unaffected by outdir.
 data:
-  frags_dir:    /date/gcb/gcb_MZ/SNAPIE/frags
+  frags_dir:    /cfs/klemming/projects/supr/uppstore2017150/anita/cfchrom_frag
   bam_dir:      /date/gcb/gcb_MZ/SNAPIE/align/dac
   bam_suffix:   .dac_filtered.dedup.unique.sorted.bam
   peaks_dir:    /date/gcb/gcb_MZ/SNAPIE/peaks
@@ -17,18 +17,51 @@ data:
 
 # ── Sample metadata ───────────────────────────────────────────────────────────
 # Absolute path — this is a repo file in the code directory, not under outdir.
-sample_metadata: /home/mattia/cfChromatin_in_MS/MS-cfEpiMap/config/sample_metadata.tsv
+sample_metadata: /cfs/klemming/projects/supr/uppstore2017150/anita/cfChromatin_in_MS/MS-cfEpiMap/config/sample_metadata.tsv
+
+# ── Group taxonomy ────────────────────────────────────────────────────────────
+# Maps the `group` column of sample_metadata.tsv onto the roles the pipeline
+# cares about. Adding a new MS sub-group (a new treatment arm, a new cohort
+# batch) here is enough — no module needs editing.
+#
+#   ctrl      Reference group. Module 3 scales BCI by its mean; Module 4
+#             computes cross-sample z-scores against its distribution.
+#   ms        Every MS sub-group. These collapse to the single display label
+#             "MS" when summarising by group (Module 4 display_group), and
+#             together with `ctrl` they form the in-house group ordering used
+#             by the per-group plots in Modules 3, 8, 10 and the HTML report.
+#             Groups NOT listed here keep their own name, so externally
+#             sourced cohorts (Healthy, Hepatocellular, Glioma) stay separate.
+#   rituximab The Rituximab-treated subset of `ms`. Drives the reconstitution
+#             analyses (BCI flagging, months_since_rtx correlation) and the
+#             rituximab_treated covariate in the DESeq2/glmmTMB designs.
+groups:
+  ctrl: Ctrl
+  ms:
+    - NEW
+    - MS-Unknown-V4
+    - MS-Natalizumab-V4
+    - MS-Rituximab-Stable
+    - MS-Rituximab-Progressive
+  rituximab:
+    - MS-Rituximab-Stable
+    - MS-Rituximab-Progressive
 
 # ── Genome reference ──────────────────────────────────────────────────────────
 genome:
   assembly:    hg19
-  chrom_sizes: /home/mattia/Genomes/hg19/hg19.chrom.sizes
-  dac_regions: /home/mattia/Genomes/hg19/hg19-blacklist.v2.bed
-  fasta: /home/mattia/Genomes/hg19/fa/hg19.fa
+  chrom_sizes: /cfs/klemming/projects/supr/uppstore2017150/anita/hg19/hg19.chrom.sizes
+  dac_regions: /cfs/klemming/projects/supr/uppstore2017150/anita/hg19/hg19_dac_exclusion.bed
+  fasta: /cfs/klemming/projects/supr/uppstore2017150/anita/hg19/hg19.fa.gz
 
 # ── Reference RRE files (produced by Module 1, written under outdir) ──────────
 rre:
-  universe_bed:      reference/rre/ms_rre_universe.bed
+  universe_bed:      /cfs/klemming/projects/supr/uppstore2017150/anita/cfChromatin_in_MS/tissue_markers_sadeh/universe.bed
+  universe_top_bed:  /cfs/klemming/projects/supr/uppstore2017150/anita/cfChromatin_in_MS/tissue_markers_sadeh/universe_top.bed
+  # Bedgraph directories for top-N RRE equalisation (Step 4.5 in module1).
+  # Leave empty to skip top-N filtering (ms_rre_universe_top.bed = full universe copy).
+  cns_bedgraph_dir:     /cfs/klemming/projects/supr/uppstore2017150/anita/combined_bedgraph_bins_consistent_10_hg19
+  roadmap_bedgraph_dir: /cfs/klemming/projects/supr/uppstore2017150/anita/epiroadmap/bedgraph
   cns_bed:           reference/rre/cns_rre.bed
   immune_bed:        reference/rre/immune_rre.bed
   bcell_bed:         reference/rre/bcell_rre.bed
@@ -36,34 +69,80 @@ rre:
   merge_distance_bp: 200
   min_size_bp:       100
   max_size_bp:       10000
-  # Per-cell-type CNS subsets (only list cell types whose BED is non-empty)
+  # CNS mode: "sc" = single-cell types (default) | "brain" = merged Roadmap brain tissues
+  # Change this single key to switch the entire pipeline between the two modes.
+  cns_mode: brain
+  # Per-cell-type CNS subsets used when cns_mode=sc
   cns_cell_types:
     - oligodendrocyte
     - neuron
     - astrocyte
     - microglia
+    - opc
   cns_celltype_beds:
     oligodendrocyte: reference/rre/oligodendrocyte_rre.bed
     neuron:          reference/rre/neuron_rre.bed
     astrocyte:       reference/rre/astrocyte_rre.bed
     microglia:       reference/rre/microglia_rre.bed
+    opc:             reference/rre/opc_rre.bed
+  # Brain-mode settings used when cns_mode=brain
+  brain_bed: /cfs/klemming/projects/supr/uppstore2017150/anita/cfChromatin_in_MS/tissue_markers_sadeh/brain_markers.bed.gz
+  brain_cell_types:
+    - brain
+  brain_celltype_beds:
+    brain: /cfs/klemming/projects/supr/uppstore2017150/anita/cfChromatin_in_MS/tissue_markers_sadeh/brain_markers.bed.gz
   # Per-cell-type B cell subsets (exclusive signature regions for each B cell type)
+  # Must match the corresponding REFERENCE_DATA key in module1_build_rre.py
   bcell_cell_types:
-    - b_naive
+    - b_cell
   bcell_celltype_beds:
-    b_naive: reference/rre/b_naive_rre.bed
+    b_cell: reference/rre/b_cell_rre.bed
   # opc and gwas_proximal BEDs are currently empty — re-add when data is available
 
 # ── Normalization (Module 2) ──────────────────────────────────────────────────
 normalization:
-  constitutive_anchors_bed: reference/rre/constitutive_anchors.bed
+  constitutive_anchors_bed: /cfs/klemming/projects/supr/uppstore2017150/anita/cfChromatin_in_MS/tissue_markers_sadeh/constitutive_anchors.bed
   # housekeeping_seed is a static repo file — absolute path so workdir does not affect it
-  housekeeping_seed:    /home/mattia/cfChromatin_in_MS/MS-cfEpiMap/reference/rre/housekeeping_seed.bed
+  housekeeping_seed:    /cfs/klemming/projects/supr/uppstore2017150/anita/cfChromatin_in_MS/MS-cfEpiMap/reference/rre/housekeeping_seed.bed
   min_anchor_celltypes: 0.8     # fraction of downloaded cell types that must be active (≥80%); auto-scales to however many were downloaded
   flag_sf_sd_threshold: 3.0     # flag samples >N SD from mean SF
 deconvolution:
-  off_target_bed: /home/mattia/cfChromatin_in_MS/SNAPIE/ref_files/chromhmm_offtarget_H3K27ac.bed
-  gene_annotation_bed: /home/mattia/Genomes/hg19/gencode_v19_genes.bed   # 6-column BED
+  off_target_bed: /cfs/klemming/projects/supr/uppstore2017150/anita/cfChromatin_in_MS/SNAPIE/ref_files/chromhmm_offtarget_H3K27ac.bed
+  gene_annotation_bed: /cfs/klemming/projects/supr/uppstore2017150/anita/Genomes/hg19/gencode_v19_genes.bed   # 6-column BED
+  # Cell types for deconvolution — names must match REFERENCE_DATA keys in module1_build_rre.py.
+  # To switch reference sets: update REFERENCE_DATA in module1, then update this block to match.
+  cell_types:
+    adipose:           other
+    b_cell:            immune
+    brain:             cns
+    brain_pb:     cns         # brain pseudobulk from single cell
+    breast:            other
+    epithelial:        other
+    digestive:         other   # pre-merged Colon+Rectum+Stomach
+    heart:             other   # pre-merged Atrium+Ventricle+Aorta
+    t_cell:            immune
+    liver:             other
+    lung:              other
+    pancreas:          other   # pre-merged Pancreas+Islet
+    prostate:          other
+    ovary:             other
+    nk:                immune
+    neutrophil:        immune
+    monocyte:          immune
+    skin:              other
+    placenta:          other
+    gi_smooth_muscle:  other
+    skeletal_muscle_f: other
+    blood_vessel: other
+    megakaryocyte_mep: immune
+    astrocyte:           cns
+    microglia:            cns
+    neuron:               cns
+    oligodendrocyte:      cns
+    opc:                  cns
+  cdi_types: []
+  nii_types: []
+  iai_types: []
 # ── Bins (Module 6) ───────────────────────────────────────────────────────────
 bins:
   size_bp:         5000
@@ -114,7 +193,7 @@ glmmtmb:
 tf_activity:
   min_sites:    100
   # tf_sites_dir is a static repo directory — absolute path so workdir does not affect it
-  tf_sites_dir: /home/mattia/cfChromatin_in_MS/MS-cfEpiMap/reference/tf_sites
+  tf_sites_dir: /cfs/klemming/projects/supr/uppstore2017150/anita/cfChromatin_in_MS/MS-cfEpiMap/reference/tf_sites
 
 # ── Machine learning (Module 10) ─────────────────────────────────────────────
 ml:

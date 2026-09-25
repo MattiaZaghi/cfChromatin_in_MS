@@ -60,9 +60,9 @@ def count_midpoints(frags_bed: str, regions_bed: str, output_file: str) -> None:
         # bedtools sort -i - reads from stdin and sorts by chromosome then position.
         # The sorted output is written to tmp_path for use in the intersect step.
         awk = (
+            f"zcat -f {frags_bed} | "
             "awk 'BEGIN{OFS=\"\\t\"} "
-            "{mid=int(($2+$3)/2); print $1, mid, mid+1}' "
-            f"{frags_bed}"
+            "{mid=int(($2+$3)/2); print $1, mid, mid+1}'"
         )
         sort = "bedtools sort -i -"
         with open(tmp_path, "w") as out:

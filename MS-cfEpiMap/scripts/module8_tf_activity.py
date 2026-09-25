@@ -72,11 +72,16 @@ def _count_one_sample(args):
 
 # ─── Step 1: Load inputs ──────────────────────────────────────────────────────
 samples      = snakemake.params.samples
-frags_dir    = snakemake.params.frags_dir
+sample_bed_map = snakemake.params.sample_bed_map
 min_sites    = int(snakemake.params.min_sites)
 tf_sites_dir = str(snakemake.input.tf_sites_dir)
 anchors_bed  = snakemake.input.anchors
 n_cpus       = snakemake.threads
+
+# Group taxonomy from config/config.yaml — see the `groups:` block there.
+_GROUP_CFG  = snakemake.config["groups"]
+_CTRL_GROUP = _GROUP_CFG["ctrl"]
+_MS_GROUPS  = list(_GROUP_CFG["ms"])
 
 meta  = pd.read_csv(snakemake.input.meta, sep="\t", comment="#")
 meta  = meta[meta["sample_id"].isin(samples)]
@@ -150,7 +155,7 @@ print(f"[Module 8] Counting for {len(samples)} samples "
       f"using {n_cpus} parallel workers ...")
 
 args_list = [
-    (sid, f"{frags_dir}/{sid}.bed", sorted_combined)
+    (sid, sample_bed_map[sid], sorted_combined)
     for sid in samples
 ]
 
@@ -198,12 +203,25 @@ Path(snakemake.output.auc_matrix).parent.mkdir(parents=True, exist_ok=True)
 auc_matrix.to_csv(snakemake.output.auc_matrix, sep="\t")
 
 # ─── Step 7: Heatmap ─────────────────────────────────────────────────────────
-groups      = ["Ctrl", "NEW", "MS-Rituximab-Stable", "MS-Rituximab-Progressive"]
-palette     = {
-    "Ctrl": "#4878CF", "NEW": "#6ACC65",
+import seaborn as sns
+
+groups = [_CTRL_GROUP] + _MS_GROUPS
+# The four original groups keep their established colours; any group added to
+# config["groups"] since then draws from Set2.
+_FIXED_COLORS = {
+    _CTRL_GROUP: "#4878CF", "NEW": "#6ACC65",
     "MS-Rituximab-Stable": "#D65F5F",
     "MS-Rituximab-Progressive": "#B47CC7",
 }
+_auto_pal = sns.color_palette("Set2", max(len(groups), 8))
+palette   = {}
+_auto_idx = 0
+for _g in groups:
+    if _g in _FIXED_COLORS:
+        palette[_g] = _FIXED_COLORS[_g]
+    else:
+        palette[_g] = _auto_pal[_auto_idx % len(_auto_pal)]
+        _auto_idx += 1
 _mi = meta.set_index("sample_id")
 group_order  = [g for g in groups if g in meta["group"].unique()]
 sample_order = (

@@ -12,11 +12,7 @@ rule compute_bci:
     run statistical tests, generate figures.
     """
     input:
-        frags_list  = expand(
-            "{frags_dir}/{sample}.bed",
-            frags_dir=config["data"]["frags_dir"],
-            sample=SAMPLES,
-        ),
+        frags_list  = [SAMPLE_FRAG_BED[s] for s in SAMPLES],
         bcell_rre   = config["rre"]["bcell_bed"],
         anchors     = config["normalization"]["constitutive_anchors_bed"],
         meta        = config["sample_metadata"],
@@ -26,7 +22,7 @@ rule compute_bci:
         plots       = "results/bcell_qc/bci_reconstitution.pdf",
     params:
         samples             = SAMPLES,
-        frags_dir           = config["data"]["frags_dir"],
+        sample_bed_map      = SAMPLE_FRAG_BED,
         flag_fold           = config["bcell"]["flag_above_ctrl_fold"],
     conda:  "../../envs/python_analysis.yaml"
     threads: config["threads"]

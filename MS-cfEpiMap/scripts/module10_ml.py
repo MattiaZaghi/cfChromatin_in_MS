@@ -84,7 +84,15 @@ max_feats   = int(snakemake.params.max_features)     # cap on total features
 
 # Restrict to QC-passing samples (exclude QC_Mix and flagged samples)
 meta   = meta[meta["qc_include"].astype(str).str.upper() == "TRUE"]
-GROUPS = ["Ctrl", "NEW", "MS-Rituximab-Stable", "MS-Rituximab-Progressive"]
+
+# Group taxonomy from config/config.yaml — see the `groups:` block there.
+# GROUPS is the label set for Classifier A: the reference group plus every MS
+# sub-group.  External cohorts are excluded, so adding one to the metadata
+# never silently turns the staging classifier into a cancer-vs-MS model.
+_GROUP_CFG = snakemake.config["groups"]
+CTRL_GROUP = _GROUP_CFG["ctrl"]
+RTX_GROUPS = list(_GROUP_CFG["rituximab"])
+GROUPS     = [CTRL_GROUP] + list(_GROUP_CFG["ms"])
 
 # ── Step 2: Assemble the feature matrix ──────────────────────────────────────
 
@@ -255,7 +263,8 @@ true_A, proba_A, model_A, le_A = tune_and_cv(X_A, y_A, cv_A, snakemake.params.ra
 # MEAS is expected to correlate with EDSS, NfL, and CDI across groups.
 prog_idx = list(le_A.classes_).index("MS-Rituximab-Progressive") if \
            "MS-Rituximab-Progressive" in le_A.classes_ else 0
-ctrl_idx = list(le_A.classes_).index("Ctrl") if "Ctrl" in le_A.classes_ else 1
+ctrl_idx = list(le_A.classes_).index(CTRL_GROUP) \
+           if CTRL_GROUP in le_A.classes_ else 1
 
 meas_df = pd.DataFrame({
     "sample_id":  X_A.index.tolist(),
@@ -269,8 +278,7 @@ meas_df = meas_df.merge(
 
 # ── Classifier B: binary Rituximab response (Stable vs Progressive) ────────
 print("[Module 10] Classifier B: binary response")
-rtx_groups = ["MS-Rituximab-Stable", "MS-Rituximab-Progressive"]
-mask_B     = labels.isin(rtx_groups)
+mask_B     = labels.isin(RTX_GROUPS)
 X_B, y_B   = feat[mask_B], labels[mask_B]
 
 if len(y_B.unique()) == 2 and len(y_B) >= 4:

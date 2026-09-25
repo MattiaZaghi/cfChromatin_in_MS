@@ -11,11 +11,7 @@ rule compute_tf_activity:
     constitutive anchor background.  Run Kruskal-Wallis + Dunn tests.
     """
     input:
-        frags_list  = expand(
-            "{frags_dir}/{sample}.bed",
-            frags_dir=config["data"]["frags_dir"],
-            sample=SAMPLES,
-        ),
+        frags_list  = [SAMPLE_FRAG_BED[s] for s in SAMPLES],
         anchors     = config["normalization"]["constitutive_anchors_bed"],
         sf          = "results/normalization/constitutive_scaling_factors.tsv",
         tf_sites_dir = config["tf_activity"]["tf_sites_dir"],
@@ -25,9 +21,9 @@ rule compute_tf_activity:
         heatmap     = "results/tf_activity/tf_activity_heatmap.pdf",
         bcell_plot  = "results/tf_activity/bcell_tf_reconstitution.pdf",
     params:
-        samples   = SAMPLES,
-        frags_dir = config["data"]["frags_dir"],
-        min_sites = config["tf_activity"]["min_sites"],
+        samples        = SAMPLES,
+        sample_bed_map = SAMPLE_FRAG_BED,
+        min_sites      = config["tf_activity"]["min_sites"],
     conda:  "../../envs/python_analysis.yaml"
     threads: config["threads"]
     script: "../../scripts/module8_tf_activity.py"

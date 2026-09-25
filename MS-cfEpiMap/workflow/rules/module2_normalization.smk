@@ -8,13 +8,15 @@ computes scaling factors, generates anchor-normalised bigWigs and QC plot.
 rule count_anchor_midpoints:
     """Count fragment midpoints overlapping constitutive anchor regions."""
     input:
-        frags   = lambda wc: f"{config['data']['frags_dir']}/{wc.sample}.bed",
+        frags   = lambda wc: SAMPLE_FRAG_BED[wc.sample],
         anchors = config["normalization"]["constitutive_anchors_bed"],
     output:
         temp("results/normalization/anchor_counts_per_sample/{sample}.counts"),
     params:
         script = workflow.basedir + "/scripts/count_midpoints.py",
     threads: 1
+    resources:
+        mem_mb = 8000,
     conda:  "../../envs/python_analysis.yaml"
     shell:
         """

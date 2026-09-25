@@ -81,12 +81,29 @@ Path(snakemake.output.qc_summary).parent.mkdir(parents=True, exist_ok=True)
 qc.to_csv(snakemake.output.qc_summary, sep="\t", index=False)
 
 # ── Step 3: Generate inline figures ──────────────────────────────────────────
-palette = {
-    "Ctrl":                     "#4878CF",
+# Group taxonomy from config/config.yaml — see the `groups:` block there.
+# The four original groups keep their established colours; any group added to
+# the config since then draws from Set2 rather than falling back to grey.
+_GROUP_CFG  = snakemake.config["groups"]
+CTRL_GROUP  = _GROUP_CFG["ctrl"]
+GROUP_ORDER = [CTRL_GROUP] + list(_GROUP_CFG["ms"])
+
+_FIXED_COLORS = {
+    CTRL_GROUP:                 "#4878CF",
     "NEW":                      "#6ACC65",
     "MS-Rituximab-Stable":      "#D65F5F",
     "MS-Rituximab-Progressive": "#B47CC7",
 }
+_set2     = plt.get_cmap("Set2")
+_auto_pal = [_set2(i % 8) for i in range(max(len(GROUP_ORDER), 8))]
+palette   = {}
+_auto_idx = 0
+for _g in GROUP_ORDER:
+    if _g in _FIXED_COLORS:
+        palette[_g] = _FIXED_COLORS[_g]
+    else:
+        palette[_g] = _auto_pal[_auto_idx % len(_auto_pal)]
+        _auto_idx += 1
 
 # ── Figure 1: Scaling factor barplot (Module 2 QC) ───────────────────────────
 # Each bar is one sample; height = constitutive SF; colour = group.
@@ -108,8 +125,7 @@ plt.close(fig1)
 # Quick visual check: do Ctrl samples have BCI near 1, and are treated patients
 # within the expected range? Obvious outliers suggest reconstitution extremes.
 fig2, ax = plt.subplots(figsize=(6, 4))
-order = [g for g in ["Ctrl", "NEW", "MS-Rituximab-Stable", "MS-Rituximab-Progressive"]
-         if g in bci["group"].unique()]
+order = [g for g in GROUP_ORDER if g in bci["group"].unique()]
 for i, grp in enumerate(order):
     vals = bci.loc[bci["group"] == grp, "bci"].dropna()
     ax.violinplot(vals, positions=[i], showmedians=True)

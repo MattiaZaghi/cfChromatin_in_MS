@@ -31,13 +31,14 @@ meta <- merge(meta, ruv, by = "sample_id", all.x = TRUE)
 meta <- merge(meta, bci[, c("sample_id", "bci_scaled")],
               by = "sample_id", all.x = TRUE)
 
+# Group taxonomy from config/config.yaml — see the `groups:` block there.
+group_cfg    <- snakemake@config$groups
+group_levels <- c(group_cfg$ctrl, unlist(group_cfg$ms))
+
 meta$rituximab_treated <- as.integer(
-    meta$group %in% c("MS-Rituximab-Stable", "MS-Rituximab-Progressive")
+    meta$group %in% unlist(group_cfg$rituximab)
 )
-meta$group <- factor(
-    meta$group,
-    levels = c("Ctrl", "NEW", "MS-Rituximab-Stable", "MS-Rituximab-Progressive")
-)
+meta$group <- factor(meta$group, levels = group_levels)
 meta$total_frags <- colSums(bin_counts)[meta$sample_id]
 
 # Align

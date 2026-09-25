@@ -16,13 +16,22 @@ if (!("group" %in% colnames(df))) {
     df <- merge(sf, extra, by = "sample_id", all.x = TRUE)
 }
 
-group_order  <- c("Ctrl", "NEW", "MS-Rituximab-Stable", "MS-Rituximab-Progressive")
-group_colors <- c(
-    Ctrl                         = "#4878CF",
-    NEW                          = "#6ACC65",
-    `MS-Rituximab-Stable`        = "#D65F5F",
-    `MS-Rituximab-Progressive`   = "#B47CC7"
+# Group ordering from config/config.yaml — see the `groups:` block there.
+# The four original groups keep their established colours; any group added to
+# the config since then draws from Set2, so a new MS arm plots correctly
+# instead of falling through to the grey na.value below.
+group_cfg   <- snakemake@config$groups
+group_order <- c(group_cfg$ctrl, unlist(group_cfg$ms))
+
+fixed_colors <- c("#4878CF", "#6ACC65", "#D65F5F", "#B47CC7")
+names(fixed_colors) <- c(group_cfg$ctrl, "NEW",
+                         "MS-Rituximab-Stable", "MS-Rituximab-Progressive")
+
+group_colors <- setNames(
+    scales::hue_pal()(length(group_order)), group_order
 )
+group_colors[names(fixed_colors)] <- fixed_colors
+group_colors <- group_colors[group_order]
 
 df$sf_flagged <- df$sf_flagged %in% c(TRUE, "True", "TRUE")
 df$group <- factor(df$group, levels = group_order)

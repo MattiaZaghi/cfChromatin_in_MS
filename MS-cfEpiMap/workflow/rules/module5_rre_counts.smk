@@ -14,15 +14,15 @@ RRE_BED = {
     "immune":        config["rre"]["immune_bed"],
     "gwas_proximal": config["rre"]["gwas_proximal_bed"],
     **{
-        f"cns_{ct}": config["rre"]["cns_celltype_beds"][ct]
-        for ct in config["rre"].get("cns_cell_types", [])
+        f"cns_{ct}": config["rre"][_CNS_BEDS_KEY][ct]
+        for ct in CNS_CELL_TYPES
     },
 }
 
 rule count_rre_midpoints_per_sample:
     """Count midpoints overlapping one RRE subset for one sample."""
     input:
-        frags   = lambda wc: f"{config['data']['frags_dir']}/{wc.sample}.bed",
+        frags   = lambda wc: SAMPLE_FRAG_BED[wc.sample],
         regions = lambda wc: RRE_BED[wc.subset],
     output:
         temp("results/counts/rre_per_sample/{subset}/{sample}.counts"),

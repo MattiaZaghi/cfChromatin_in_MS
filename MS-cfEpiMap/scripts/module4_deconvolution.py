@@ -12,6 +12,7 @@ KEY OPTIMIZATION vs previous version:
 
 import gzip
 import os
+import sys
 import subprocess
 import tempfile
 from collections import defaultdict
@@ -30,29 +31,14 @@ import seaborn as sns
 import statsmodels.api as sm
 
 
-# ─── Cell-type definitions ────────────────────────────────────────────────────
-CELL_TYPES = {
-    "Oligodendrocyte": "cns",
-    "OPC":             "cns",
-    "Neuron":          "cns",
-    "Astrocyte":       "cns",
-    "Microglia":       "cns",
-    "CD4_Th1":         "immune",
-    "CD4_Th17":        "immune",
-    "CD4_Treg":        "immune",
-    "CD8_T":           "immune",
-    "B_naive":         "bcell",
-    "B_memory":        "bcell",
-    "Monocyte_CD14":   "immune",
-    "Monocyte_CD16":   "immune",
-    "NK":              "immune",
-    "Neutrophil":      "immune",
-    "Megakaryocyte":   "other",
-}
-
-CDI_TYPES = ["Oligodendrocyte", "OPC", "Neuron"]
-NII_TYPES = ["CD4_Th1", "CD4_Th17", "Monocyte_CD14", "NK"]
-IAI_TYPES = ["Monocyte_CD14", "Monocyte_CD16", "NK"]
+# ─── Cell-type definitions (driven by config.yaml deconvolution.cell_types) ──
+# To switch reference sets: update REFERENCE_DATA in module1_build_rre.py and
+# the deconvolution.cell_types / cdi_types / nii_types / iai_types in config.yaml.
+_deconv_cfg = snakemake.config.get("deconvolution", {})
+CELL_TYPES  = _deconv_cfg.get("cell_types", {})
+CDI_TYPES   = _deconv_cfg.get("cdi_types", [])
+NII_TYPES   = _deconv_cfg.get("nii_types", [])
+IAI_TYPES   = _deconv_cfg.get("iai_types", [])
 
 
 # ─── Parallel worker (module-level for pickling) ──────────────────────────────
@@ -67,8 +53,9 @@ def _count_one_sample(args):
     mid_tmp = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
     try:
         awk = (
+            f"zcat -f {frags_bed} | "
             f"awk 'BEGIN{{OFS=\"\\t\"}}"
-            f"{{mid=int(($2+$3)/2); print $1,mid,mid+1}}' {frags_bed}"
+            f"{{mid=int(($2+$3)/2); print $1,mid,mid+1}}'"
         )
         p1 = subprocess.Popen(awk, shell=True, stdout=subprocess.PIPE)
         p2 = subprocess.run(
@@ -108,8 +95,9 @@ def _count_per_region_sample(args):
     mid_tmp = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
     try:
         awk = (
+            f"zcat -f {frags_bed} | "
             f"awk 'BEGIN{{OFS=\"\\t\"}}"
-            f"{{mid=int(($2+$3)/2); print $1,mid,mid+1}}' {frags_bed}"
+            f"{{mid=int(($2+$3)/2); print $1,mid,mid+1}}'"
         )
         p1 = subprocess.Popen(awk, shell=True, stdout=subprocess.PIPE)
         p2 = subprocess.run(
@@ -135,12 +123,35 @@ def _count_per_region_sample(args):
 
 
 # ─── Step 1: Load inputs ──────────────────────────────────────────────────────
-samples   = snakemake.params.samples
-frags_dir = snakemake.params.frags_dir
+samples        = snakemake.params.samples
+
+# Optional sample subset: the chunked deconvolution path runs this script
+# once per chunk. `meta` is filtered by `samples` a few lines below, so
+# restricting here propagates everywhere. Absent -> every sample (default).
+_SUBSET = getattr(snakemake.params, 'samples_subset', None)
+if _SUBSET:
+    _subset_set = set(_SUBSET)
+    samples = [s for s in samples if s in _subset_set]
+    print(f'[Module 4] sample subset active: {len(samples)} samples')
+_sample_bed_map = snakemake.params.sample_bed_map
 n_cpus    = snakemake.threads
 
 meta  = pd.read_csv(snakemake.input.meta, sep="\t", comment="#")
 meta  = meta[meta["sample_id"].isin(samples)]
+
+# Collapse MS sub-groups into a single "MS" display label; all other groups
+# keep their original name so externally-sourced cohorts (e.g. cancer, Healthy)
+# appear as distinct groups in every plot.  The membership list lives in
+# config["groups"]["ms"] so a new treatment arm only has to be named there.
+_GROUP_CFG   = snakemake.config["groups"]
+_CTRL_GROUP  = _GROUP_CFG["ctrl"]
+_MS_SUBTYPES = set(_GROUP_CFG["ms"])
+meta["display_group"] = meta["group"].apply(
+    lambda g: "MS" if g in _MS_SUBTYPES else g
+)
+_unmapped = sorted(set(meta["group"]) - _MS_SUBTYPES - {_CTRL_GROUP})
+if _unmapped:
+    print(f"[Module 4] groups kept separate from MS/{_CTRL_GROUP}: {_unmapped}")
 sf_df = pd.read_csv(snakemake.input.sf, sep="\t")
 sf    = sf_df.set_index("sample_id")["constitutive_sf"].to_dict()
 
@@ -282,7 +293,7 @@ ct_regions: dict[str, pd.DataFrame] = {}
 for ct in CELL_TYPES:
     in_ct    = rre["cell_types"].str.contains(ct, regex=False)
     others   = [c for c in CELL_TYPES if c != ct]
-    in_other = rre["cell_types"].apply(lambda x: any(c in x for c in others))
+    in_other = rre["cell_types"].apply(lambda x: any(c in x.split(',') for c in others))
     ct_regions[ct] = rre[in_ct & ~in_other]
 
 # sig_kb: total kilobases of exclusive signature regions for each cell type.
@@ -295,570 +306,682 @@ sig_kb: dict[str, float] = {
     for ct, sig_df in ct_regions.items()
 }
 
-# ─── Step 3: Write combined BED (all cell types, label in col 4) ──────────────
-combined_rows = []
-for ct, sig_df in ct_regions.items():
-    if sig_df.empty:
-        print(f"  [Module 4] {ct}: 0 signature regions — skipping")
-        continue
-    print(f"  [Module 4] {ct}: {len(sig_df)} signature regions")
-    for _, row in sig_df.iterrows():
-        combined_rows.append(f"{row[0]}\t{int(row[1])}\t{int(row[2])}\t{ct}")
-
-raw_combined = tempfile.NamedTemporaryFile(
-    suffix=".bed", delete=False, mode="w"
+# ── Dynamic group ordering and colouring ─────────────────────────────────────
+# Ctrl always first, MS second, then remaining groups alphabetically.
+# Unknown groups receive colours from seaborn Set2 automatically.
+_PRIORITY_COLORS = {_CTRL_GROUP: "#4878CF", "MS": "#D65F5F", "Healthy": "#6ACC65"}
+_PRIORITY_ORDER  = {_CTRL_GROUP: 0, "MS": 1}
+_all_display_groups = sorted(meta["display_group"].unique())
+group_order = sorted(
+    _all_display_groups,
+    key=lambda g: (_PRIORITY_ORDER.get(g, 2), g),
 )
-raw_combined.write("\n".join(combined_rows) + "\n")
-raw_combined.close()
+_auto_pal = sns.color_palette("Set2", max(len(group_order), 8))
+_auto_idx = 0
+group_colors: dict = {}
+for _g in group_order:
+    if _g in _PRIORITY_COLORS:
+        group_colors[_g] = _PRIORITY_COLORS[_g]
+    else:
+        group_colors[_g] = _auto_pal[_auto_idx % len(_auto_pal)]
+        _auto_idx += 1
 
-sorted_combined = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
-subprocess.run(
-    f"bedtools sort -i {raw_combined.name} > {sorted_combined}",
-    shell=True, check=True,
-)
-os.remove(raw_combined.name)
+# ─── Stage switch ────────────────────────────────────────────────────────────
+# This script has two independent halves (verified: the within-sample half
+# references nothing the cross-sample half defines except ct_regions and
+# group_colors, both hoisted above this point):
+#   cross  — cohort-level Poisson/NB z vs the Ctrl distribution. Counts are
+#            per-cell-type totals (a few ints per sample), so memory is flat
+#            in sample count. MUST see every sample: the scaling factor is a
+#            cohort median and the z-scores are relative to the Ctrl mean.
+#   within — per-sample NB-GLM vs Sadeh local background. Counts are one int
+#            per region per sample and all are held at once, so memory is
+#            linear in sample count -- this is the half that must be chunked.
+# stage='all' (the default) runs both in the original order and is unchanged
+# from the single-rule behaviour.
+_STAGE = getattr(snakemake.params, 'stage', 'all')
+if _STAGE not in ('all', 'cross', 'within'):
+    raise SystemExit(f'unknown stage {_STAGE!r}; expected all|cross|within')
+print(f'[Module 4] stage = {_STAGE}')
 
-# ─── Step 4: Count midpoints per sample in parallel ───────────────────────────
-print(f"\n[Module 4] Counting for {len(samples)} samples "
-      f"using {len(samples)} parallel workers ...")
-
-args_list = [
-    (sid, f"{frags_dir}/{sid}.bed", sorted_combined)
-    for sid in samples
-]
-
-sig_counts: dict[str, dict[str, int]] = defaultdict(dict)
-with ProcessPoolExecutor(max_workers=len(samples)) as pool:
-    for sid, ct_cnts in pool.map(_count_one_sample, args_list):
-        for ct in CELL_TYPES:
-            sig_counts[ct][sid] = ct_cnts.get(ct, 0)
-        print(f"  done: {sid}")
-
-os.remove(sorted_combined)
-
-# ─── Step 5: Anchor-normalise, Poisson enrichment test, and z-scores ─────────
-ctrl_samples = meta.loc[meta["group"] == "Ctrl", "sample_id"].tolist()
-
-
-def _bh_correct(pvals: np.ndarray) -> np.ndarray:
-    """
-    Benjamini-Hochberg FDR correction on a 1-D array of p-values.
-    Returns adjusted p-values (padj) clipped to [0, 1].
-
-    How it works step by step:
-      1. Sort p-values from smallest to largest and remember the original
-         positions so we can unsort at the end.
-      2. Multiply each sorted p-value by n / rank (where rank goes 1..n).
-         This is the BH formula: padj_i = p_i * n / rank_i.
-      3. Enforce monotonicity from right to left with a cumulative minimum:
-         a later (larger) p-value must never produce a smaller padj than an
-         earlier one, otherwise the rejection region would not be contiguous.
-      4. Put the adjusted values back in original order and clip to 1.
-    """
-    n = len(pvals)
-    if n == 0:
-        return np.array([])
-    # Step 1: argsort gives positions that would sort the array
-    order   = np.argsort(pvals)
-    # Step 2: multiply by n / rank (ranks are 1-based: 1, 2, ..., n)
-    bh      = pvals[order] * n / np.arange(1, n + 1)
-    # Step 3: cumulative minimum from right — np.minimum.accumulate on reversed
-    # array, then reverse back
-    padj_sorted = np.minimum.accumulate(bh[::-1])[::-1]
-    # Step 4: unsort back to original order
-    padj = np.empty(n)
-    padj[order] = padj_sorted
-    return np.minimum(padj, 1.0)
-
-
-rows = []
-for ct, sample_cnts in sig_counts.items():
-
-    # ── Group-level reference (same as before) ────────────────────────────────
-    # Collect anchor-normalised counts from all control samples for this cell
-    # type.  ctrl_mean is the reference level: the average normalised signal
-    # healthy controls show at this cell type's signature.
-    ctrl_norms = [
-        sample_cnts[s] * sf.get(s, 1.0)
-        for s in ctrl_samples if s in sample_cnts
-    ]
-    ctrl_mean = np.mean(ctrl_norms) if ctrl_norms else 1.0
-
-    # ── Per-sample Poisson null parameters ───────────────────────────────────
-    # s_kb: total kilobases of exclusive signature regions for this cell type.
-    # Used to scale the anchor density to get the expected count.
-    s_kb = sig_kb.get(ct, 0.0)
-
-    for sid, cnt in sample_cnts.items():
-
-        # ── Anchor-normalised count and group-relative z-score ────────────────
-        # norm_cnt: raw count scaled by this sample's constitutive anchor
-        # scaling factor, placing it on a common library-size-adjusted scale.
-        norm_cnt = cnt * sf.get(sid, 1.0)
-
-        # z: how many Poisson standard deviations this sample sits above or
-        # below the control mean.  sqrt(ctrl_mean) is the Poisson SD.
-        z = (norm_cnt - ctrl_mean) / np.sqrt(max(ctrl_mean, 1))
-
-        # ── Within-sample Poisson enrichment test ────────────────────────────
-        # anchor_cnt: raw fragment midpoints at constitutive anchor regions for
-        # this specific sample (from Module 2 output, not normalised).
-        anchor_cnt = anchor_counts.get(sid, 0)
-
-        if anchor_cnt > 0 and anchor_kb > 0 and s_kb > 0:
-
-            # anchor_density: reads per kilobase at constitutive loci in this
-            # specific sample.  Both numerator and denominator are raw counts
-            # from the same library, so this ratio is automatically normalised
-            # for sequencing depth — a deeper library has proportionally more
-            # reads in both numerator (anchor_cnt) and denominator (anchor_kb
-            # is fixed), so the density tracks IP efficiency rather than depth.
-            anchor_density = anchor_cnt / anchor_kb
-
-            # expected: the null-hypothesis count at this cell type's signature
-            # regions.  If cfDNA fragments were distributed at the same density
-            # as the constitutive anchors (no cell-type-specific enrichment),
-            # you would observe this many midpoints.
-            expected = anchor_density * s_kb
-
-            # fold_enrichment: how many times above the null expectation the
-            # observed count is.  A value of 1 means no enrichment; 2 means
-            # twice the constitutive baseline; <1 means depletion.
-            fold_enrichment = cnt / expected if expected > 0 else np.nan
-
-            # ── Negative-binomial one-sided enrichment test ───────────────────
-            #
-            # We now use the NB distribution rather than Poisson.  The key
-            # difference is that NB has an extra parameter α (nb_alpha,
-            # estimated from anchor regions in Step 1b) that allows the
-            # variance to exceed the mean:
-            #
-            #   Var(X_NB) = μ + α · μ²    vs    Var(X_Poisson) = μ
-            #
-            # This makes the NB test more conservative (harder to call
-            # enrichment) but more calibrated: when the null is true, the
-            # fraction of false positives matches the stated α threshold.
-            #
-            # scipy.stats.nbinom uses a different parameterisation from the
-            # (μ, α) form we reason about.  The conversion is:
-            #
-            #   n  = 1 / α          ("number of successes" in scipy's NB)
-            #   p  = n / (n + μ)    ("probability of success" in scipy's NB)
-            #
-            # Deriving this:
-            #   scipy's NB has mean = n(1-p)/p and variance = n(1-p)/p²
-            #   Setting mean = μ:   n(1-p)/p = μ   →   n = μ·p/(1-p)
-            #   Setting var  = μ + α·μ²:
-            #     n(1-p)/p² = μ + α·μ²
-            #     μ/p       = μ + α·μ²     (substituting mean formula)
-            #     1/p       = 1 + α·μ
-            #     p         = 1/(1 + α·μ)  = n/(n + μ)  where n = 1/α
-            #
-            # So: n_nb = 1/α,  p_nb = n_nb / (n_nb + expected)
-
-            n_nb = 1.0 / nb_alpha
-            p_nb = n_nb / (n_nb + expected)
-
-            # One-sided p-value: P(X >= cnt | NB(n_nb, p_nb))
-            #
-            # nbinom.cdf(k, n, p) = P(X <= k)
-            # Therefore P(X >= cnt) = 1 - P(X <= cnt-1) = 1 - nbinom.cdf(cnt-1, n, p)
-            #
-            # Using cnt-1 (not cnt) is essential for discrete distributions:
-            # it includes the observed value itself in the tail being tested.
-            # If we used cnt, we would compute P(X > cnt) which excludes the
-            # observed value — a logical error for a test of "at least as extreme".
-            pval_nb = 1 - stats.nbinom.cdf(cnt - 1, n=n_nb, p=p_nb)
-
-        else:
-            # If anchor data or region size is missing, set to NaN so these
-            # rows are excluded from FDR correction rather than distorting it.
-            expected        = np.nan
-            fold_enrichment = np.nan
-            pval_nb    = np.nan
-
-        rows.append({
-            "sample_id":       sid,
-            "cell_type":       ct,
-            "raw_count":       cnt,
-            "norm_count":      norm_cnt,
-            "zscore":          z,
-            "expected_count":  expected,
-            "fold_enrichment": fold_enrichment,
-            "pval_nb":         pval_nb,   # column renamed to reflect NB test
-        })
-
-# ── Build DataFrame and apply BH FDR correction within each sample ───────────
-# We correct across all cell types tested within a single sample (up to 16
-# tests per sample).  Correcting within-sample rather than globally keeps the
-# FDR meaningful: we are controlling the false discovery rate among cell types
-# called enriched in that individual sample.
-scores_df = pd.DataFrame(rows).merge(meta[["sample_id", "group"]], on="sample_id")
-
-
-def _add_fdr(sample_df: pd.DataFrame) -> pd.DataFrame:
-    """Apply BH correction to pval_nb within one sample's cell types."""
-    pvals = sample_df["pval_nb"].values
-    # Only correct non-NaN values; NaN rows keep padj = NaN
-    valid_mask = ~np.isnan(pvals)
-    padj = np.full(len(pvals), np.nan)
-    if valid_mask.sum() > 1:
-        # Multiple tests: apply BH
-        padj[valid_mask] = _bh_correct(pvals[valid_mask])
-    elif valid_mask.sum() == 1:
-        # Single valid test: padj equals pval (no correction needed)
-        padj[valid_mask] = pvals[valid_mask]
-    sample_df = sample_df.copy()
-    sample_df["padj_nb"] = padj
-    # enriched: True if the BH-adjusted p-value is below 0.05.
-    # This is the binary per-sample per-cell-type enrichment call.
-    sample_df["enriched"] = sample_df["padj_nb"] < 0.05
-    return sample_df
-
-
-# groupby sample_id applies _add_fdr independently to each sample's rows
-scores_df = scores_df.groupby("sample_id", group_keys=False).apply(_add_fdr)
-
-# ─── Step 6: Composite indices (CDI, NII, IAI) ───────────────────────────────
-pivot = scores_df.pivot(index="sample_id", columns="cell_type", values="zscore")
-
-composite = pd.DataFrame({"sample_id": list(pivot.index)})
-for name, types in [("CDI", CDI_TYPES), ("NII", NII_TYPES), ("IAI", IAI_TYPES)]:
-    cols = [c for c in types if c in pivot.columns]
-    composite[name] = pivot[cols].mean(axis=1).values if cols else np.nan
-composite = composite.merge(meta[["sample_id", "group"]], on="sample_id")
-
-# ─── Step 7: Save TSVs ───────────────────────────────────────────────────────
-Path(snakemake.output.scores).parent.mkdir(parents=True, exist_ok=True)
-scores_df.to_csv(snakemake.output.scores, sep="\t", index=False)
-composite.to_csv(snakemake.output.composite, sep="\t", index=False)
-
-# ─── Step 8: Heatmap ─────────────────────────────────────────────────────────
-group_order = ["Ctrl", "NEW", "MS-Rituximab-Stable", "MS-Rituximab-Progressive"]
-group_colors = {
-    "Ctrl": "#4878CF", "NEW": "#6ACC65",
-    "MS-Rituximab-Stable": "#D65F5F",
-    "MS-Rituximab-Progressive": "#B47CC7",
-}
-
-_mi = meta.set_index("sample_id")
-sample_order = (
-    _mi.loc[_mi["group"].isin(group_order), "group"]
-    .sort_values()
-    .index.tolist()
-)
-sample_order = [s for s in sample_order if s in pivot.index]
-
-fig, ax = plt.subplots(
-    figsize=(max(8, len(sample_order) * 0.18), max(6, len(pivot.columns) * 0.4))
-)
-sns.heatmap(
-    pivot.loc[sample_order].T,
-    cmap="RdBu_r", center=0, vmin=-3, vmax=3,
-    ax=ax, yticklabels=True, xticklabels=False,
-    cbar_kws={"label": "Poisson z-score"},
-)
-
-grp_colors = [
-    group_colors.get(_mi.loc[s, "group"], "grey")
-    for s in sample_order if s in _mi.index
-]
-for i, c in enumerate(grp_colors):
-    ax.add_patch(plt.Rectangle(
-        (i, len(pivot.columns)), 1, 0.5,
-        color=c, clip_on=False, transform=ax.transData,
-    ))
-
-ax.set_title("Cell-type deconvolution (Poisson z-scores)")
-ax.set_xlabel("Samples")
-plt.tight_layout()
-fig.savefig(snakemake.output.heatmap)
-plt.close(fig)
-
-# ─── Step 9: Violin plots per cell type with between-group statistics ─────────
-group_palette = {
-    "Ctrl": "#4878CF", "NEW": "#6ACC65",
-    "MS-Rituximab-Stable": "#D65F5F",
-    "MS-Rituximab-Progressive": "#B47CC7",
-}
-
-def dunn_posthoc(df, group_col, value_col, groups):
-    """Dunn's test approximation: Mann-Whitney U with Bonferroni correction."""
-    pairs = list(combinations(groups, 2))
-    results = {}
-    for g1, g2 in pairs:
-        a = df.loc[df[group_col] == g1, value_col].dropna()
-        b = df.loc[df[group_col] == g2, value_col].dropna()
-        if len(a) < 2 or len(b) < 2:
-            results[(g1, g2)] = 1.0
+if _STAGE in ('all', 'cross'):
+    # ─── Step 3: Write combined BED (all cell types, label in col 4) ──────────────
+    combined_rows = []
+    for ct, sig_df in ct_regions.items():
+        if sig_df.empty:
+            print(f"  [Module 4] {ct}: 0 signature regions — skipping")
             continue
-        _, p = stats.mannwhitneyu(a, b, alternative="two-sided")
-        results[(g1, g2)] = p
-    # Bonferroni correction
-    n = len(pairs)
-    return {k: min(v * n, 1.0) for k, v in results.items()}
+        print(f"  [Module 4] {ct}: {len(sig_df)} signature regions")
+        for _, row in sig_df.iterrows():
+            combined_rows.append(f"{row[0]}\t{int(row[1])}\t{int(row[2])}\t{ct}")
 
-
-def sig_label(p):
-    if p < 0.001: return "***"
-    if p < 0.01:  return "**"
-    if p < 0.05:  return "*"
-    return "ns"
-
-
-present_groups = [g for g in group_order if g in scores_df["group"].unique()]
-cell_types_list = list(CELL_TYPES.keys())
-
-# ─── Step 10: Collect all figures and write single PDF ───────────────────────
-# Two new figures appended to the violin PDF.
-#
-# Figure A — Fold-enrichment heatmap
-#   Same layout as the z-score heatmap (Step 8) but the colour encodes
-#   fold_enrichment = observed / expected, where expected comes from the
-#   within-sample anchor density.  This is group-agnostic: a value of 2
-#   means "this sample has twice as many midpoints at this cell type's
-#   signature than the constitutive baseline predicts", regardless of what
-#   the controls look like.  Asterisks mark cells where padj_nb < 0.05.
-#
-# Figure B — Enrichment rate bar chart
-#   For each cell type, one grouped bar per disease group showing the
-#   fraction of samples in that group called enriched (padj < 0.05).
-#   Fisher's exact test is run between every pair of groups; significant
-#   pairwise comparisons (p < 0.05) are annotated with brackets.
-
-from scipy.stats import fisher_exact as _fisher_exact
-
-# ── Figure A: fold-enrichment heatmap ────────────────────────────────────────
-
-# Pivot fold_enrichment into a samples × cell-types matrix, same ordering as
-# the z-score pivot used above.
-fe_pivot = scores_df.pivot(
-    index="sample_id", columns="cell_type", values="fold_enrichment"
-)
-# Pivot enriched flag into a parallel boolean matrix for asterisk annotation.
-enriched_pivot = scores_df.pivot(
-    index="sample_id", columns="cell_type", values="enriched"
-).fillna(False)
-
-# Align both pivots to the same sample and cell-type order.
-fe_sample_order = [s for s in sample_order if s in fe_pivot.index]
-fe_ct_order     = [c for c in fe_pivot.columns]
-
-# Collect all figures in a list; write to violin PDF in one PdfPages call
-# at the very end so all pages (violin + composite + Poisson enrichment) land
-# in a single file without needing to reopen/append.
-_all_figs = []
-
-# ── Re-generate violin figures (same logic as Step 9) so we can collect them --
-for ct in cell_types_list:
-    ct_df = scores_df[scores_df["cell_type"] == ct].copy()
-    if ct_df.empty:
-        continue
-    fig, ax = plt.subplots(figsize=(7, 5))
-    plot_df = ct_df[ct_df["group"].isin(present_groups)].copy()
-    plot_df["group"] = pd.Categorical(plot_df["group"], categories=present_groups)
-    plot_df = plot_df.sort_values("group")
-    group_data = [plot_df.loc[plot_df["group"] == g, "zscore"].dropna().values
-                  for g in present_groups]
-    colors = [group_palette.get(g, "grey") for g in present_groups]
-    parts = ax.violinplot(group_data, positions=range(len(present_groups)),
-                          showmedians=True, showextrema=True)
-    for pc, col in zip(parts["bodies"], colors):
-        pc.set_facecolor(col); pc.set_alpha(0.6)
-    for key in ("cmedians", "cmins", "cmaxes", "cbars"):
-        parts[key].set_color("black")
-    rng = np.random.default_rng(42)
-    for i, (grp, col) in enumerate(zip(present_groups, colors)):
-        vals = plot_df.loc[plot_df["group"] == grp, "zscore"].dropna()
-        jx   = rng.uniform(-0.08, 0.08, size=len(vals)) + i
-        ax.scatter(jx, vals, color=col, s=20, zorder=3, alpha=0.8,
-                   edgecolors="white", lw=0.4)
-    ax.set_xticks(range(len(present_groups)))
-    ax.set_xticklabels([g.replace("MS-Rituximab-", "RTX-") for g in present_groups],
-                       rotation=20, ha="right", fontsize=9)
-    ax.axhline(0, ls="--", lw=0.8, color="grey")
-    ax.set_ylabel("Poisson z-score vs Ctrl")
-    ax.set_title(ct)
-    valid = [d for d in group_data if len(d) >= 2]
-    if len(valid) >= 2:
-        kw_stat, kw_p = stats.kruskal(*valid)
-        ax.text(0.98, 0.98, f"KW p={kw_p:.3g}", transform=ax.transAxes,
-                ha="right", va="top", fontsize=8)
-        posthoc  = dunn_posthoc(plot_df, "group", "zscore", present_groups)
-        sig_pairs = {k: v for k, v in posthoc.items() if v < 0.05}
-        y_top = plot_df["zscore"].max() if not plot_df.empty else 3
-        step  = (y_top - ax.get_ylim()[0]) * 0.12
-        for lvl, ((g1, g2), p) in enumerate(sig_pairs.items()):
-            x1, x2 = present_groups.index(g1), present_groups.index(g2)
-            y = y_top + step * (lvl + 1)
-            ax.plot([x1, x1, x2, x2], [y - step*0.2, y, y, y - step*0.2],
-                    lw=1, color="black")
-            ax.text((x1+x2)/2, y, sig_label(p), ha="center", va="bottom", fontsize=9)
-    plt.tight_layout()
-    _all_figs.append(fig)
-
-for idx_col in ["CDI", "NII", "IAI"]:
-    if idx_col not in composite.columns:
-        continue
-    fig, ax = plt.subplots(figsize=(7, 5))
-    comp_sub = composite[composite["group"].isin(present_groups)].copy()
-    comp_sub["group"] = pd.Categorical(comp_sub["group"], categories=present_groups)
-    group_data = [comp_sub.loc[comp_sub["group"] == g, idx_col].dropna().values
-                  for g in present_groups]
-    colors = [group_palette.get(g, "grey") for g in present_groups]
-    parts = ax.violinplot(group_data, positions=range(len(present_groups)),
-                          showmedians=True, showextrema=True)
-    for pc, col in zip(parts["bodies"], colors):
-        pc.set_facecolor(col); pc.set_alpha(0.6)
-    for key in ("cmedians", "cmins", "cmaxes", "cbars"):
-        parts[key].set_color("black")
-    rng2 = np.random.default_rng(0)
-    for i, (grp, col) in enumerate(zip(present_groups, colors)):
-        vals = comp_sub.loc[comp_sub["group"] == grp, idx_col].dropna()
-        jx   = rng2.uniform(-0.08, 0.08, size=len(vals)) + i
-        ax.scatter(jx, vals, color=col, s=22, zorder=3, alpha=0.8,
-                   edgecolors="white", lw=0.4)
-    ax.set_xticks(range(len(present_groups)))
-    ax.set_xticklabels([g.replace("MS-Rituximab-", "RTX-") for g in present_groups],
-                       rotation=20, ha="right", fontsize=9)
-    ax.axhline(0, ls="--", lw=0.8, color="grey")
-    ax.set_ylabel("Composite index score")
-    ax.set_title(f"{idx_col} — composite index")
-    valid = [d for d in group_data if len(d) >= 2]
-    if len(valid) >= 2:
-        _, kw_p = stats.kruskal(*valid)
-        ax.text(0.98, 0.98, f"KW p={kw_p:.3g}", transform=ax.transAxes,
-                ha="right", va="top", fontsize=8)
-    plt.tight_layout()
-    _all_figs.append(fig)
-
-# ── Figure A: fold-enrichment heatmap ────────────────────────────────────────
-if len(fe_sample_order) > 0 and len(fe_ct_order) > 0:
-    fig, ax = plt.subplots(
-        figsize=(max(8, len(fe_sample_order) * 0.18),
-                 max(6, len(fe_ct_order) * 0.4))
+    raw_combined = tempfile.NamedTemporaryFile(
+        suffix=".bed", delete=False, mode="w"
     )
-    # log2(fold_enrichment) centres the colour scale at 0 (fold=1 → log2=0),
-    # making enrichment (>1) red and depletion (<1) blue, matching the z-score
-    # heatmap colour logic.  Clip to avoid log2(0) = -inf.
-    log2_fe = np.log2(
-        fe_pivot.loc[fe_sample_order, fe_ct_order]
-        .clip(lower=0.01)
-        .astype(float)
+    raw_combined.write("\n".join(combined_rows) + "\n")
+    raw_combined.close()
+
+    sorted_combined = tempfile.NamedTemporaryFile(suffix=".bed", delete=False).name
+    subprocess.run(
+        f"bedtools sort -i {raw_combined.name} > {sorted_combined}",
+        shell=True, check=True,
+    )
+    os.remove(raw_combined.name)
+
+    # ─── Step 4: Count midpoints per sample in parallel ───────────────────────────
+    print(f"\n[Module 4] Counting for {len(samples)} samples "
+          f"using {n_cpus} parallel workers ...")
+
+    args_list = [
+        (sid, _sample_bed_map[sid], sorted_combined)
+        for sid in samples
+    ]
+
+    sig_counts: dict[str, dict[str, int]] = defaultdict(dict)
+    with ProcessPoolExecutor(max_workers=min(4, n_cpus)) as pool:
+        for sid, ct_cnts in pool.map(_count_one_sample, args_list):
+            for ct in CELL_TYPES:
+                sig_counts[ct][sid] = ct_cnts.get(ct, 0)
+            print(f"  done: {sid}")
+
+    os.remove(sorted_combined)
+
+    # ─── Step 5: Anchor-normalise, Poisson enrichment test, and z-scores ─────────
+    ctrl_samples = meta.loc[meta["group"] == _CTRL_GROUP, "sample_id"].tolist()
+
+
+    def _bh_correct(pvals: np.ndarray) -> np.ndarray:
+        """
+        Benjamini-Hochberg FDR correction on a 1-D array of p-values.
+        Returns adjusted p-values (padj) clipped to [0, 1].
+
+        How it works step by step:
+          1. Sort p-values from smallest to largest and remember the original
+             positions so we can unsort at the end.
+          2. Multiply each sorted p-value by n / rank (where rank goes 1..n).
+             This is the BH formula: padj_i = p_i * n / rank_i.
+          3. Enforce monotonicity from right to left with a cumulative minimum:
+             a later (larger) p-value must never produce a smaller padj than an
+             earlier one, otherwise the rejection region would not be contiguous.
+          4. Put the adjusted values back in original order and clip to 1.
+        """
+        n = len(pvals)
+        if n == 0:
+            return np.array([])
+        # Step 1: argsort gives positions that would sort the array
+        order   = np.argsort(pvals)
+        # Step 2: multiply by n / rank (ranks are 1-based: 1, 2, ..., n)
+        bh      = pvals[order] * n / np.arange(1, n + 1)
+        # Step 3: cumulative minimum from right — np.minimum.accumulate on reversed
+        # array, then reverse back
+        padj_sorted = np.minimum.accumulate(bh[::-1])[::-1]
+        # Step 4: unsort back to original order
+        padj = np.empty(n)
+        padj[order] = padj_sorted
+        return np.minimum(padj, 1.0)
+
+
+    rows = []
+    for ct, sample_cnts in sig_counts.items():
+
+        # ── Group-level reference (same as before) ────────────────────────────────
+        # Collect anchor-normalised counts from all control samples for this cell
+        # type.  ctrl_mean is the reference level: the average normalised signal
+        # healthy controls show at this cell type's signature.
+        ctrl_norms = [
+            sample_cnts[s] * sf.get(s, 1.0)
+            for s in ctrl_samples if s in sample_cnts
+        ]
+        ctrl_mean = np.mean(ctrl_norms) if ctrl_norms else 1.0
+
+        # ── Per-sample Poisson null parameters ───────────────────────────────────
+        # s_kb: total kilobases of exclusive signature regions for this cell type.
+        # Used to scale the anchor density to get the expected count.
+        s_kb = sig_kb.get(ct, 0.0)
+
+        for sid, cnt in sample_cnts.items():
+
+            # ── Anchor-normalised count and group-relative z-score ────────────────
+            # norm_cnt: raw count scaled by this sample's constitutive anchor
+            # scaling factor, placing it on a common library-size-adjusted scale.
+            norm_cnt = cnt * sf.get(sid, 1.0)
+
+            # z: how many Poisson standard deviations this sample sits above or
+            # below the control mean.  sqrt(ctrl_mean) is the Poisson SD.
+            z = (norm_cnt - ctrl_mean) / np.sqrt(max(ctrl_mean, 1))
+
+            # ── Within-sample Poisson enrichment test ────────────────────────────
+            # anchor_cnt: raw fragment midpoints at constitutive anchor regions for
+            # this specific sample (from Module 2 output, not normalised).
+            anchor_cnt = anchor_counts.get(sid, 0)
+
+            if anchor_cnt > 0 and anchor_kb > 0 and s_kb > 0:
+
+                # anchor_density: reads per kilobase at constitutive loci in this
+                # specific sample.  Both numerator and denominator are raw counts
+                # from the same library, so this ratio is automatically normalised
+                # for sequencing depth — a deeper library has proportionally more
+                # reads in both numerator (anchor_cnt) and denominator (anchor_kb
+                # is fixed), so the density tracks IP efficiency rather than depth.
+                anchor_density = anchor_cnt / anchor_kb
+
+                # expected: the null-hypothesis count at this cell type's signature
+                # regions.  If cfDNA fragments were distributed at the same density
+                # as the constitutive anchors (no cell-type-specific enrichment),
+                # you would observe this many midpoints.
+                expected = anchor_density * s_kb
+
+                # fold_enrichment: how many times above the null expectation the
+                # observed count is.  A value of 1 means no enrichment; 2 means
+                # twice the constitutive baseline; <1 means depletion.
+                fold_enrichment = cnt / expected if expected > 0 else np.nan
+
+                # ── Negative-binomial one-sided enrichment test ───────────────────
+                #
+                # We now use the NB distribution rather than Poisson.  The key
+                # difference is that NB has an extra parameter α (nb_alpha,
+                # estimated from anchor regions in Step 1b) that allows the
+                # variance to exceed the mean:
+                #
+                #   Var(X_NB) = μ + α · μ²    vs    Var(X_Poisson) = μ
+                #
+                # This makes the NB test more conservative (harder to call
+                # enrichment) but more calibrated: when the null is true, the
+                # fraction of false positives matches the stated α threshold.
+                #
+                # scipy.stats.nbinom uses a different parameterisation from the
+                # (μ, α) form we reason about.  The conversion is:
+                #
+                #   n  = 1 / α          ("number of successes" in scipy's NB)
+                #   p  = n / (n + μ)    ("probability of success" in scipy's NB)
+                #
+                # Deriving this:
+                #   scipy's NB has mean = n(1-p)/p and variance = n(1-p)/p²
+                #   Setting mean = μ:   n(1-p)/p = μ   →   n = μ·p/(1-p)
+                #   Setting var  = μ + α·μ²:
+                #     n(1-p)/p² = μ + α·μ²
+                #     μ/p       = μ + α·μ²     (substituting mean formula)
+                #     1/p       = 1 + α·μ
+                #     p         = 1/(1 + α·μ)  = n/(n + μ)  where n = 1/α
+                #
+                # So: n_nb = 1/α,  p_nb = n_nb / (n_nb + expected)
+
+                n_nb = 1.0 / nb_alpha
+                p_nb = n_nb / (n_nb + expected)
+
+                # One-sided p-value: P(X >= cnt | NB(n_nb, p_nb))
+                #
+                # nbinom.cdf(k, n, p) = P(X <= k)
+                # Therefore P(X >= cnt) = 1 - P(X <= cnt-1) = 1 - nbinom.cdf(cnt-1, n, p)
+                #
+                # Using cnt-1 (not cnt) is essential for discrete distributions:
+                # it includes the observed value itself in the tail being tested.
+                # If we used cnt, we would compute P(X > cnt) which excludes the
+                # observed value — a logical error for a test of "at least as extreme".
+                pval_nb = 1 - stats.nbinom.cdf(cnt - 1, n=n_nb, p=p_nb)
+
+            else:
+                # If anchor data or region size is missing, set to NaN so these
+                # rows are excluded from FDR correction rather than distorting it.
+                expected        = np.nan
+                fold_enrichment = np.nan
+                pval_nb    = np.nan
+
+            rows.append({
+                "sample_id":       sid,
+                "cell_type":       ct,
+                "raw_count":       cnt,
+                "norm_count":      norm_cnt,
+                "zscore":          z,
+                "expected_count":  expected,
+                "fold_enrichment": fold_enrichment,
+                "pval_nb":         pval_nb,   # column renamed to reflect NB test
+            })
+
+    # ── Build DataFrame and apply BH FDR correction within each sample ───────────
+    # We correct across all cell types tested within a single sample (up to 16
+    # tests per sample).  Correcting within-sample rather than globally keeps the
+    # FDR meaningful: we are controlling the false discovery rate among cell types
+    # called enriched in that individual sample.
+    scores_df = pd.DataFrame(rows).merge(
+        meta[["sample_id", "group", "display_group"]], on="sample_id"
+    )
+
+
+    def _add_fdr(sample_df: pd.DataFrame) -> pd.DataFrame:
+        """Apply BH correction to pval_nb within one sample's cell types."""
+        pvals = sample_df["pval_nb"].values
+        # Only correct non-NaN values; NaN rows keep padj = NaN
+        valid_mask = ~np.isnan(pvals)
+        padj = np.full(len(pvals), np.nan)
+        if valid_mask.sum() > 1:
+            # Multiple tests: apply BH
+            padj[valid_mask] = _bh_correct(pvals[valid_mask])
+        elif valid_mask.sum() == 1:
+            # Single valid test: padj equals pval (no correction needed)
+            padj[valid_mask] = pvals[valid_mask]
+        sample_df = sample_df.copy()
+        sample_df["padj_nb"] = padj
+        # enriched: True if the BH-adjusted p-value is below 0.05.
+        # This is the binary per-sample per-cell-type enrichment call.
+        sample_df["enriched"] = sample_df["padj_nb"] < 0.05
+        return sample_df
+
+
+    # groupby sample_id applies _add_fdr independently to each sample's rows
+    scores_df = scores_df.groupby("sample_id", group_keys=False).apply(_add_fdr)
+
+    # ─── Step 6: Composite indices (CDI, NII, IAI) ───────────────────────────────
+    pivot = scores_df.pivot(index="sample_id", columns="cell_type", values="zscore")
+
+    composite = pd.DataFrame({"sample_id": list(pivot.index)})
+    for name, types in [("CDI", CDI_TYPES), ("NII", NII_TYPES), ("IAI", IAI_TYPES)]:
+        cols = [c for c in types if c in pivot.columns]
+        composite[name] = pivot[cols].mean(axis=1).values if cols else np.nan
+    composite = composite.merge(
+        meta[["sample_id", "group", "display_group"]], on="sample_id"
+    )
+
+    # ─── Step 7: Save TSVs ───────────────────────────────────────────────────────
+    Path(snakemake.output.scores).parent.mkdir(parents=True, exist_ok=True)
+    scores_df.to_csv(snakemake.output.scores, sep="\t", index=False)
+    composite.to_csv(snakemake.output.composite, sep="\t", index=False)
+
+    # ─── Step 8: Heatmap ─────────────────────────────────────────────────────────
+
+    _mi = meta.set_index("sample_id")
+    sample_order = (
+        _mi.loc[_mi["display_group"].isin(group_order), "display_group"]
+        .sort_values()
+        .index.tolist()
+    )
+    sample_order = [s for s in sample_order if s in pivot.index]
+
+    fig, ax = plt.subplots(
+        figsize=(max(8, len(sample_order) * 0.18), max(6, len(pivot.columns) * 0.4))
     )
     sns.heatmap(
-        log2_fe.T,
+        pivot.loc[sample_order].T,
         cmap="RdBu_r", center=0, vmin=-3, vmax=3,
         ax=ax, yticklabels=True, xticklabels=False,
-        cbar_kws={"label": "log2(fold enrichment over anchor baseline)"},
+        cbar_kws={"label": "Poisson z-score"},
     )
-    # Overlay an asterisk on cells where padj_nb < 0.05.
-    # enriched_pivot rows = samples, columns = cell types; we iterate over
-    # the transposed layout (rows = cell types, columns = samples).
-    enr_mat = enriched_pivot.loc[fe_sample_order, fe_ct_order].T.values
-    for row_i, ct_name in enumerate(fe_ct_order):
-        for col_j, sid in enumerate(fe_sample_order):
-            if enr_mat[row_i, col_j]:
-                # Place asterisk at the centre of the cell
-                ax.text(col_j + 0.5, row_i + 0.5, "*",
-                        ha="center", va="center",
-                        fontsize=6, color="black", fontweight="bold")
-    # Group colour bar below x-axis (same as z-score heatmap)
-    fe_grp_colors = [
-        group_colors.get(_mi.loc[s, "group"], "grey")
-        for s in fe_sample_order if s in _mi.index
+
+    grp_colors = [
+        group_colors.get(_mi.loc[s, "display_group"], "grey")
+        for s in sample_order if s in _mi.index
     ]
-    for i, c in enumerate(fe_grp_colors):
+    for i, c in enumerate(grp_colors):
         ax.add_patch(plt.Rectangle(
-            (i, len(fe_ct_order)), 1, 0.5,
+            (i, len(pivot.columns)), 1, 0.5,
             color=c, clip_on=False, transform=ax.transData,
         ))
-    ax.set_title("Cell-type deconvolution — log2 fold enrichment over anchor baseline\n"
-                 "(* = padj_nb < 0.05 within sample)")
+
+    ax.set_title("Cell-type deconvolution (Poisson z-scores)")
     ax.set_xlabel("Samples")
     plt.tight_layout()
-    _all_figs.append(fig)
+    fig.savefig(snakemake.output.heatmap)
+    plt.close(fig)
 
-# ── Figure B: enrichment rate bar chart with Fisher's exact test ─────────────
-# For each cell type: one bar per group = fraction of samples called enriched.
-# Fisher's exact test on a 2×2 contingency table (enriched vs not, group1 vs
-# group2) tests whether the enrichment rate differs between groups.
-#
-# Contingency table layout:
-#              enriched    not enriched
-#   group 1  [  n1_yes       n1_no   ]
-#   group 2  [  n2_yes       n2_no   ]
-#
-# fisher_exact returns (odds_ratio, p_value); we use p_value only.
+    # ─── Step 9: Violin plots per cell type with between-group statistics ─────────
+    def dunn_posthoc(df, group_col, value_col, groups):
+        """Dunn's test approximation: Mann-Whitney U with Bonferroni correction."""
+        pairs = list(combinations(groups, 2))
+        results = {}
+        for g1, g2 in pairs:
+            a = df.loc[df[group_col] == g1, value_col].dropna()
+            b = df.loc[df[group_col] == g2, value_col].dropna()
+            if len(a) < 2 or len(b) < 2:
+                results[(g1, g2)] = 1.0
+                continue
+            _, p = stats.mannwhitneyu(a, b, alternative="two-sided")
+            results[(g1, g2)] = p
+        # Bonferroni correction
+        n = len(pairs)
+        return {k: min(v * n, 1.0) for k, v in results.items()}
 
-for ct in cell_types_list:
-    ct_data = scores_df[scores_df["cell_type"] == ct].copy()
-    if ct_data.empty or "enriched" not in ct_data.columns:
-        continue
 
-    # Compute enrichment rate (fraction True) and sample size per group
-    rates   = {}
-    n_per   = {}
-    for grp in present_groups:
-        grp_vals = ct_data.loc[ct_data["group"] == grp, "enriched"].dropna()
-        rates[grp] = float(grp_vals.mean()) if len(grp_vals) > 0 else 0.0
-        n_per[grp] = len(grp_vals)
+    def sig_label(p):
+        if p < 0.001: return "***"
+        if p < 0.01:  return "**"
+        if p < 0.05:  return "*"
+        return "ns"
 
-    fig, ax = plt.subplots(figsize=(7, 5))
-    x      = np.arange(len(present_groups))
-    colors = [group_palette.get(g, "grey") for g in present_groups]
 
-    # Draw bars: height = fraction enriched, label shows n above bar
-    bars = ax.bar(x, [rates[g] for g in present_groups],
-                  color=colors, alpha=0.8, edgecolor="black", linewidth=0.6)
-    for bar, grp in zip(bars, present_groups):
-        n = n_per[grp]
-        h = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width() / 2, h + 0.02,
-                f"n={n}", ha="center", va="bottom", fontsize=8)
+    present_groups = [g for g in group_order if g in scores_df["display_group"].unique()]
+    cell_types_list = list(CELL_TYPES.keys())
 
-    ax.set_ylim(0, 1.25)
-    ax.set_xticks(x)
-    ax.set_xticklabels([g.replace("MS-Rituximab-", "RTX-") for g in present_groups],
-                       rotation=20, ha="right", fontsize=9)
-    ax.set_ylabel("Fraction of samples enriched (padj < 0.05)")
-    ax.set_title(f"{ct} — enrichment rate by group")
-    ax.axhline(0.05, ls=":", lw=0.8, color="grey", label="5% reference")
+    # ─── Step 10: Collect all figures and write single PDF ───────────────────────
+    # Two new figures appended to the violin PDF.
+    #
+    # Figure A — Fold-enrichment heatmap
+    #   Same layout as the z-score heatmap (Step 8) but the colour encodes
+    #   fold_enrichment = observed / expected, where expected comes from the
+    #   within-sample anchor density.  This is group-agnostic: a value of 2
+    #   means "this sample has twice as many midpoints at this cell type's
+    #   signature than the constitutive baseline predicts", regardless of what
+    #   the controls look like.  Asterisks mark cells where padj_nb < 0.05.
+    #
+    # Figure B — Enrichment rate bar chart
+    #   For each cell type, one grouped bar per disease group showing the
+    #   fraction of samples in that group called enriched (padj < 0.05).
+    #   Fisher's exact test is run between every pair of groups; significant
+    #   pairwise comparisons (p < 0.05) are annotated with brackets.
 
-    # Fisher's exact test between every pair of groups;
-    # annotate only significant pairs (p < 0.05) with brackets.
-    pair_results = []
-    for g1, g2 in combinations(present_groups, 2):
-        d1 = ct_data.loc[ct_data["group"] == g1, "enriched"].dropna()
-        d2 = ct_data.loc[ct_data["group"] == g2, "enriched"].dropna()
-        if len(d1) < 2 or len(d2) < 2:
+    from scipy.stats import fisher_exact as _fisher_exact
+
+    # ── Figure A: fold-enrichment heatmap ────────────────────────────────────────
+
+    # Pivot fold_enrichment into a samples × cell-types matrix, same ordering as
+    # the z-score pivot used above.
+    fe_pivot = scores_df.pivot(
+        index="sample_id", columns="cell_type", values="fold_enrichment"
+    )
+    # Pivot enriched flag into a parallel boolean matrix for asterisk annotation.
+    enriched_pivot = scores_df.pivot(
+        index="sample_id", columns="cell_type", values="enriched"
+    ).fillna(False)
+
+    # Align both pivots to the same sample and cell-type order.
+    fe_sample_order = [s for s in sample_order if s in fe_pivot.index]
+    fe_ct_order     = [c for c in fe_pivot.columns]
+
+    # Collect all figures in a list; write to violin PDF in one PdfPages call
+    # at the very end so all pages (violin + composite + Poisson enrichment) land
+    # in a single file without needing to reopen/append.
+    _all_figs = []
+
+    # ── Re-generate violin figures (same logic as Step 9) so we can collect them --
+    for ct in cell_types_list:
+        ct_df = scores_df[scores_df["cell_type"] == ct].copy()
+        if ct_df.empty:
             continue
-        # Build 2×2 table: [[enriched_g1, not_g1], [enriched_g2, not_g2]]
-        n1_yes = int(d1.sum());  n1_no = len(d1) - n1_yes
-        n2_yes = int(d2.sum());  n2_no = len(d2) - n2_yes
-        _, p_fisher = _fisher_exact([[n1_yes, n1_no], [n2_yes, n2_no]])
-        if p_fisher < 0.05:
-            pair_results.append((g1, g2, p_fisher))
+        fig, ax = plt.subplots(figsize=(max(7, len(present_groups) * 1.1), 5))
+        plot_df = ct_df[ct_df["display_group"].isin(present_groups)].copy()
+        plot_df["display_group"] = pd.Categorical(
+            plot_df["display_group"], categories=present_groups
+        )
+        plot_df = plot_df.sort_values("display_group")
+        group_data = [
+            plot_df.loc[plot_df["display_group"] == g, "zscore"].dropna().values
+            for g in present_groups
+        ]
+        colors = [group_colors.get(g, "grey") for g in present_groups]
+        # violinplot chokes on empty arrays (np.min of zero-size); plot only the
+        # groups that have data, keeping each violin at its true x-position.
+        vp_idx = [i for i, d in enumerate(group_data) if len(d) > 0]
+        if vp_idx:
+            parts = ax.violinplot([group_data[i] for i in vp_idx], positions=vp_idx,
+                                  showmedians=True, showextrema=True)
+            for pc, i in zip(parts["bodies"], vp_idx):
+                pc.set_facecolor(colors[i]); pc.set_alpha(0.6)
+            for key in ("cmedians", "cmins", "cmaxes", "cbars"):
+                parts[key].set_color("black")
+        rng = np.random.default_rng(42)
+        for i, (grp, col) in enumerate(zip(present_groups, colors)):
+            vals = plot_df.loc[plot_df["display_group"] == grp, "zscore"].dropna()
+            jx   = rng.uniform(-0.08, 0.08, size=len(vals)) + i
+            ax.scatter(jx, vals, color=col, s=20, zorder=3, alpha=0.8,
+                       edgecolors="white", lw=0.4)
+        ax.set_xticks(range(len(present_groups)))
+        ax.set_xticklabels(present_groups, rotation=40, ha="right", fontsize=9)
+        ax.axhline(0, ls="--", lw=0.8, color="grey")
+        ax.set_ylabel("Poisson z-score vs Ctrl")
+        ax.set_title(ct)
+        valid = [d for d in group_data if len(d) >= 2]
+        if len(valid) >= 2:
+            kw_stat, kw_p = stats.kruskal(*valid)
+            ax.text(0.98, 0.98, f"KW p={kw_p:.3g}", transform=ax.transAxes,
+                    ha="right", va="top", fontsize=8)
+            posthoc  = dunn_posthoc(plot_df, "display_group", "zscore", present_groups)
+            sig_pairs = {k: v for k, v in posthoc.items() if v < 0.05}
+            y_top = plot_df["zscore"].max() if not plot_df.empty else 3
+            step  = (y_top - ax.get_ylim()[0]) * 0.12
+            for lvl, ((g1, g2), p) in enumerate(sig_pairs.items()):
+                x1, x2 = present_groups.index(g1), present_groups.index(g2)
+                y = y_top + step * (lvl + 1)
+                ax.plot([x1, x1, x2, x2], [y - step*0.2, y, y, y - step*0.2],
+                        lw=1, color="black")
+                ax.text((x1+x2)/2, y, sig_label(p), ha="center", va="bottom", fontsize=9)
+        plt.tight_layout()
+        _all_figs.append(fig)
 
-    # Draw significance brackets above the bars
-    y_base = max(rates.values()) + 0.12 if rates else 0.8
-    for lvl, (g1, g2, p_fisher) in enumerate(pair_results):
-        x1 = present_groups.index(g1)
-        x2 = present_groups.index(g2)
-        y  = y_base + lvl * 0.12
-        ax.plot([x1, x1, x2, x2], [y - 0.02, y, y, y - 0.02],
-                lw=1, color="black")
-        ax.text((x1 + x2) / 2, y + 0.01, sig_label(p_fisher),
-                ha="center", va="bottom", fontsize=9)
+    for idx_col in ["CDI", "NII", "IAI"]:
+        if idx_col not in composite.columns:
+            continue
+        fig, ax = plt.subplots(figsize=(max(7, len(present_groups) * 1.1), 5))
+        comp_sub = composite[composite["display_group"].isin(present_groups)].copy()
+        comp_sub["display_group"] = pd.Categorical(
+            comp_sub["display_group"], categories=present_groups
+        )
+        group_data = [comp_sub.loc[comp_sub["display_group"] == g, idx_col].dropna().values
+                      for g in present_groups]
+        colors = [group_colors.get(g, "grey") for g in present_groups]
+        # violinplot chokes on empty arrays (np.min of zero-size); plot only the
+        # groups that have data, keeping each violin at its true x-position.
+        vp_idx = [i for i, d in enumerate(group_data) if len(d) > 0]
+        if vp_idx:
+            parts = ax.violinplot([group_data[i] for i in vp_idx], positions=vp_idx,
+                                  showmedians=True, showextrema=True)
+            for pc, i in zip(parts["bodies"], vp_idx):
+                pc.set_facecolor(colors[i]); pc.set_alpha(0.6)
+            for key in ("cmedians", "cmins", "cmaxes", "cbars"):
+                parts[key].set_color("black")
+        rng2 = np.random.default_rng(0)
+        for i, (grp, col) in enumerate(zip(present_groups, colors)):
+            vals = comp_sub.loc[comp_sub["display_group"] == grp, idx_col].dropna()
+            jx   = rng2.uniform(-0.08, 0.08, size=len(vals)) + i
+            ax.scatter(jx, vals, color=col, s=22, zorder=3, alpha=0.8,
+                       edgecolors="white", lw=0.4)
+        ax.set_xticks(range(len(present_groups)))
+        ax.set_xticklabels(present_groups, rotation=40, ha="right", fontsize=9)
+        ax.axhline(0, ls="--", lw=0.8, color="grey")
+        ax.set_ylabel("Composite index score")
+        ax.set_title(f"{idx_col} — composite index")
+        valid = [d for d in group_data if len(d) >= 2]
+        if len(valid) >= 2:
+            _, kw_p = stats.kruskal(*valid)
+            ax.text(0.98, 0.98, f"KW p={kw_p:.3g}", transform=ax.transAxes,
+                    ha="right", va="top", fontsize=8)
+        plt.tight_layout()
+        _all_figs.append(fig)
 
+    # ── Figure A: fold-enrichment heatmap ────────────────────────────────────────
+    if len(fe_sample_order) > 0 and len(fe_ct_order) > 0:
+        fig, ax = plt.subplots(
+            figsize=(max(8, len(fe_sample_order) * 0.18),
+                     max(6, len(fe_ct_order) * 0.4))
+        )
+        # log2(fold_enrichment) centres the colour scale at 0 (fold=1 → log2=0),
+        # making enrichment (>1) red and depletion (<1) blue, matching the z-score
+        # heatmap colour logic.  Clip to avoid log2(0) = -inf.
+        log2_fe = np.log2(
+            fe_pivot.loc[fe_sample_order, fe_ct_order]
+            .clip(lower=0.01)
+            .astype(float)
+        )
+        sns.heatmap(
+            log2_fe.T,
+            cmap="RdBu_r", center=0, vmin=-3, vmax=3,
+            ax=ax, yticklabels=True, xticklabels=False,
+            cbar_kws={"label": "log2(fold enrichment over anchor baseline)"},
+        )
+        # Overlay an asterisk on cells where padj_nb < 0.05.
+        # enriched_pivot rows = samples, columns = cell types; we iterate over
+        # the transposed layout (rows = cell types, columns = samples).
+        enr_mat = enriched_pivot.loc[fe_sample_order, fe_ct_order].T.values
+        for row_i, ct_name in enumerate(fe_ct_order):
+            for col_j, sid in enumerate(fe_sample_order):
+                if enr_mat[row_i, col_j]:
+                    # Place asterisk at the centre of the cell
+                    ax.text(col_j + 0.5, row_i + 0.5, "*",
+                            ha="center", va="center",
+                            fontsize=6, color="black", fontweight="bold")
+        # Group colour bar below x-axis (same as z-score heatmap)
+        fe_grp_colors = [
+            group_colors.get(_mi.loc[s, "display_group"], "grey")
+            for s in fe_sample_order if s in _mi.index
+        ]
+        for i, c in enumerate(fe_grp_colors):
+            ax.add_patch(plt.Rectangle(
+                (i, len(fe_ct_order)), 1, 0.5,
+                color=c, clip_on=False, transform=ax.transData,
+            ))
+        ax.set_title("Cell-type deconvolution — log2 fold enrichment over anchor baseline\n"
+                     "(* = padj_nb < 0.05 within sample)")
+        ax.set_xlabel("Samples")
+        plt.tight_layout()
+        _all_figs.append(fig)
+
+    # ── Figure B: enrichment rate bar chart with Fisher's exact test ─────────────
+    # For each cell type: one bar per group = fraction of samples called enriched.
+    # Fisher's exact test on a 2×2 contingency table (enriched vs not, group1 vs
+    # group2) tests whether the enrichment rate differs between groups.
+    #
+    # Contingency table layout:
+    #              enriched    not enriched
+    #   group 1  [  n1_yes       n1_no   ]
+    #   group 2  [  n2_yes       n2_no   ]
+    #
+    # fisher_exact returns (odds_ratio, p_value); we use p_value only.
+
+    for ct in cell_types_list:
+        ct_data = scores_df[scores_df["cell_type"] == ct].copy()
+        if ct_data.empty or "enriched" not in ct_data.columns:
+            continue
+
+        # Compute enrichment rate (fraction True) and sample size per group
+        rates   = {}
+        n_per   = {}
+        for grp in present_groups:
+            grp_vals = ct_data.loc[ct_data["display_group"] == grp, "enriched"].dropna()
+            rates[grp] = float(grp_vals.mean()) if len(grp_vals) > 0 else 0.0
+            n_per[grp] = len(grp_vals)
+
+        fig, ax = plt.subplots(figsize=(max(7, len(present_groups) * 1.1), 5))
+        x      = np.arange(len(present_groups))
+        colors = [group_colors.get(g, "grey") for g in present_groups]
+
+        # Draw bars: height = fraction enriched, label shows n above bar
+        bars = ax.bar(x, [rates[g] for g in present_groups],
+                      color=colors, alpha=0.8, edgecolor="black", linewidth=0.6)
+        for bar, grp in zip(bars, present_groups):
+            n = n_per[grp]
+            h = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width() / 2, h + 0.02,
+                    f"n={n}", ha="center", va="bottom", fontsize=8)
+
+        ax.set_ylim(0, 1.25)
+        ax.set_xticks(x)
+        ax.set_xticklabels(present_groups, rotation=40, ha="right", fontsize=9)
+        ax.set_ylabel("Fraction of samples enriched (padj < 0.05)")
+        ax.set_title(f"{ct} — enrichment rate by group")
+        ax.axhline(0.05, ls=":", lw=0.8, color="grey", label="5% reference")
+
+        # Fisher's exact test between every pair of groups;
+        # annotate only significant pairs (p < 0.05) with brackets.
+        pair_results = []
+        for g1, g2 in combinations(present_groups, 2):
+            d1 = ct_data.loc[ct_data["display_group"] == g1, "enriched"].dropna()
+            d2 = ct_data.loc[ct_data["display_group"] == g2, "enriched"].dropna()
+            if len(d1) < 2 or len(d2) < 2:
+                continue
+            # Build 2×2 table: [[enriched_g1, not_g1], [enriched_g2, not_g2]]
+            n1_yes = int(d1.sum());  n1_no = len(d1) - n1_yes
+            n2_yes = int(d2.sum());  n2_no = len(d2) - n2_yes
+            _, p_fisher = _fisher_exact([[n1_yes, n1_no], [n2_yes, n2_no]])
+            if p_fisher < 0.05:
+                pair_results.append((g1, g2, p_fisher))
+
+        # Draw significance brackets above the bars
+        y_base = max(rates.values()) + 0.12 if rates else 0.8
+        for lvl, (g1, g2, p_fisher) in enumerate(pair_results):
+            x1 = present_groups.index(g1)
+            x2 = present_groups.index(g2)
+            y  = y_base + lvl * 0.12
+            ax.plot([x1, x1, x2, x2], [y - 0.02, y, y, y - 0.02],
+                    lw=1, color="black")
+            ax.text((x1 + x2) / 2, y + 0.01, sig_label(p_fisher),
+                    ha="center", va="bottom", fontsize=9)
+
+        plt.tight_layout()
+        _all_figs.append(fig)
+
+    # ── Figure: reads per kb — one subplot per cell type, all groups on x-axis ───
+    # Subplot grid layout: more readable than a single crowded plot when there
+    # are many groups. Panel width scales with the number of groups.
+    _rpkb_df = scores_df[
+        ["sample_id", "cell_type", "norm_count", "group", "display_group"]
+    ].copy()
+    _rpkb_df["sig_kb"] = _rpkb_df["cell_type"].map(sig_kb)
+    _rpkb_df["reads_per_kb"] = (
+        _rpkb_df["norm_count"] / _rpkb_df["sig_kb"].replace(0, np.nan)
+    )
+
+    _rpkb_n_cts  = len(cell_types_list)
+    _rpkb_n_cols = min(4, _rpkb_n_cts)
+    _rpkb_n_rows = int(np.ceil(_rpkb_n_cts / _rpkb_n_cols))
+    _rpkb_panel_w = max(3.5, len(present_groups) * 0.75)
+    _fig_rpkb, _axes_rpkb = plt.subplots(
+        _rpkb_n_rows, _rpkb_n_cols,
+        figsize=(_rpkb_n_cols * _rpkb_panel_w, _rpkb_n_rows * 4.0),
+        squeeze=False,
+    )
+    _axes_rpkb_flat = _axes_rpkb.flatten()
+
+    for _rpkb_i, _ct in enumerate(cell_types_list):
+        _ax = _axes_rpkb_flat[_rpkb_i]
+        _ct_df = _rpkb_df[_rpkb_df["cell_type"] == _ct]
+        _rpkb_order  = [g for g in present_groups if g in _ct_df["display_group"].values]
+        _rpkb_colors = [group_colors.get(g, "grey") for g in _rpkb_order]
+        _boxes_data  = [
+            _ct_df.loc[_ct_df["display_group"] == _g, "reads_per_kb"].dropna().values
+            for _g in _rpkb_order
+        ]
+        _bp = _ax.boxplot(
+            _boxes_data, patch_artist=True, showfliers=False,
+            widths=0.5, positions=list(range(len(_rpkb_order))),
+        )
+        for _patch, _col in zip(_bp["boxes"], _rpkb_colors):
+            _patch.set_facecolor(_col); _patch.set_alpha(0.7)
+        for _elem in ["whiskers", "caps", "medians"]:
+            for _ln in _bp[_elem]:
+                _ln.set_color("black"); _ln.set_linewidth(0.8)
+        _rng_rpkb = np.random.default_rng(42)
+        for _gi, (_g, _col) in enumerate(zip(_rpkb_order, _rpkb_colors)):
+            _gdata = _ct_df.loc[_ct_df["display_group"] == _g, "reads_per_kb"].dropna().values
+            _xjit  = _rng_rpkb.uniform(-0.2, 0.2, size=len(_gdata)) + _gi
+            _ax.scatter(_xjit, _gdata, color=_col, s=9, alpha=0.55, zorder=3)
+        _ax.set_xticks(range(len(_rpkb_order)))
+        _ax.set_title(_ct, fontsize=10, fontweight="bold")
+        _ax.set_xlabel("")
+        _ax.set_ylabel(
+            "Reads / kb (anchor-norm.)" if _rpkb_i % _rpkb_n_cols == 0 else ""
+        )
+        _ax.set_xticklabels(_rpkb_order, rotation=45, ha="right", fontsize=8)
+        _ax.tick_params(axis="y", labelsize=8)
+
+    for _rpkb_i in range(_rpkb_n_cts, len(_axes_rpkb_flat)):
+        _axes_rpkb_flat[_rpkb_i].set_visible(False)
+
+    _fig_rpkb.suptitle(
+        "Fragment density at exclusive signature regions\n"
+        "(reads per kb of exclusive RREs, anchor-normalised)",
+        fontsize=12, y=1.02,
+    )
     plt.tight_layout()
-    _all_figs.append(fig)
+    _all_figs.append(_fig_rpkb)
 
-# ── Save all figures into the violin PDF in one pass ─────────────────────────
-with pdf_backend.PdfPages(snakemake.output.violin) as _pp:
-    for _fig in _all_figs:
-        _pp.savefig(_fig)
-        plt.close(_fig)
+    # ── Save all figures into the violin PDF in one pass ─────────────────────────
+    with pdf_backend.PdfPages(snakemake.output.violin) as _pp:
+        for _fig in _all_figs:
+            _pp.savefig(_fig)
+            plt.close(_fig)
+
+
+if _STAGE == 'cross':
+    print('[Module 4] stage=cross complete; skipping within-sample half.')
+    sys.exit(0)
 
 # === within-sample enrichment (group-agnostic) — Sadeh local background ===
 #
@@ -884,9 +1007,19 @@ _WS_BG_WIN       = 5_000        # bp — background tile size
 _WS_REGION       = 2_000_000    # bp — neighbourhood for local rate fitting
 _WS_BG_TRIM      = 0.95         # Sadeh fitNoise percentile trim
 _WS_MIN_BG       = 20           # min windows to fit a regional rate
-_WS_MIN_SIG      = 50           # min signature windows for NB GLM
+_WS_MIN_SIG      = 9           # min signature windows for NB GLM
 _WS_N_PERM       = 200          # permuted-signature null iterations
-_WS_PERM_THR     = 0.2          # |median_perm_log2FE| flag threshold
+
+# |median_perm_log2FE| flag threshold. Overridable because 0.2 is not a slack
+# bound on this statistic: the fake signatures are GC+length-matched to the
+# REFERENCE cell type's marker windows, while the local rate they are scored
+# against is fit over all background tiles, so matched tiles carry a small
+# positive offset by construction. An accepted reference run sat at mean 0.199
+# with 31% of samples flagged, i.e. the default rides directly on the offset and
+# a modest panel-to-panel shift flips an entire cohort past it. Retuning that per
+# marker set is a calibration decision, so it belongs in config rather than in a
+# source edit; leave it unset to keep the historical 0.2 exactly.
+_WS_PERM_THR     = float(snakemake.config.get("deconv_perm_thr", 0.2))
 _WS_EPS          = 1.0          # log2FE pseudocount
 _WS_GC_BINS      = 5            # GC decile bins for matched sampling
 _WS_LEN_BINS     = 5            # length decile bins for matched sampling
@@ -1092,15 +1225,69 @@ print(f"[Module 4]   {len(_ws_sig_rows):,} signal + {len(_ws_bg_rows):,} bg rows
       f"→ {snakemake.output.within_sample_windows_bed}")
 
 # ── WS-E: parallel fragment counting ─────────────────────────────────────────
-print(f"[Module 4] Per-region counting ({len(samples)} samples, {len(samples)} workers) ...")
-_ws_count_args = [(sid, f"{frags_dir}/{sid}.bed", _ws_combined) for sid in samples]
+print(f"[Module 4] Per-region counting ({len(samples)} samples, {n_cpus} workers) ...")
+_ws_count_args = [(sid, _sample_bed_map[sid], _ws_combined) for sid in samples]
 _ws_sample_counts: dict[str, dict[str, int]] = {}
-with ProcessPoolExecutor(max_workers=len(samples)) as _ws_pool:
+with ProcessPoolExecutor(max_workers=min(4, n_cpus)) as _ws_pool:
     for _sid_ws, _cnts_ws in _ws_pool.map(_count_per_region_sample, _ws_count_args):
         _ws_sample_counts[_sid_ws] = _cnts_ws
         print(f"  done: {_sid_ws}")
 os.remove(_ws_combined)
 print("[Module 4] Counting complete.")
+
+
+def _ws_mean_variance_plot(count_matrix, out_path, title, unit_label):
+    """Per-window mean-vs-variance scatter across columns (test samples).
+
+    Diagnoses count overdispersion. Poisson predicts var == mean (red y=x);
+    a negative-binomial model predicts var = mean + alpha*mean^2. A single
+    global alpha is fit by regressing (var - mean) on mean^2 through the origin
+    and drawn as the trend — the panel-wide analogue of the per-sample alpha_s
+    that _ws_build_bg_model fits on the background tiles.
+    """
+    M = np.asarray(count_matrix, dtype=float)
+    if M.ndim != 2 or M.shape[1] < 2:
+        print(f"  [mean-variance] need >=2 columns, got shape {M.shape}; skipping.")
+        return
+    m = M.mean(axis=1)
+    v = M.var(axis=1, ddof=1)
+    keep = m > 0
+    m, v = m[keep], v[keep]
+    if m.size == 0:
+        print("  [mean-variance] no non-zero windows; skipping.")
+        return
+    m2 = m ** 2
+    denom = float(np.sum(m2 ** 2))
+    alpha = max(float(np.sum((v - m) * m2) / denom), 0.0) if denom > 0 else 0.0
+
+    fig, ax = plt.subplots(figsize=(7, 6))
+    ax.scatter(m, v, s=6, alpha=0.25, edgecolors="none", color="#3b6fb0",
+               label=f"windows (n={m.size:,})")
+    grid = np.geomspace(max(float(m.min()), 1e-3), float(m.max()), 200)
+    ax.plot(grid, grid, "r--", lw=1.5, label="Poisson (var = mean)")
+    ax.plot(grid, grid + alpha * grid ** 2, "k-", lw=1.5,
+            label=f"NB trend (α = {alpha:.3g})")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel(f"Per-window mean count  ({unit_label})")
+    ax.set_ylabel("Per-window variance")
+    ax.set_title(title)
+    ax.legend(fontsize=8, loc="upper left")
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    print(f"  mean-variance plot → {out_path}")
+
+
+# ── WS-E2: mean-variance diagnostic on raw test-sample window counts ──────────
+_ws_mv_df  = pd.DataFrame.from_dict(_ws_sample_counts, orient="index").T
+_ws_mv_sig = _ws_mv_df[_ws_mv_df.index.str.startswith("sig|")].fillna(0.0)
+_ws_mv_png = (Path(snakemake.output.within_sample_qc).parent
+              / "mean_variance_test_samples.png")
+_ws_mean_variance_plot(
+    _ws_mv_sig.to_numpy(), _ws_mv_png,
+    f"Window-count mean–variance across {len(samples)} test samples",
+    "signal windows, across samples")
 
 # ── WS-F: per-sample Sadeh background model ───────────────────────────────────
 _ws_bg_rids   = _ws_bg_df["region_id"].values
@@ -1390,14 +1577,31 @@ for sid in samples:
                     _sig_exp_count, _bg_exp_arr,
                     _alpha_s)
 
+        # proportion of enriched markers
+        _marker_enriched = _sig_cnt > _sig_exp_count
+        _n_marker_enriched = int(_marker_enriched.sum())
+        _n_markers = len(_sig_cnt)
+
+        _prop_marker_enriched = (
+            _n_marker_enriched / _n_markers
+            if _n_markers > 0 else np.nan
+        )
+
         _ws_rows.append({
             "sample": sid, "cell_type": _ct_ws,
             "log2FE":         _log2fe,           # sum-based, canonical
             "log2FE_median":  _log2fe_median,    # legacy, diagnostic only
             "beta_nb": _beta_nb, "p_nb": _p_nb,
+            # NB overdispersion actually used by the test (Var = mu + alpha*mu^2).
+            # Exported so the Poisson/dispersion crossover depth can be measured
+            # rather than assumed: depth stops buying power once mu >> 1/alpha.
+            "alpha_nb": _alpha_s,
             "q_nb": float("nan"), "excess": _excess,
             "contribution": float("nan"), "enriched": False,
             "low_n": _low_n, "n_sig_windows": len(_df_ct),
+            "n_marker_enriched": _n_marker_enriched,
+            "n_markers": _n_markers,
+            "prop_marker_enriched": _prop_marker_enriched,
         })
 
         # Stash the per-region driver info for WS-L.  Indexed by (sample, ct).
@@ -1477,27 +1681,40 @@ for sid in samples:
             _fake_cnt  = np.array(
                 [_cnts_s.get(_ws_bg_rids[i], 0) for i in _fake_idx], float)
             _fake_len  = _ws_bg_len_kb[_fake_idx]
-            _fake_dens = _fake_cnt / np.maximum(_fake_len, 1e-3)
-            _fake_exp  = np.array(
+            _fake_exp_dens = np.array(
                 [_ws_expected_density(_ws_bg_chr[i], int(_ws_bg_start[i]),
                                       _model_s)
                  for i in _fake_idx], float)
+            # Pool/sum-based log2FE — the SAME estimator as the canonical
+            # _log2fe_pool in the main enrichment loop (sum of observed counts
+            # vs sum of expected COUNTS = density × length).  The previous
+            # median-of-density form was biased NEGATIVE for sparse counts
+            # (median < mean) and further distorted by the density-scale _WS_EPS
+            # pseudocount (≈ the typical density itself), which pushed this null
+            # systematically below 0 and mis-flagged clean samples as GC-biased.
+            # Summing counts makes _WS_EPS negligible and removes both artefacts,
+            # so a well-calibrated background now centres this null on 0.
+            _fake_sum_obs = float(_fake_cnt.sum())
+            _fake_sum_exp = float(
+                (_fake_exp_dens * np.maximum(_fake_len, 1e-3)).sum())
             _perm_fes.append(float(np.log2(
-                (np.median(_fake_dens) + _WS_EPS)
-                / (np.median(_fake_exp)  + _WS_EPS))))
+                (_fake_sum_obs + _WS_EPS) / (_fake_sum_exp + _WS_EPS))))
     _med_perm = float(np.median(_perm_fes)) if _perm_fes else float("nan")
 
-    # Anti-signal: fixed random set of background windows
+    # Anti-signal: fixed random set of background windows.  Same pool/sum-based
+    # log2FE as the permuted null and the canonical _log2fe_pool (sum observed
+    # counts vs sum expected counts), so this negative control also centres on 0.
     _anti_idx    = _ws_rng.integers(0, len(_ws_bg_rids),
                                     size=min(500, len(_ws_bg_rids)))
-    _a_dens      = (np.array([_cnts_s.get(_ws_bg_rids[i], 0)
-                               for i in _anti_idx], float)
-                    / _ws_bg_len_kb[_anti_idx])
-    _a_exp       = np.array(
+    _a_cnt       = np.array([_cnts_s.get(_ws_bg_rids[i], 0)
+                             for i in _anti_idx], float)
+    _a_len       = _ws_bg_len_kb[_anti_idx]
+    _a_exp_dens  = np.array(
         [_ws_expected_density(_ws_bg_chr[i], int(_ws_bg_start[i]), _model_s)
          for i in _anti_idx], float)
     _anti_log2fe = float(np.log2(
-        (np.median(_a_dens) + _WS_EPS) / (np.median(_a_exp) + _WS_EPS)))
+        (float(_a_cnt.sum()) + _WS_EPS)
+        / (float((_a_exp_dens * np.maximum(_a_len, 1e-3)).sum()) + _WS_EPS)))
 
     _perm_flag = (abs(_med_perm) > _WS_PERM_THR
                   if np.isfinite(_med_perm) else False)
@@ -1515,7 +1732,17 @@ _n_perm_flagged = int(qc_ws_df["perm_flag"].sum())
 if _n_perm_flagged > 0:
     print(f"[Module 4] WARNING: {_n_perm_flagged}/{len(qc_ws_df)} samples "
           f"flagged by permuted-signature null — possible GC/length bias.")
-if _n_perm_flagged == len(samples) and len(samples) > 0:
+# "Every sample is flagged" is a COHORT statement. Under chunking `samples` is
+# one chunk, so applying the rule here would abort on a chunk that happens to
+# hold only flagged samples even when the cohort rate is well under 100% —
+# a stricter test than the single-job path ever applied. Defer to
+# module4_within_merge.py, which sees every chunk's qc rows at once and applies
+# the identical `all flagged` rule to the full cohort.
+if _STAGE == 'within':
+    if _n_perm_flagged == len(qc_ws_df) and len(qc_ws_df) > 0:
+        print("[Module 4] NOTE: all samples in THIS CHUNK are flagged; the "
+              "cohort-level abort is evaluated in merge_within_sample.")
+elif _n_perm_flagged == len(samples) and len(samples) > 0:
     raise RuntimeError(
         "[Module 4] ABORT: permuted-signature null fails for all samples. "
         "Likely systematic GC or length bias. "
@@ -1527,8 +1754,10 @@ _ws_out_dir.mkdir(parents=True, exist_ok=True)
 
 ws_df_out[[
     "sample", "cell_type", "log2FE", "log2FE_median", "beta_nb",
+    "alpha_nb",
     "p_nb", "q_nb", "excess", "contribution", "enriched",
-    "low_n", "n_sig_windows",
+    "low_n", "n_sig_windows","n_marker_enriched",
+    "n_markers","prop_marker_enriched"
 ]].to_csv(snakemake.output.within_sample_scores, sep="\t", index=False)
 
 qc_ws_df.to_csv(snakemake.output.within_sample_qc, sep="\t", index=False)
@@ -1795,7 +2024,10 @@ _ws_low_n_cts = {
 _fig_log2fe_ws, _ax_log2fe = plt.subplots(
     figsize=(max(8, len(_ws_ct_order) * 0.7), 5))
 _bp = _ax_log2fe.boxplot(
-    _ws_box_data, labels=_ws_ct_order,
+    # No labels= here — matplotlib >=3.9 renamed it to tick_labels and later
+    # versions dropped labels= entirely. Redundant anyway: set_xticklabels
+    # below already applies _ws_ct_order to the same default 1..N positions.
+    _ws_box_data,
     patch_artist=True, notch=False, sym=".",
     medianprops={"color": "black", "linewidth": 1.5},
     boxprops={"facecolor": "#AECDE8", "alpha": 0.8},
@@ -1813,8 +2045,9 @@ plt.tight_layout()
 
 # Group-coloured variant (page 2 — downstream reference only)
 _ws_grp_df = ws_df_out.merge(
-    meta[["sample_id", "group"]], left_on="sample", right_on="sample_id",
-    how="left")
+    meta[["sample_id", "group", "display_group"]],
+    left_on="sample", right_on="sample_id", how="left",
+)
 _n_ct_ws = len(_ws_ct_order)
 _fig_grp_ws, _axes_grp = plt.subplots(
     1, _n_ct_ws, figsize=(max(12, _n_ct_ws * 1.1), 5), sharey=True)
@@ -1823,8 +2056,8 @@ if _n_ct_ws == 1:
 _ws_jitter_rng = np.random.default_rng(7)
 for _ax_g, _ct_g in zip(_axes_grp, _ws_ct_order):
     _ct_sub = _ws_grp_df[_ws_grp_df["cell_type"] == _ct_g]
-    for _grp_g, _col_g in group_palette.items():
-        _vals_g = _ct_sub.loc[_ct_sub["group"] == _grp_g, "log2FE"].dropna()
+    for _grp_g, _col_g in group_colors.items():
+        _vals_g = _ct_sub.loc[_ct_sub["display_group"] == _grp_g, "log2FE"].dropna()
         if len(_vals_g) > 0:
             _jx = _ws_jitter_rng.uniform(-0.15, 0.15, size=len(_vals_g))
             _ax_g.scatter(_jx, _vals_g, color=_col_g, s=12, alpha=0.7,
@@ -1835,7 +2068,7 @@ for _ax_g, _ct_g in zip(_axes_grp, _ws_ct_order):
     _ax_g.set_xticks([])
 _handles_grp = [
     plt.Line2D([0], [0], marker="o", color=c, lw=0, label=g)
-    for g, c in group_palette.items()
+    for g, c in group_colors.items()
 ]
 _fig_grp_ws.legend(handles=_handles_grp, loc="upper right", fontsize=7)
 _fig_grp_ws.suptitle(
@@ -1882,29 +2115,70 @@ _ax_contrib.set_xticks(range(len(_ws_contrib_piv)))
 _ax_contrib.set_xticklabels(_sample_labels, rotation=45, fontsize=6,
                             ha="right", rotation_mode="anchor")
 
-# Optional: colour tick labels by group so the clinical reader can still
-# see Ctrl vs MS at a glance even without group-sorting. Comment out
-# the block below if you do not want this.
-_group_colors = {
-    "Ctrl":                      "#1f77b4",
-    "MS-Rituximab-Stable":       "#ff7f0e",
-    "MS-Rituximab-Progressive":  "#d62728",
-    "MS-New-RR":                 "#2ca02c",
-    "MS-New-PPMS":               "#9467bd",
-}
+# Colour tick labels by display_group using the shared group_colors palette.
+_sample_to_disp = meta.set_index("sample_id")["display_group"].to_dict()
 for _tick, _sid in zip(_ax_contrib.get_xticklabels(), _sample_labels):
-    _grp = next((g for g in _group_colors if g in _sid), None)
-    if _grp:
-        _tick.set_color(_group_colors[_grp])
+    _grp = _sample_to_disp.get(_sid)
+    if _grp and _grp in group_colors:
+        _tick.set_color(group_colors[_grp])
 
 _ax_contrib.set_xlabel("Samples (alphabetical, no group sorting)")
 _ax_contrib.legend(loc="upper right", fontsize=6, ncol=2)
 
 plt.tight_layout()   # called AFTER set_xticklabels so the bottom margin
                      # accommodates the rotated sample IDs
+
+# ── Second page: contributions from SIGNIFICANTLY ENRICHED tissues only ──────
+# The page above stacks every cell type, including ones not called enriched in
+# that sample.  Here we keep only (sample, cell_type) pairs with enriched=True,
+# then renormalise each sample's surviving contributions to sum to 1 so the bar
+# shows the composition *among the significant tissues*.  Samples with no
+# enriched tissue get an empty bar.
+_ws_enr_piv = (ws_df_out
+               .pivot(index="sample", columns="cell_type", values="enriched")
+               .reindex(index=_ws_contrib_piv.index,
+                        columns=_ws_contrib_piv.columns)
+               .fillna(False).astype(bool))
+_ws_contrib_sig = _ws_contrib_piv.where(_ws_enr_piv, 0.0)
+_ws_sig_tot     = _ws_contrib_sig.sum(axis=1)
+_ws_contrib_sig = _ws_contrib_sig.div(_ws_sig_tot.where(_ws_sig_tot > 0, 1.0),
+                                      axis=0)
+
+_fig_contrib_sig, _ax_contrib_sig = plt.subplots(
+    figsize=(max(10, len(_ws_contrib_sig) * 0.35), 6))
+_ws_bottom_sig = np.zeros(len(_ws_contrib_sig))
+for _ct_cb in _ws_ct_order:
+    if _ct_cb not in _ws_contrib_sig.columns:
+        continue
+    _vals_sig = _ws_contrib_sig[_ct_cb].values
+    _ax_contrib_sig.bar(range(len(_ws_contrib_sig)), _vals_sig,
+                        bottom=_ws_bottom_sig, color=_ws_cmap[_ct_cb],
+                        label=_ct_cb, width=1.0, edgecolor="none")
+    _ws_bottom_sig += _vals_sig
+
+_ax_contrib_sig.set_xlim(-0.5, len(_ws_contrib_sig) - 0.5)
+_ax_contrib_sig.set_ylim(0, 1)
+_ax_contrib_sig.set_ylabel("Fractional contribution (renormalised)")
+_ax_contrib_sig.set_title(
+    "Per-sample contributions — significantly enriched tissues only "
+    "(enriched = q_nb < 0.05)")
+_ax_contrib_sig.set_xticks(range(len(_ws_contrib_sig)))
+_ax_contrib_sig.set_xticklabels(_ws_contrib_sig.index.tolist(), rotation=45,
+                                fontsize=6, ha="right", rotation_mode="anchor")
+for _tick, _sid in zip(_ax_contrib_sig.get_xticklabels(),
+                       _ws_contrib_sig.index.tolist()):
+    _grp = _sample_to_disp.get(_sid)
+    if _grp and _grp in group_colors:
+        _tick.set_color(group_colors[_grp])
+_ax_contrib_sig.set_xlabel("Samples (alphabetical, no group sorting)")
+_ax_contrib_sig.legend(loc="upper right", fontsize=6, ncol=2)
+_fig_contrib_sig.tight_layout()
+
 with pdf_backend.PdfPages(snakemake.output.within_sample_contribution) as _pp_cb:
     _pp_cb.savefig(_fig_contrib_ws)
+    _pp_cb.savefig(_fig_contrib_sig)
 plt.close(_fig_contrib_ws)
+plt.close(_fig_contrib_sig)
 
 # QC panel: permuted-signature null + anti-signal scatter
 _fig_qc_ws, _axes_qc = plt.subplots(1, 2, figsize=(12, 5))
@@ -1915,7 +2189,8 @@ for _v in [_WS_PERM_THR, -_WS_PERM_THR]:
     _axes_qc[0].axvline(_v, color="red", ls="--", lw=1.2)
 _axes_qc[0].set_xlabel("Median permuted-signature log2FE")
 _axes_qc[0].set_title(
-    "Permuted-signature null\n(expect |x| < 0.2; tests GC/length bias)")
+    f"Permuted-signature null\n(expect |x| < {_WS_PERM_THR:g}; "
+    "tests GC/length bias)")
 
 _axes_qc[1].scatter(qc_ws_df["median_perm_log2FE"],
                     qc_ws_df["neg_ctrl_log2FE"],
@@ -1940,3 +2215,5 @@ print(
 )
 
 print("[Module 4] Done.")
+
+

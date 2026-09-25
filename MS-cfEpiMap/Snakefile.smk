@@ -10,7 +10,7 @@ Module 1 (RRE universe) must be built once before the main pipeline:
     snakemake --cores 4 --use-conda build_rre_universe
 """
 
-configfile: "config/config.yaml"
+configfile: workflow.basedir + "/config/config.yaml"
 
 # All relative paths in every rule file resolve under outdir.
 # Change outdir in config/config.yaml to redirect all output.
@@ -25,15 +25,29 @@ if "qc_include" in meta.columns:
 
 SAMPLES   = meta["sample_id"].tolist()
 SAMPLES_P = meta.loc[meta["sample_type"] == "plasma", "sample_id"].tolist()
+SAMPLE_FRAG_BED = dict(zip(meta["sample_id"], meta["fragment_bed"]))
 
-GROUPS = ["Ctrl", "NEW", "MS-Rituximab-Stable", "MS-Rituximab-Progressive"]
+# In-house group ordering: reference group first, then the MS sub-groups in the
+# order they are listed in config["groups"]["ms"]. External cohorts (Healthy,
+# Hepatocellular, Glioma, ...) are deliberately absent — they are not part of
+# the MS-vs-Ctrl design.
+CTRL_GROUP = config["groups"]["ctrl"]
+MS_GROUPS  = list(config["groups"]["ms"])
+RTX_GROUPS = list(config["groups"]["rituximab"])
+GROUPS     = [CTRL_GROUP] + MS_GROUPS
 
 CONTRASTS = [
     f"{c[0]}_vs_{c[1]}"
     for c in config["deseq2"]["contrasts"]
 ]
 
-CNS_CELL_TYPES = config["rre"]["cns_cell_types"]
+_CNS_MODE = config["rre"].get("cns_mode", "sc")
+if _CNS_MODE == "brain":
+    CNS_CELL_TYPES  = config["rre"].get("brain_cell_types", ["brain"])
+    _CNS_BEDS_KEY   = "brain_celltype_beds"
+else:
+    CNS_CELL_TYPES  = config["rre"]["cns_cell_types"]
+    _CNS_BEDS_KEY   = "cns_celltype_beds"
 
 # Only include RRE subsets whose BED file is non-empty
 def _rre_bed(subset):
@@ -46,7 +60,7 @@ def _rre_bed(subset):
         "gwas_proximal": config["rre"]["gwas_proximal_bed"],
     }
     for ct in CNS_CELL_TYPES:
-        mapping[f"cns_{ct}"] = config["rre"]["cns_celltype_beds"][ct]
+        mapping[f"cns_{ct}"] = config["rre"][_CNS_BEDS_KEY][ct]
     rel = mapping.get(subset, "")
     return os.path.join(outdir, rel) if rel else ""
 
@@ -78,7 +92,7 @@ rule all:
         # Module 2 — normalization
         "results/normalization/constitutive_scaling_factors.tsv",
         "results/normalization/anchor_counts.tsv",
-        expand("results/normalization/bigwigs/{sample}_anchnorm.bw", sample=SAMPLES),
+        #expand("results/normalization/bigwigs/{sample}_anchnorm.bw", sample=SAMPLES),
         "results/normalization/anchor_qc.pdf",
         # Module 3 — B cell index
         "results/bcell_qc/bci_scores.tsv",

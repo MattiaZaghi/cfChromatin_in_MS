@@ -32,7 +32,7 @@ rule make_bin_universe:
 rule count_bin_midpoints_per_sample:
     """Count midpoints overlapping genome bins for one sample."""
     input:
-        frags = lambda wc: f"{config['data']['frags_dir']}/{wc.sample}.bed",
+        frags = lambda wc: SAMPLE_FRAG_BED[wc.sample],
         bins  = "results/counts/bin_universe.bed",
     output:
         temp("results/counts/bins_per_sample/{sample}.counts"),

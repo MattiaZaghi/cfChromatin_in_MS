@@ -22,3 +22,15 @@ __pycache__/
 *.fastq.gz
 *.fq
 *.fq.gz
+
+# Generated marker/reference outputs
+tissue_markers_sadeh/
+tissue_markers_sadeh_brain_pb/
+tissue_markers_sadeh_pctcheck/
+tissue_markers_sadeh_stale/
+
+# Generated cache
+_cache_background_rate_counts/
+
+# Old/obsolete metadata
+MS-cfEpiMap/config/sample_metadata_old.tsv
