@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """
-Compute per-sample H3K27ac cfChIP-seq enrichment score.
+Compute a per-sample cfChIP-seq enrichment score.
 
 Enrichment score = (on_frags / on_bp) / (off_frags / off_bp)
 
 Fragment midpoints (not read pairs) are intersected against
 chromHMM on-target and off-target BED files.
-On-target : H3K27ac-active in >= 95% of 131 Roadmap samples
+On-target : mark-active in >= 95% of Epimap samples
 Off-target: never active in any sample, > 10 kb from any on-target site
+
+The caller picks the reference pair for the sample's mark; --mark is recorded
+in the output so the aggregate table can be stratified downstream. Scores are
+only comparable within a mark.
 
 Usage:
     python compute_enrichment_score.py \
@@ -15,6 +19,7 @@ Usage:
         --ontarget  ref_files/chromhmm_ontarget_H3K27ac.bed \
         --offtarget ref_files/chromhmm_offtarget_H3K27ac.bed \
         --sample    sample_id \
+        --mark      H3K27ac \
         --out       results/enrichment/sample_enrichment.tsv
 """
 
@@ -63,6 +68,9 @@ def main():
     parser.add_argument("--offtarget", required=True,
                         help="chromHMM off-target BED")
     parser.add_argument("--sample",    required=True, help="Sample ID")
+    parser.add_argument("--mark",      default="H3K27ac",
+                        help="Enrichment mark these reference BEDs belong to "
+                             "(from the samplesheet 'enrichment_mark' column)")
     parser.add_argument("--out",       required=True, help="Output TSV path")
     args = parser.parse_args()
 
@@ -92,10 +100,11 @@ def main():
         os.makedirs(out_dir, exist_ok=True)
 
     with open(args.out, "w") as fh:
-        fh.write("sample_id\ton_frags\ton_bp\toff_frags\toff_bp\tenrichment_score\n")
-        fh.write(f"{args.sample}\t{on_frags}\t{on_bp}\t{off_frags}\t{off_bp}\t{score}\n")
+        fh.write("sample_id\tmark\ton_frags\ton_bp\toff_frags\toff_bp\tenrichment_score\n")
+        fh.write(f"{args.sample}\t{args.mark}\t{on_frags}\t{on_bp}\t"
+                 f"{off_frags}\t{off_bp}\t{score}\n")
 
-    print(f"[{args.sample}] Enrichment score = {score}  "
+    print(f"[{args.sample}] {args.mark} enrichment score = {score}  "
           f"(on: {on_frags:,} frags / {on_bp:,} bp; "
           f"off: {off_frags:,} frags / {off_bp:,} bp)",
           flush=True)

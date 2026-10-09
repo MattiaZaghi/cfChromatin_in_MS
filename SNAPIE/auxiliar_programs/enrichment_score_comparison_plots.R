@@ -1,7 +1,8 @@
 #!/usr/bin/env Rscript
 # enrichment_score_comparison_plots.R
 #
-# Three comparison boxplots of H3K27ac enrichment scores across the cohort:
+# Three comparison boxplots of enrichment scores across the cohort, on one page
+# per enrichment mark:
 #   1. By protocol version  (V1 / V2 / V3 / V4 / 1D — parsed from sample IDs)
 #   2. By sample type       (Plasma / CSF — parsed from sample IDs)
 #   3. By disease group     (Ctrl / MS-New / MS-Rit-Stable / … — parsed from IDs)
@@ -9,10 +10,12 @@
 # Protocol version and sample type are inferred from the sample ID naming
 # convention: {PatientID}-{P|C}-{Disease…}-{V1|V2|V3|V4}-{Amount}
 #
-# A Kruskal-Wallis p-value is annotated on each plot.
+# A Kruskal-Wallis p-value is annotated on each plot, computed within a mark:
+# the on/off-target region sets differ per mark, so a test pooling marks would
+# mostly measure the region sets rather than the biology.
 #
 # Args:
-#   1  aggregate_tsv  — TSV with columns: sample_id, enrichment_score (+ others)
+#   1  aggregate_tsv  — TSV with columns: sample_id, mark, enrichment_score (+ others)
 #   2  output_pdf     — output PDF path
 
 suppressPackageStartupMessages({
@@ -33,6 +36,9 @@ dat <- read.table(agg_tsv, header = TRUE, sep = "\t",
                   stringsAsFactors = FALSE, comment.char = "") %>%
   mutate(enrichment_score = suppressWarnings(as.numeric(enrichment_score))) %>%
   filter(!is.na(enrichment_score))
+
+# Aggregates written before the score became mark-aware have no 'mark' column.
+if (!"mark" %in% names(dat)) dat$mark <- "H3K27ac"
 
 if (nrow(dat) == 0) {
   message("No valid enrichment scores. Writing blank PDF.")
@@ -117,33 +123,6 @@ kw_subtitle <- function(data, group_col) {
   }, error = function(e) "")
 }
 
-# ── Plot 1: by protocol version ───────────────────────────────────────────────
-p1 <- ggplot(dat, aes(x = protocol, y = enrichment_score, fill = protocol)) +
-  geom_boxplot(outlier.shape = NA, alpha = 0.65, linewidth = 0.45, width = 0.55) +
-  geom_jitter(width = 0.18, size = 1.7, alpha = 0.75, stroke = 0.3, color = "grey25") +
-  scale_fill_brewer(palette = "Set1") +
-  labs(
-    title    = "Enrichment score by protocol version",
-    subtitle = kw_subtitle(dat, "protocol"),
-    x        = "Protocol",
-    y        = "Enrichment score\n(on-target / off-target density)"
-  ) +
-  theme_box
-
-# ── Plot 2: by sample type ────────────────────────────────────────────────────
-p2 <- ggplot(dat, aes(x = sample_type, y = enrichment_score, fill = sample_type)) +
-  geom_boxplot(outlier.shape = NA, alpha = 0.65, linewidth = 0.45, width = 0.45) +
-  geom_jitter(width = 0.15, size = 1.7, alpha = 0.75, stroke = 0.3, color = "grey25") +
-  scale_fill_brewer(palette = "Set2") +
-  labs(
-    title    = "Enrichment score by sample type",
-    subtitle = kw_subtitle(dat, "sample_type"),
-    x        = "Sample type",
-    y        = "Enrichment score\n(on-target / off-target density)"
-  ) +
-  theme_box
-
-# ── Plot 3: by disease group ───────────────────────────────────────────────────
 dis_pal <- c(
   "Ctrl"               = "#4DAF4A",
   "MS-New-RR"          = "#377EB8",
@@ -153,23 +132,55 @@ dis_pal <- c(
   "Mix"                = "#999999",
   "Unknown"            = "#CCCCCC"
 )
-dis_pal_use <- dis_pal[levels(dat$disease)]
 
-p3 <- ggplot(dat, aes(x = disease, y = enrichment_score, fill = disease)) +
-  geom_boxplot(outlier.shape = NA, alpha = 0.65, linewidth = 0.45, width = 0.55) +
-  geom_jitter(width = 0.18, size = 1.7, alpha = 0.75, stroke = 0.3, color = "grey25") +
-  scale_fill_manual(values = dis_pal_use) +
-  labs(
-    title    = "Enrichment score by disease group",
-    subtitle = kw_subtitle(dat, "disease"),
-    x        = "Disease group",
-    y        = "Enrichment score\n(on-target / off-target density)"
-  ) +
-  theme_box
+# ── One page of three boxplots for a single mark ──────────────────────────────
+# Each page gets its own y-axis scale and its own Kruskal-Wallis tests, because
+# scores are only comparable within a mark.
+mark_page <- function(d, mark) {
+  d$protocol    <- droplevels(d$protocol)
+  d$sample_type <- droplevels(d$sample_type)
+  d$disease     <- droplevels(d$disease)
+  y_lab <- "Enrichment score\n(on-target / off-target density)"
 
-# ── Combine and save ──────────────────────────────────────────────────────────
+  p1 <- ggplot(d, aes(x = protocol, y = enrichment_score, fill = protocol)) +
+    geom_boxplot(outlier.shape = NA, alpha = 0.65, linewidth = 0.45, width = 0.55) +
+    geom_jitter(width = 0.18, size = 1.7, alpha = 0.75, stroke = 0.3, color = "grey25") +
+    scale_fill_brewer(palette = "Set1") +
+    labs(title    = sprintf("%s - by protocol version", mark),
+         subtitle = kw_subtitle(d, "protocol"),
+         x = "Protocol", y = y_lab) +
+    theme_box
+
+  p2 <- ggplot(d, aes(x = sample_type, y = enrichment_score, fill = sample_type)) +
+    geom_boxplot(outlier.shape = NA, alpha = 0.65, linewidth = 0.45, width = 0.45) +
+    geom_jitter(width = 0.15, size = 1.7, alpha = 0.75, stroke = 0.3, color = "grey25") +
+    scale_fill_brewer(palette = "Set2") +
+    labs(title    = sprintf("%s - by sample type", mark),
+         subtitle = kw_subtitle(d, "sample_type"),
+         x = "Sample type", y = y_lab) +
+    theme_box
+
+  p3 <- ggplot(d, aes(x = disease, y = enrichment_score, fill = disease)) +
+    geom_boxplot(outlier.shape = NA, alpha = 0.65, linewidth = 0.45, width = 0.55) +
+    geom_jitter(width = 0.18, size = 1.7, alpha = 0.75, stroke = 0.3, color = "grey25") +
+    scale_fill_manual(values = dis_pal[levels(d$disease)]) +
+    labs(title    = sprintf("%s - by disease group  (n = %d)", mark, nrow(d)),
+         subtitle = kw_subtitle(d, "disease"),
+         x = "Disease group", y = y_lab) +
+    theme_box
+
+  plot_grid(p1, p2, p3, nrow = 1, align = "h", axis = "tb")
+}
+
+# ── Render one page per mark ───────────────────────────────────────────────────
 dir.create(dirname(out_pdf), recursive = TRUE, showWarnings = FALSE)
 pdf(out_pdf, width = 24, height = 10)
-print(plot_grid(p1, p2, p3, nrow = 1, align = "h", axis = "tb"))
+for (m in sort(unique(dat$mark))) {
+  d <- dat[dat$mark == m, , drop = FALSE]
+  message(sprintf("[%s] n=%d  median=%.2f  range=%.2f–%.2f",
+                  m, nrow(d), median(d$enrichment_score),
+                  min(d$enrichment_score), max(d$enrichment_score)))
+  print(mark_page(d, m))
+}
 dev.off()
 message("Saved: ", out_pdf)

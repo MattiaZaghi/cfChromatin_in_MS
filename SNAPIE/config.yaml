@@ -44,14 +44,48 @@ smooth_length: "300"
 # External published fragment BED files (Sadeh et al., GSE accession)
 external_bed_dir: "/date/gcb/gcb_MZ/Analysis/BED/H3K27ac"
 
-# H3K27ac enrichment score (chromHMM on/off-target reference BEDs)
+# Enrichment score (chromHMM on/off-target reference BEDs)
 # Build once with: python auxiliar_programs/build_chromhmm_reference.py
 #   --chromhmm_dir  /path/to/roadmap_chromhmm_beds
 #   --chrom_sizes   /home/mattia/Genomes/hg19/hg19.chrom.sizes
 #   --blacklist     /home/mattia/Genomes/hg19/hg19-blacklist.v2.bed
 #   --out_dir       ref_files  --threads 8
+#
+# Fallback pair, used for any mark absent from enrichment_targets below and
+# for the external published cohort (which is H3K27ac-only).
 chromhmm_ontarget:  "ref_files/chromhmm_ontarget_H3K27ac.bed"
 chromhmm_offtarget: "ref_files/chromhmm_offtarget_H3K27ac.bed"
+
+# Per-mark reference regions, keyed on the samplesheet 'enrichment_mark' column.
+# Region counts match the source publication exactly:
+#   H3K27ac   1,651 on  /  219,809 off
+#   H3K4me3   8,174 on  /  281,426 off
+enrichment_targets:
+  H3K27ac:
+    ontarget:  "ref_files/chromhmm_ontarget_H3K27ac.bed"
+    offtarget: "ref_files/chromhmm_offtarget_H3K27ac.bed"
+  H3K4me3:
+    ontarget:  "ref_files/chromhmm_ontarget_H3K4me3.bed"
+    offtarget: "ref_files/chromhmm_offtarget_H3K4me3.bed"
+
+# Per-mark QC cut-offs. Applied independently within each mark.
+#
+# The two marks sit on comparable score scales: against like-for-like libraries
+# (Ctrl V4) H3K27ac runs median 14.4 / max 38.1 and H3K4me3 median 22.7 /
+# max 37.1, which is why the source publication lands on two near-identical
+# cut-offs (8.5 / 8.7). 7 is kept here for both, as previously pinned.
+#
+# Calibration anchors measured on this cohort, on the H3K4me3 region set:
+#   failed libraries              0.62 - 0.69   (depleted, below the null of 1)
+#   H3K27ac libraries, wrong mark 6.5  - 12.4   (generic TSS capture)
+#   true H3K4me3 libraries        4.2  - 37.1
+qc_thresholds:
+  H3K27ac:
+    enrichment: 7
+    fragments:  1000000
+  H3K4me3:
+    enrichment: 7
+    fragments:  1000000
 
 # Meta-coverage plots (cfChIP-seq Sadeh style: TSS + Enhancer panels)
 housekeeping_promoters_bed: "ref_files/housekeeping_promoters.bed"

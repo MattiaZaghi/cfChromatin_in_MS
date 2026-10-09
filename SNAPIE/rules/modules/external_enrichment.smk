@@ -14,9 +14,12 @@ import glob as _glob
 import os as _os
 
 _EXT_BED_DIR = config.get('external_bed_dir', '/date/gcb/gcb_MZ/Analysis/BED/H3K27ac')
-_ENRICH_ON   = config.get('chromhmm_ontarget',  'ref_files/chromhmm_ontarget_H3K27ac.bed')
-_ENRICH_OFF  = config.get('chromhmm_offtarget', 'ref_files/chromhmm_offtarget_H3K27ac.bed')
 _OUT         = config['outputFolder']
+
+# The published cohort is H3K27ac only, so this module is pinned to that mark
+# rather than following the samplesheet.
+_EXT_MARK              = 'H3K27ac'
+_ENRICH_ON, _ENRICH_OFF = enrichment_refs(_EXT_MARK)
 
 # Auto-discover all GSM*.bed files in the external directory
 _EXT_BED_FILES = sorted(_glob.glob(_os.path.join(_EXT_BED_DIR, 'GSM*.bed')))
@@ -42,7 +45,8 @@ rule compute_external_enrichment_score:
     output:
         tsv = _OUT + "/external_enrichment/{ext_sample}_enrichment.tsv"
     params:
-        sample = "{ext_sample}"
+        sample = "{ext_sample}",
+        mark   = _EXT_MARK
     shell:
         """
         mkdir -p $(dirname {output.tsv})
@@ -51,6 +55,7 @@ rule compute_external_enrichment_score:
             --ontarget  {input.ontarget} \
             --offtarget {input.offtarget} \
             --sample    {params.sample} \
+            --mark      {params.mark} \
             --out       {output.tsv}
         """
 

@@ -1,9 +1,13 @@
 """
-H3K27ac cfChIP-seq enrichment score module.
+cfChIP-seq enrichment score module.
 
 Computes per-sample enrichment = (on-target density) / (off-target density)
-where on/off-target regions come from chromHMM 15-state Roadmap Epigenomics
-annotations (build_chromhmm_reference.py, run once before the pipeline).
+where on/off-target regions come from the 18-state Epimap chromHMM
+segmentation (build_chromhmm_reference.py, run once before the pipeline).
+
+The reference pair is chosen per sample from the samplesheet's
+'enrichment_mark' column, so H3K4me3 libraries are scored against the H3K4me3
+region set and H3K27ac libraries against the H3K27ac one.
 
 Rules:
   compute_enrichment_score   — per sample, uses fragment midpoints
@@ -11,27 +15,26 @@ Rules:
   enrichment_score_plot       — per-sample ECDF plot with knee-point
 """
 
-_ENRICH_ON  = config.get('chromhmm_ontarget',  'ref_files/chromhmm_ontarget_H3K27ac.bed')
-_ENRICH_OFF = config.get('chromhmm_offtarget', 'ref_files/chromhmm_offtarget_H3K27ac.bed')
-_OUT        = config['outputFolder']
+_OUT = config['outputFolder']
 
 
 rule compute_enrichment_score:
     """
-    Compute H3K27ac enrichment score for one sample.
+    Compute the enrichment score for one sample against its own mark's regions.
     Score = (on_frags / on_bp) / (off_frags / off_bp)
     Uses fragment midpoints (bedtools intersect) against chromHMM BEDs.
     """
     conda: "envs/qc.yaml"
     input:
         frag_bed  = _OUT + "/frags/{sample}.bed",
-        ontarget  = _ENRICH_ON,
-        offtarget = _ENRICH_OFF,
+        ontarget  = lambda wc: enrichment_refs(sample_mark(wc.sample))[0],
+        offtarget = lambda wc: enrichment_refs(sample_mark(wc.sample))[1],
         script    = "auxiliar_programs/compute_enrichment_score.py"
     output:
         tsv = _OUT + "/enrichment/{sample}_enrichment.tsv"
     params:
-        sample = "{sample}"
+        sample = "{sample}",
+        mark   = lambda wc: sample_mark(wc.sample)
     shell:
         """
         mkdir -p $(dirname {output.tsv})
@@ -40,6 +43,7 @@ rule compute_enrichment_score:
             --ontarget  {input.ontarget} \
             --offtarget {input.offtarget} \
             --sample    {params.sample} \
+            --mark      {params.mark} \
             --out       {output.tsv}
         """
 
@@ -74,11 +78,11 @@ rule aggregate_enrichment_scores:
 
 rule enrichment_score_comparison_plots:
     """
-    Cohort-level comparison boxplots of H3K27ac enrichment scores:
+    Cohort-level comparison boxplots of enrichment scores, one page per mark:
       - By protocol version (V1/V2/V3/V4/1D — inferred from sample IDs)
       - By sample type (Plasma / CSF — inferred from sample IDs)
       - By disease group (Ctrl / MS-New / MS-Rit-Stable / …)
-    Kruskal-Wallis p-value annotated on each panel.
+    Kruskal-Wallis p-value annotated on each panel, computed within a mark.
     Output: reports/enrichment/enrichment_comparison_plots.pdf
     """
     conda: "envs/r_plots_dplyr.yaml"
@@ -101,7 +105,7 @@ rule enrichment_score_comparison_plots:
 rule enrichment_score_plot:
     """
     Per-sample enrichment score QC plot.
-    Shows ECDF of all samples with:
+    Shows the ECDF of all samples sharing this sample's mark, with:
       - current sample highlighted (red dot + label)
       - quantile dotted lines Q10/Q25/Q50/Q75/Q90
       - knee-point of the distribution marked (green line)

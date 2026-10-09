@@ -5,7 +5,10 @@ import os
 from pathlib import Path
 
 # ─── Sample list ──────────────────────────────────────────────────────────────
+DEFAULT_MARK = 'H3K27ac'
+
 SAMPLES = []
+SAMPLE_MARK = {}
 if config.get('samplesheet'):
     samplesheet_path = Path(config['samplesheet'])
     if samplesheet_path.exists():
@@ -15,6 +18,7 @@ if config.get('samplesheet'):
                 sid = row.get('sampleId') or row.get('sample') or row.get('sample_id')
                 if sid:
                     SAMPLES.append(sid)
+                    SAMPLE_MARK[sid] = (row.get('enrichment_mark') or DEFAULT_MARK).strip()
     else:
         print(f"Warning: samplesheet {samplesheet_path} not found; SAMPLES empty")
 else:
@@ -22,6 +26,29 @@ else:
 
 # Expose sample list to rules that need it (e.g. fragle_ct_estimation)
 config['_samples_'] = SAMPLES
+# Expose the per-sample enrichment mark so the enrichment score and QC rules
+# can pick the matching chromHMM reference BEDs and cut-offs.
+config['_sample_mark_'] = SAMPLE_MARK
+
+
+def enrichment_refs(mark):
+    """(ontarget, offtarget) chromHMM BEDs for one enrichment mark.
+
+    Falls back to the single global chromhmm_ontarget/offtarget pair for any
+    mark not listed under enrichment_targets, which keeps pre-existing configs
+    (and the H3K27ac-only external cohort) working unchanged.
+    """
+    entry = config.get('enrichment_targets', {}).get(mark, {})
+    return (
+        entry.get('ontarget',
+                  config.get('chromhmm_ontarget', 'ref_files/chromhmm_ontarget_H3K27ac.bed')),
+        entry.get('offtarget',
+                  config.get('chromhmm_offtarget', 'ref_files/chromhmm_offtarget_H3K27ac.bed')),
+    )
+
+
+def sample_mark(sample):
+    return config.get('_sample_mark_', {}).get(sample, DEFAULT_MARK)
 
 # ─── Include rule modules ──────────────────────────────────────────────────────
 # Preprocessing
@@ -133,13 +160,22 @@ UNIQUE_FRAGS = expand(OUT + "/frags/{sample}/{sample}_unique_frags.csv", sample=
 META_PLOTS    = expand(OUT + "/reports/meta_plots/{sample}_housekeeping_meta.pdf", sample=SAMPLES)
 HK_PROM_META  = expand(OUT + "/reports/qc/hk_meta/{sample}_hk_promoters_meta.pdf", sample=SAMPLES)
 
-# Enrichment score targets — only added when chromHMM reference BEDs exist
-_ENRICH_ON_PATH  = config.get('chromhmm_ontarget',  'ref_files/chromhmm_ontarget_H3K27ac.bed')
-_ENRICH_OFF_PATH = config.get('chromhmm_offtarget', 'ref_files/chromhmm_offtarget_H3K27ac.bed')
-_ENRICHMENT_AVAILABLE = (
-    os.path.exists(_ENRICH_ON_PATH) and os.path.getsize(_ENRICH_ON_PATH) > 0 and
-    os.path.exists(_ENRICH_OFF_PATH) and os.path.getsize(_ENRICH_OFF_PATH) > 0
-)
+# Enrichment score targets — require a usable reference pair for EVERY mark the
+# samplesheet actually uses, so a missing H3K4me3 BED disables the block loudly
+# instead of silently scoring H3K4me3 libraries against H3K27ac regions.
+def _usable(path):
+    return os.path.exists(path) and os.path.getsize(path) > 0
+
+_MARKS_IN_USE = sorted(set(SAMPLE_MARK.values())) or [DEFAULT_MARK]
+_MISSING_REFS = {
+    m: [p for p in enrichment_refs(m) if not _usable(p)]
+    for m in _MARKS_IN_USE
+}
+_MISSING_REFS = {m: p for m, p in _MISSING_REFS.items() if p}
+for _m, _paths in _MISSING_REFS.items():
+    print(f"Warning: enrichment reference BEDs missing/empty for mark {_m}: "
+          f"{', '.join(_paths)} — enrichment score targets disabled")
+_ENRICHMENT_AVAILABLE = not _MISSING_REFS
 ENRICHMENT_PLOTS        = expand(OUT + "/reports/enrichment/{sample}_enrichment_score.pdf", sample=SAMPLES)
 ENRICHMENT_COMPARISON   = OUT + "/reports/enrichment/enrichment_comparison_plots.pdf"
 ENRICHMENT_CROSS_COMP   = OUT + "/reports/enrichment/enrichment_cross_comparison.pdf"

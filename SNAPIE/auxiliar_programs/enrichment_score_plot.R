@@ -2,15 +2,19 @@
 # enrichment_score_plot.R
 #
 # Per-sample enrichment score QC plot.
-# Shows the sorted distribution of enrichment scores across all samples
-# (empirical CDF), with the current sample highlighted, quantile reference
-# lines, and the knee-point of the distribution marked.
+# Shows the sorted distribution of enrichment scores (empirical CDF) across all
+# samples sharing this sample's enrichment mark, with the current sample
+# highlighted, quantile reference lines, and the knee-point marked.
+#
+# The ECDF, quantiles and knee are restricted to one mark on purpose: on- and
+# off-target region sets differ per mark, so scores from different marks are on
+# different scales and pooling them would place a sample at a meaningless rank.
 #
 # X-axis: enrichment score value (used as cutoff threshold)
 # Y-axis: cumulative fraction of samples at or below that score
 #
 # Args:
-#   1  aggregate_tsv  — TSV with columns sample_id, enrichment_score (all samples)
+#   1  aggregate_tsv  — TSV with columns sample_id, mark, enrichment_score
 #   2  sample_id      — ID of the sample to highlight
 #   3  output_pdf     — Path for the output PDF
 
@@ -35,7 +39,27 @@ dat <- read.table(agg_tsv, header = TRUE, sep = "\t",
 dat <- dat %>%
   filter(!is.na(enrichment_score), enrichment_score != "NA") %>%
   mutate(enrichment_score = as.numeric(enrichment_score)) %>%
-  filter(!is.na(enrichment_score)) %>%
+  filter(!is.na(enrichment_score))
+
+# ── Restrict to this sample's mark ───────────────────────────────────────────
+# Aggregates written before the score became mark-aware have no 'mark' column;
+# those are all H3K27ac.
+if (!"mark" %in% names(dat)) dat$mark <- "H3K27ac"
+
+this_mark <- unique(dat$mark[dat$sample_id == sample_id])
+if (length(this_mark) == 1) {
+  dat <- dat[dat$mark == this_mark, , drop = FALSE]
+} else {
+  # Sample absent from the aggregate: keep every row so the rule still yields a
+  # PDF, and say so rather than silently ranking against a mixture of marks.
+  this_mark <- paste(sort(unique(dat$mark)), collapse = " + ")
+  message("Sample ", sample_id, " not found in ", agg_tsv,
+          "; plotting all marks pooled (", this_mark, ")")
+}
+message(sprintf("%s: ranking against %d %s sample(s)",
+                sample_id, nrow(dat), this_mark))
+
+dat <- dat %>%
   arrange(enrichment_score) %>%
   mutate(
     rank     = seq_len(n()),
@@ -133,13 +157,15 @@ p <- ggplot(dat, aes(x = enrichment_score, y = fraction)) +
   ) +
 
   labs(
-    title   = sprintf("H3K27ac Enrichment Score — %s", sample_id),
-    x       = "Enrichment Score  (on-target density / off-target density)",
-    y       = "Cumulative fraction of samples"
+    title    = sprintf("%s Enrichment Score - %s", this_mark, sample_id),
+    subtitle = sprintf("Ranked against %d %s sample(s)", nrow(dat), this_mark),
+    x        = "Enrichment Score  (on-target density / off-target density)",
+    y        = "Cumulative fraction of samples"
   ) +
   theme_bw(base_size = 22) +
   theme(
     plot.title    = element_text(face = "bold", size = 22),
+    plot.subtitle = element_text(size = 17, colour = "grey40"),
     legend.position = c(0.82, 0.25),
     legend.background = element_rect(fill = "white", color = "grey80"),
     legend.title  = element_text(size = 20),

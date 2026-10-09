@@ -3,6 +3,10 @@
 #
 # Cross-cohort H3K27ac cfChIP-seq enrichment score comparison.
 #
+# H3K27ac only: the published cohort has no other mark, and scores from a
+# different mark are computed against a different on/off-target region set, so
+# internal non-H3K27ac samples are dropped rather than plotted on this axis.
+#
 # Panel 1 — Protocol comparison (primary):
 #   Internal samples broken down by protocol version (V1/V2/V3/V4/1D) vs
 #   all external published samples collapsed into one "Literature (Baca et al.)"
@@ -42,6 +46,17 @@ read_scores <- function(path, dataset_label) {
 
 int_dat <- read_scores(int_tsv, "Internal")
 ext_dat <- read_scores(ext_tsv, "External")
+
+# The published cohort is H3K27ac only, so restrict the internal side to the
+# same mark: an H3K4me3 score is computed against a different region set and
+# cannot be placed on this axis.
+if ("mark" %in% names(int_dat)) {
+  n_before <- nrow(int_dat)
+  int_dat  <- int_dat[int_dat$mark == "H3K27ac", , drop = FALSE]
+  if (nrow(int_dat) < n_before)
+    message(sprintf("Dropped %d non-H3K27ac internal sample(s); external cohort is H3K27ac only",
+                    n_before - nrow(int_dat)))
+}
 
 # ── Parse internal metadata ───────────────────────────────────────────────────
 parse_internal_protocol <- function(id) {
@@ -171,8 +186,9 @@ p1 <- ggplot(proto_combined,
   scale_fill_manual(values = res1$pal) +
   labs(
     title    = "Enrichment score: internal protocols vs. Literature (Baca et al.)",
-    subtitle = kw_subtitle(proto_combined$enrichment_score,
-                           as.character(proto_combined$group)),
+    subtitle = paste0("H3K27ac only  |  ",
+                      kw_subtitle(proto_combined$enrichment_score,
+                                  as.character(proto_combined$group))),
     x        = NULL,
     y        = "Enrichment score  (on-target / off-target density)"
   ) +
